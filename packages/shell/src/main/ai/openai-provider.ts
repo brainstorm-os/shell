@@ -56,6 +56,9 @@ export type OpenAiProviderConfig = {
 	defaultModel: string;
 	defaultMaxTokens?: number;
 	getApiKey: () => Promise<string | null> | string | null;
+	/** `false` for a keyless endpoint (local LM Studio / vLLM): a missing key
+	 *  then sends no `Authorization` header instead of failing closed. */
+	requireApiKey?: boolean;
 	http: OpenAiHttp;
 };
 
@@ -67,6 +70,20 @@ type OpenAiResponse = {
 	model?: string;
 	usage?: { prompt_tokens?: number; completion_tokens?: number };
 };
+
+const REDACTED = "[redacted]";
+
+/** A user-added endpoint is arbitrary code and may echo the request headers
+ *  back — in an error body OR in a 2xx completion. Every string from it that
+ *  reaches the app passes through here, covering the raw key and the escaped
+ *  forms an echo would take (JSON-quoted, URL-encoded). */
+export function scrubApiKey(text: string, apiKey: string | null): string {
+	if (!apiKey) return text;
+	let out = text;
+	const forms = new Set([apiKey, JSON.stringify(apiKey).slice(1, -1), encodeURIComponent(apiKey)]);
+	for (const form of forms) if (form) out = out.split(form).join(REDACTED);
+	return out;
+}
 
 function completionsUrl(baseUrl: string): string {
 	return `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
@@ -80,7 +97,7 @@ export function createOpenAiProvider(config: OpenAiProviderConfig): ModelProvide
 		id,
 		async generate(req: AiGenerateRequest, signal?: AbortSignal): Promise<AiGenerateResult> {
 			const apiKey = await config.getApiKey();
-			if (!apiKey) {
+			if (!apiKey && config.requireApiKey !== false) {
 				throw new AiServiceError(
 					"Unavailable",
 					`ai.generate: no ${label} API key is configured (add one in Settings → AI)`,
@@ -100,21 +117,23 @@ export function createOpenAiProvider(config: OpenAiProviderConfig): ModelProvide
 			try {
 				res = await config.http({
 					url,
-					headers: { Authorization: `Bearer ${apiKey}` },
+					headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
 					bodyJson: body,
 					...(signal ? { signal } : {}),
 				});
 			} catch (error) {
 				throw new AiServiceError(
 					"Unavailable",
-					`${label} API unreachable: ${(error as Error).message}`,
+					scrubApiKey(`${label} API unreachable: ${(error as Error).message}`, apiKey),
 				);
 			}
 
 			if (res.status < 200 || res.status >= 300) {
+				// Scrub BEFORE slicing, or a key straddling the cut survives in part.
+				const body = scrubApiKey(res.text, apiKey).slice(0, 200);
 				throw new AiServiceError(
 					"Unavailable",
-					`${label} API returned HTTP ${res.status}${res.text ? `: ${res.text.slice(0, 200)}` : ""}`,
+					`${label} API returned HTTP ${res.status}${body ? `: ${body}` : ""}`,
 				);
 			}
 
@@ -133,10 +152,10 @@ export function createOpenAiProvider(config: OpenAiProviderConfig): ModelProvide
 
 			const usage = buildUsage(parsed.usage?.prompt_tokens, parsed.usage?.completion_tokens);
 			return {
-				content,
+				content: scrubApiKey(content, apiKey),
 				provider: id,
-				model: parsed.model ?? model,
-				...(choice?.finish_reason ? { finishReason: choice.finish_reason } : {}),
+				model: scrubApiKey(parsed.model ?? model, apiKey),
+				...(choice?.finish_reason ? { finishReason: scrubApiKey(choice.finish_reason, apiKey) } : {}),
 				...(usage ? { usage } : {}),
 			};
 		},

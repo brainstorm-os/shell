@@ -31,6 +31,10 @@ export type ShortcutSetupOptions = {
 	 *  Code Editor) keeps Ctrl+Tab for its own in-app tab cycling. Defaults to
 	 *  a value that always intercepts when omitted (tests / legacy callers). */
 	getWindowCount?: () => number;
+	/** Runs a `routesToWindow` action (split view) against the renderer the
+	 *  chord fired in. Returns false when there was nothing to act on, so the
+	 *  chord falls through to the app. Absent → those chords always fall through. */
+	runWindowAction?: (id: string, webContentsId: number) => boolean;
 };
 
 const SWITCH_WINDOW = "shell/switch-window";
@@ -90,6 +94,11 @@ export function createShortcutSetup(options: ShortcutSetupOptions): ShortcutSetu
 			if ((id === SWITCH_WINDOW || id === SWITCH_WINDOW_PREV) && getWindowCount() < 2) {
 				return;
 			}
+			const action = registry.shellBindings().find((b) => b.action.id === id)?.action;
+			if (action?.routesToWindow) {
+				if (options.runWindowAction?.(id, webContents.id)) event.preventDefault();
+				return;
+			}
 			if (id === SWITCH_WINDOW || id === SWITCH_WINDOW_PREV) switcherOpen = true;
 			event.preventDefault();
 			// Shell actions that open a UI on the dashboard (launcher,
@@ -97,7 +106,6 @@ export function createShortcutSetup(options: ShortcutSetupOptions): ShortcutSetu
 			// fired from an app window. Silent actions like
 			// `shell/appearance.toggle` set `surfacesOnDashboard: false`
 			// and must NOT yank focus away from the active app window.
-			const action = registry.shellBindings().find((b) => b.action.id === id)?.action;
 			const surfaces = action?.surfacesOnDashboard !== false;
 			if (surfaces && dashboard.id !== webContents.id) {
 				const window = BrowserWindow.fromWebContents(dashboard);

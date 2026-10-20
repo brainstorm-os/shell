@@ -21,6 +21,7 @@ import {
 	createRecurrenceEditor,
 } from "@brainstorm-os/sdk/recurrence-editor";
 import { t } from "../i18n/t";
+import { CompletionState, completionStateOf } from "../logic/task-status";
 import type { Task, TaskComment } from "../types/task";
 import { renderCompletionToggle, renderEditableName } from "./task-row";
 
@@ -77,7 +78,6 @@ export type TaskDetailView = {
 
 export function renderTaskDetailView(props: TaskDetailViewProps): TaskDetailView {
 	const { task } = props;
-	const done = task.completedAt !== null;
 
 	const root = document.createElement("section");
 	root.className = "tasks-detail";
@@ -90,7 +90,9 @@ export function renderTaskDetailView(props: TaskDetailViewProps): TaskDetailView
 	titleRow.className = "tasks-detail__titlerow";
 	const titleGroup = document.createElement("div");
 	titleGroup.className = "tasks-detail__title-group";
-	titleGroup.appendChild(renderCompletionToggle(task, done, props.onToggleComplete));
+	titleGroup.appendChild(
+		renderCompletionToggle(task, completionStateOf(task), props.onToggleComplete),
+	);
 	titleGroup.appendChild(renderEditableName(task, props.onRenameTask, { singleClick: true }));
 	titleRow.appendChild(titleGroup);
 	root.appendChild(titleRow);
@@ -242,10 +244,11 @@ function renderSubtaskRow(child: Task, props: TaskDetailViewProps): HTMLElement 
 	const item = document.createElement("li");
 	item.className = "tasks-detail__subtask";
 	item.dataset.taskId = child.id;
-	const childDone = child.completedAt !== null;
-	if (childDone) item.dataset.done = "true";
+	const childState = completionStateOf(child);
+	if (childState === CompletionState.Done) item.dataset.done = "true";
+	item.dataset.completion = childState;
 	if (props.onToggleSubtask) {
-		item.appendChild(renderCompletionToggle(child, childDone, props.onToggleSubtask));
+		item.appendChild(renderCompletionToggle(child, childState, props.onToggleSubtask));
 	}
 	const name = document.createElement("button");
 	name.type = "button";

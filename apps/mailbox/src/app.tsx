@@ -14,7 +14,7 @@ import { EmptyState } from "@brainstorm-os/sdk/empty-state";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { MenuAlign } from "@brainstorm-os/sdk/menus";
 import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
-import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { PanelSide, PanelToggleButton, useAutoHidePanel } from "@brainstorm-os/sdk/panel-toggle";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement, MouseEvent as ReactMouseEvent } from "react";
 import { t } from "./i18n";
@@ -101,6 +101,7 @@ export function MailboxApp(): ReactElement {
 	const [query, setQuery] = useState("");
 	const [activeId, setActiveId] = useState<string | null>(null);
 	const [railOpen, setRailOpen] = useState(true);
+	const railAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !railOpen });
 	const [threaded, setThreaded] = useState(true);
 	const [expandedThreads, setExpandedThreads] = useState<ReadonlySet<string>>(() => new Set());
 	const [connectOpen, setConnectOpen] = useState(false);
@@ -606,7 +607,8 @@ export function MailboxApp(): ReactElement {
 			) : (
 				<div className={`mb-app__panes${railOpen ? "" : " mb-app__panes--rail-closed"}`}>
 					<FolderRail
-						open={railOpen}
+						open={railAutoHide.visible}
+						autoHide={railAutoHide.panelProps}
 						accounts={accounts}
 						folders={folders}
 						selection={selection}
@@ -616,6 +618,7 @@ export function MailboxApp(): ReactElement {
 							? { onSyncAccount, onRemoveAccount, onEditAccount: openReconnect }
 							: {})}
 					/>
+					{railAutoHide.edgeProps && <div {...railAutoHide.edgeProps} />}
 					<MessageList
 						messages={visible}
 						threads={threads}

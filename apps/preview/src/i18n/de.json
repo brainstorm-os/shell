@@ -76,5 +76,14 @@
   "inspector.properties": "Eigenschaften",
   "inspector.noProperties": "Noch keine Eigenschaften",
   "inspector.addProperty": "Eigenschaft hinzufügen",
-  "inspector.removeProperty": "{name} entfernen"
+  "inspector.removeProperty": "{name} entfernen",
+  "inspector.caption": "Bildunterschrift",
+  "inspector.linkedFrom.one": "Von {count} Objekt verlinkt",
+  "inspector.linkedFrom.other": "Von {count} Objekten verlinkt",
+  "inspector.noBacklinks": "Noch nichts verlinkt hierher",
+  "inspector.openInNewTab": "„{name}“ in neuem Tab öffnen",
+  "inspector.moveToBin": "In den Papierkorb verschieben",
+  "inspector.lockedHint": "Entsperren Sie diese Datei, um sie zu ändern",
+  "inspector.deleted": "„{name}“ in den Papierkorb verschoben",
+  "inspector.deleteFailed": "„{name}“ konnte nicht in den Papierkorb verschoben werden"
 }

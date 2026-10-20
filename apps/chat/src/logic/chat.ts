@@ -22,6 +22,7 @@ import {
 	SenderKind,
 } from "@brainstorm-os/sdk-types";
 import { parseAttachments } from "@brainstorm-os/sdk/composer-context";
+import { readPinned } from "./pins";
 import { type ChannelProposal, readChannelProposal } from "./proposal";
 
 /** The Chat-owned channel type (a channel is NOT an AI `Conversation/v1`, so
@@ -52,6 +53,8 @@ export type ChatChannel = {
 	name: string;
 	topic: string;
 	createdAt: string;
+	/** Chats-4 — pinned message ids, oldest pin first (`logic/pins.ts`). */
+	pinned: string[];
 };
 
 export type ChatMessage = {
@@ -112,6 +115,7 @@ export function toChannel(entity: EntityLike): ChatChannel {
 		name: str(entity.properties.name) || "untitled",
 		topic: str(entity.properties.topic),
 		createdAt: str(entity.properties.createdAt),
+		pinned: readPinned(entity.properties.pinned),
 	};
 }
 

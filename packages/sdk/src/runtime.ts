@@ -12,14 +12,17 @@
 import type {
 	AgentProposalDecision,
 	AgentProposalsService,
+	AgentRunChanges,
 	AgentRunSummary,
 	AgentTraceEventRecord,
 	AgentTraceService,
+	AgentUndoResult,
 	AiCostEstimate,
 	AiExtractRequest,
 	AiExtractResult,
 	AiGenerateRequest,
 	AiGenerateResult,
+	AiProviderInfo,
 	AiService,
 	AiTransformRequest,
 	AiTransformResult,
@@ -38,6 +41,7 @@ import type {
 	CalDavCalendarInfo,
 	CalDavService,
 	CalDavSyncSummary,
+	ChangeSetRevertResult,
 	ConnectorRequestResult,
 	ConnectorWebhookEndpoint,
 	ConnectorWebhookStatus,
@@ -94,6 +98,7 @@ import type {
 	NetworkService,
 	ObjectDragItem,
 	PatternQueryResult,
+	PendingInvite,
 	PlatformCatalog,
 	PlatformService,
 	PresenceService,
@@ -103,6 +108,7 @@ import type {
 	RosterAgent,
 	RosterMember,
 	RosterProfileInput,
+	RosterRole,
 	RosterSelf,
 	RosterService,
 	SearchHit,
@@ -113,6 +119,7 @@ import type {
 	SettingsService,
 	ShareInviteToken,
 	SharedContact,
+	SharedLastEdit,
 	SharedMember,
 	SharingService,
 	ShortcutDeclaration,
@@ -126,6 +133,10 @@ import type {
 	UiService,
 	VaultEntitiesService,
 	VaultEntitiesSnapshot,
+	VersionHistoryList,
+	VersionHistoryService,
+	VersionPreview,
+	VersionRestoreResult,
 	WebViewClient,
 	WebViewEvent,
 	WebViewExtractedText,
@@ -293,6 +304,7 @@ export function buildRuntime(options: BuildRuntimeOptions): AppRuntime {
 			agentTrace: agentTraceProxy(bridge),
 			roster: rosterProxy(bridge),
 			sharing: sharingProxy(bridge),
+			history: historyProxy(bridge),
 			presence: presenceProxy(bridge),
 			ui: uiProxy(bridge),
 			theme: themeProxy(bridge),
@@ -379,6 +391,7 @@ export function buildRuntimeWithEmitter(options: BuildRuntimeOptions): {
 			agentTrace: agentTraceProxy(bridge),
 			roster: rosterProxy(bridge),
 			sharing: sharingProxy(bridge),
+			history: historyProxy(bridge),
 			presence: presenceProxy(bridge),
 			ui: uiProxy(bridge),
 			theme: themeProxy(bridge),
@@ -861,8 +874,22 @@ function entitiesProxy(bridge: Bridge): EntitiesService {
 				],
 				[],
 			),
-		update: (id, patch) => callService<Entity>(bridge, "entities", "update", [{ id, patch }], []),
-		delete: (id) => callService<void>(bridge, "entities", "delete", [{ id }], []),
+		update: (id, patch, provenance) =>
+			callService<Entity>(
+				bridge,
+				"entities",
+				"update",
+				[provenance === undefined ? { id, patch } : { id, patch, provenance }],
+				[],
+			),
+		delete: (id, provenance) =>
+			callService<void>(
+				bridge,
+				"entities",
+				"delete",
+				[provenance === undefined ? { id } : { id, provenance }],
+				[],
+			),
 		merge: (survivorId, loserIds, patch) =>
 			callService<EntityMergeResult>(
 				bridge,
@@ -1073,6 +1100,8 @@ function aiProxy(bridge: Bridge): AiService {
 			const caps = req.provider ? ["ai.use", `ai.provider:${req.provider}`] : ["ai.use"];
 			return callService<AiCostEstimate>(bridge, "ai", "cost", [req], caps);
 		},
+		providers: () =>
+			callService<readonly AiProviderInfo[]>(bridge, "ai", "providers", [], ["ai.use"]),
 	};
 }
 
@@ -1131,6 +1160,9 @@ function agentTraceProxy(bridge: Bridge): AgentTraceService {
 				[input],
 				[],
 			),
+		listChanges: (input) =>
+			callService<AgentRunChanges | null>(bridge, "agent-trace", "listChanges", [input], []),
+		undoRun: (input) => callService<AgentUndoResult>(bridge, "agent-trace", "undoRun", [input], []),
 	};
 }
 
@@ -1177,6 +1209,27 @@ function sharingProxy(bridge: Bridge): SharingService {
 			callService<SharedMember[]>(bridge, "sharing", "revoke", [input], ["sharing.share"]),
 		access: (entityId) =>
 			callService<SharedMember[]>(bridge, "sharing", "access", [entityId], ["sharing.read"]),
+		// Collab-C7 — the deep-link invite (scarce, like `share`), the default
+		// share role, and the last recorded editor (also read-gated on the
+		// entity's type, resolved server-side).
+		pendingInvite: () =>
+			callService<PendingInvite | null>(bridge, "sharing", "pendingInvite", [], ["sharing.share"]),
+		defaultRole: () =>
+			callService<RosterRole>(bridge, "sharing", "defaultRole", [], ["sharing.read"]),
+		lastEdit: (entityId) =>
+			callService<SharedLastEdit | null>(bridge, "sharing", "lastEdit", [entityId], ["sharing.read"]),
+	};
+}
+
+function historyProxy(bridge: Bridge): VersionHistoryService {
+	// 10.16 — no capability on the wire: the shell gates every call by the
+	// entity's own `entities.read|write:<type>` plus the OQ-VH-2 role rule.
+	return {
+		list: (entityId) => callService<VersionHistoryList>(bridge, "history", "list", [entityId], []),
+		preview: (input) => callService<VersionPreview>(bridge, "history", "preview", [input], []),
+		restore: (input) => callService<VersionRestoreResult>(bridge, "history", "restore", [input], []),
+		revertChangeSet: (changeSetId) =>
+			callService<ChangeSetRevertResult>(bridge, "history", "revertChangeSet", [changeSetId], []),
 	};
 }
 

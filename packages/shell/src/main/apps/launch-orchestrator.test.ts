@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
+import { encodeDisplayPrefs } from "@brainstorm-os/protocol/shell-prefs";
 import { ThemeName } from "@brainstorm-os/tokens";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardStore } from "../dashboard/dashboard-store";
@@ -354,6 +355,40 @@ describe("LaunchOrchestrator", () => {
 		await orchestrator.launch({ appId: "io.x.app", windowId: "second" });
 		expect(launches[1]?.locale).toBe("es-ES");
 
+		await dashboard.close();
+	});
+
+	it("carries the visibility preferences' argv encoding on every launch (12.18)", async () => {
+		const bundleDir = await setupApp({ id: "io.x.app" });
+		const appsRepo = {
+			getActive: vi.fn(() => ({
+				id: "io.x.app",
+				version: "1.0.0",
+				sdk: "1",
+				manifestPath: join(bundleDir, "manifest.json"),
+				bundleDir,
+				bundleSha256: "abc",
+				installedAt: 1,
+				updatedAt: 1,
+			})),
+		} as unknown as AppsRepository;
+		const ledger = { listActive: vi.fn(() => []) } as unknown as CapabilityLedger;
+		const { launcher, launches } = makeLauncher();
+		const yStore = new YDocStore(tmp);
+		const dashboard = await DashboardStore.open(yStore);
+		const orchestrator = new LaunchOrchestrator({
+			appsRepo,
+			ledger,
+			launcher,
+			getActiveDisplay: async () => encodeDisplayPrefs(dashboard.displayPrefs()),
+		});
+
+		await orchestrator.launch({ appId: "io.x.app" });
+		expect(launches[0]?.display).toBeUndefined();
+
+		dashboard.setDisplayPrefs({ higherContrast: true, alwaysShowScrollbars: true });
+		await orchestrator.launch({ appId: "io.x.app", windowId: "second" });
+		expect(launches[1]?.display).toBe("higherContrast,alwaysShowScrollbars");
 		await dashboard.close();
 	});
 

@@ -104,6 +104,25 @@ export function readSize(entity: Entity): number {
 	return typeof size === "number" ? size : 0;
 }
 
+/** Lower-cased trailing extension of a File's name ("" for folders, typed
+ *  objects, and names with no plausible extension). Shared by the Type
+ *  group-by bucket and the extension filter so the two agree on what counts. */
+export function readExtension(entity: Entity): string {
+	if (entity.type !== FILE_TYPE) return "";
+	const name = readName(entity);
+	const dot = name.lastIndexOf(".");
+	const ext = dot > 0 ? name.slice(dot + 1) : "";
+	if (ext.length === 0 || ext.length > 8 || ext.includes(" ")) return "";
+	return ext.toLowerCase();
+}
+
+/** The content hash a stored upload carries (`files.import`'s `contentHash`,
+ *  persisted as `hash`), or null when the row has none. */
+export function readContentHash(entity: Entity): string | null {
+	const hash = entity.properties.hash;
+	return typeof hash === "string" && hash.length > 0 ? hash : null;
+}
+
 export function readMembers(entity: Entity): string[] {
 	const members = entity.properties.members;
 	if (!Array.isArray(members)) return [];

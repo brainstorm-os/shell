@@ -20,6 +20,7 @@ const LABELS: IconPickerLabels = {
 	remove: "Remove icon",
 	search: "Search glyphs",
 	noMatch: "Nothing found",
+	recent: "Recent",
 	tabEmoji: "Emoji",
 	tabIcon: "Icon",
 	tabUpload: "Upload",

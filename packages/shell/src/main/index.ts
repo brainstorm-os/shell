@@ -17,12 +17,15 @@ import {
 	APP_TAB_COMMAND_CHANNEL,
 	APP_WEBVIEW_EVENT_CHANNEL,
 	ActionTrustTier,
+	AgentEventKind,
 	AgentRouting,
 	GEMINI_PROVIDER_ID,
 	GLM_PROVIDER_ID,
+	INVITE_LINK_PREFIX,
 	MISTRAL_PROVIDER_ID,
 	OLLAMA_PROVIDER_ID,
 	OPENAI_PROVIDER_ID,
+	type PropertyDef,
 	SOLHEIM_PROVIDER_ID,
 	StoredAssetKind,
 	TRIGGER_TYPE_URL,
@@ -34,6 +37,7 @@ import {
 import { DEFAULT_THEME, ThemeName, themes } from "@brainstorm-os/tokens";
 import {
 	net,
+	BaseWindow,
 	BrowserWindow,
 	Menu,
 	Tray,
@@ -69,13 +73,14 @@ import {
 } from "./agents/mention-runner";
 import { AgentTraceRecorder, makeBrokerTraceObserver } from "./agents/trace/agent-trace-recorder";
 import { makeAgentTraceServiceHandler } from "./agents/trace/agent-trace-service";
+import { type ApplyAiSettingsDeps, applyAiSettings, builtinInfo } from "./ai/ai-provider-config";
 import { AiQuotaService } from "./ai/ai-quota";
 import { makeAiServiceHandler } from "./ai/ai-service";
 import { recordAiUsage } from "./ai/ai-usage-log";
-import { type AnthropicHttp, createAnthropicProvider } from "./ai/anthropic-provider";
+import { createAnthropicProvider } from "./ai/anthropic-provider";
+import { pinCustomDefaultProvider } from "./ai/default-route-gate";
 import { DEMO_AGENT_PROVIDER_ID, createDemoAgentProvider } from "./ai/demo-agent-provider";
 import { createGeminiProvider } from "./ai/gemini-provider";
-import { type OllamaHttp, createOllamaProvider } from "./ai/ollama-provider";
 import { createOpenAiProvider } from "./ai/openai-provider";
 import { ProviderRegistry } from "./ai/provider-registry";
 import {
@@ -90,6 +95,7 @@ import { maskAppWindowsForLock } from "./apps/app-window-lock";
 import { setAppsChangedTarget } from "./apps/apps-changed";
 import { wireExternalLinkRouting } from "./apps/external-link-routing";
 import { validateManifest } from "./apps/manifest";
+import { isSplitShortcut, runSplitShortcut } from "./apps/split-actions";
 import { appSelfManagesTabs } from "./apps/window-container";
 import type { WebContentsViewHandle } from "./apps/window-container";
 import { type AssetChunkManifest, parseAssetChunkManifest } from "./assets/asset-chunks";
@@ -135,11 +141,16 @@ import {
 } from "./blocks/block-frame-protocol";
 import { makeBlocksServiceHandler } from "./blocks/blocks-service";
 import { makeBpGraphRouter } from "./bp/graph-router";
+import { BackupService } from "./bundle/backup-service";
+import { BundleExportScopeKind } from "./bundle/bundle-format";
+import { exportVaultBundle } from "./bundle/vault-export";
+import { importVaultBundle } from "./bundle/vault-import";
 import { makeCalDavServiceHandler } from "./caldav/caldav-service";
 import { isAuthorizedWriter, keyBytesEqual, resolveMembers } from "./collab/access-record";
 import { createAutoShareReactor } from "./collab/auto-share-reactor";
 import { ContactsStore, contactsStorePath } from "./collab/contacts-store";
 import { deriveInviteSecret } from "./collab/invite-anchor";
+import { LastEditRecorder } from "./collab/last-edit-recorder";
 import { ShareBootstrapVerdict, authorizeShareBootstrap } from "./collab/share-bootstrap-authz";
 import { authorizesWrapInstall } from "./collab/wrap-install-authz";
 import { makeConnectorsServiceHandler } from "./connectors/connectors-service";
@@ -168,7 +179,13 @@ import { makeDndServiceHandler } from "./dnd/dnd-service";
 import { DragSessionStore } from "./dnd/drag-session";
 import { createFileExporter } from "./dnd/file-exporter";
 import { createElectronGhostWindow, createGhostOverlay } from "./dnd/ghost-overlay";
-import { type ApplyRemoteDocFn, makeEntitiesServiceHandler } from "./entities/entities-service";
+import {
+	type AgentRunOps,
+	type ApplyRemoteDocFn,
+	type InverseBackfillFn,
+	type RestoreEntityFn,
+	makeEntitiesServiceHandler,
+} from "./entities/entities-service";
 import { EntityChangeEmitter } from "./entities/entity-change-emitter";
 import { installEntityDek } from "./entities/install-wrap";
 import { rehomeAssetDeks } from "./entities/rehome-asset-deks";
@@ -198,6 +215,17 @@ import { gatherStorageInventory } from "./files/gather-storage-inventory";
 import { servedMimeForName } from "./files/upload-mime";
 import { listWallpaperEntries } from "./files/wallpaper-entries";
 import {
+	HISTORY_SERVICE,
+	agentPrincipal,
+	makeHistoryServiceHandler,
+	memberPrincipal,
+} from "./history/history-service";
+import {
+	bindSessionHistory,
+	createSessionHistory,
+	resolveLocalHistoryRole,
+} from "./history/history-wiring";
+import {
 	ALLOWED_ICON_EXTS,
 	deleteIconByUrl,
 	iconSeal,
@@ -209,16 +237,21 @@ import { makeImportServiceHandler } from "./import/import-service";
 import { OPEN_VERB } from "./intents/intents-bus";
 import { makeIntentsServiceHandler } from "./intents/intents-service";
 import { registerActivityHandlers } from "./ipc/activity-handlers";
-import { registerAgentActivityHandlers } from "./ipc/agent-activity-handlers";
+import {
+	bindAgentActivityRunOps,
+	registerAgentActivityHandlers,
+} from "./ipc/agent-activity-handlers";
 import { registerAgentHandlers } from "./ipc/agent-handlers";
 import { registerAiSettingsHandlers } from "./ipc/ai-settings-handlers";
 import { registerAppsHandlers } from "./ipc/apps-handlers";
+import { registerBackupHandlers } from "./ipc/backup-handlers";
 import { registerBillingSettingsHandlers } from "./ipc/billing-settings-handlers";
 import { registerBinHandlers } from "./ipc/bin-handlers";
 import { registerBrokerHandler } from "./ipc/broker-handler";
 import { getCapabilityPromptHost } from "./ipc/capability-prompt";
 import { wireCapabilityPromptIpc } from "./ipc/capability-prompt-ipc";
 import { registerChromeTabsHandlers } from "./ipc/chrome-tabs-handlers";
+import { makeConfirmationsApi, registerConfirmationsHandlers } from "./ipc/confirmations-handlers";
 import { listCovers } from "./ipc/covers-handlers";
 import { registerCoversHandlers } from "./ipc/covers-handlers";
 import {
@@ -260,6 +293,7 @@ import {
 } from "./ipc/properties-handlers";
 import { registerDashboard } from "./ipc/renderer-identity";
 import { registerSearchHandlers } from "./ipc/search-handlers";
+import { registerSharingSettingsHandlers } from "./ipc/sharing-settings-handlers";
 import { registerShortcutsHandlers } from "./ipc/shortcuts-handlers";
 import { registerSideloadHandlers } from "./ipc/sideload-handlers";
 import { registerSpellcheckHandlers } from "./ipc/spellcheck-handlers";
@@ -282,7 +316,7 @@ import { connectMcpServer } from "./mcp/mcp-connect";
 import { makeMcpServiceHandler } from "./mcp/mcp-service";
 import { nodeStdioSpawn } from "./mcp/mcp-stdio-spawn";
 import { makeFileAuditSink } from "./network/audit-log";
-import { executeNetworkFetch } from "./network/network-service";
+import { RedirectPolicy, executeNetworkFetch } from "./network/network-service";
 import {
 	type NetworkServiceOptions,
 	enrichBlocksWithAssets,
@@ -295,7 +329,7 @@ import { LinkPreviewCache } from "./network/preview-cache";
 import { schedulePreviewCachePrune } from "./network/preview-cache-scheduler";
 import { DEFAULT_ON_PRIVACY } from "./network/privacy-config";
 import { DEFAULT_PROXY_CONFIG } from "./network/proxy-config";
-import { base64UrlToBytes } from "./pairing/pairing-channel";
+import { base64UrlToBytes, bytesToBase64Url } from "./pairing/pairing-channel";
 import { makePlatformServiceHandler } from "./platform/platform-service";
 import { makePropertiesServiceHandler } from "./properties/properties-service";
 import { UsageIndex } from "./properties/usage-index";
@@ -314,6 +348,7 @@ import {
 	initialStatus,
 	needsConsentStatus,
 } from "./search/embedder-status";
+import { LauncherMemory } from "./search/launcher-memory";
 import { loadFastembedEmbedder } from "./search/local-embedder";
 import { SearchIndexer, pickIndexable } from "./search/search-indexer";
 import { makeSearchServiceHandler } from "./search/search-service";
@@ -321,12 +356,14 @@ import { SemanticPrefsStore, semanticPrefsPath } from "./search/semantic-prefs-s
 import { type VectorIndexer, createVectorIndexer } from "./search/vector-indexer";
 import { SelectionStore, makeSelectionServiceHandler } from "./selection/selection-service";
 import { makeSettingsServiceHandler } from "./settings/settings-service";
+import { InviteOfferOutcome, PendingInviteSlot } from "./sharing/pending-invite";
 import { makeEngineHolder, makeSharingServiceHandler } from "./sharing/sharing-service";
 import { setActiveShortcutRegistry } from "./shortcuts/active-registry";
 import { migrateBindingsFileToEntity, readOverridesFromEntity } from "./shortcuts/bindings-entity";
 import type { ShortcutRegistry } from "./shortcuts/shortcut-registry";
 import { makeShortcutsServiceHandler } from "./shortcuts/shortcuts-service";
 import { makeSpellcheckServiceHandler } from "./spellcheck/spellcheck-service";
+import type { ChangeSetPrincipal } from "./storage/entities-repo";
 import {
 	AssetRefsRepository,
 	AssetsRepository,
@@ -372,26 +409,29 @@ import { getUiNotifyHost } from "./ui/notify-host";
 const damagedDocsNotified = new Set<string>();
 import { getOsBadgeAggregator } from "./ui/os-badge";
 import { makeOsNotifier } from "./ui/os-notification-host";
-import { type ComposedTray, getTrayHost } from "./ui/tray-host";
+import { type ComposedTray, TrayShellAction, getTrayHost } from "./ui/tray-host";
 import { makeUiServiceHandler } from "./ui/ui-service";
 import { AutoUpdateEngine } from "./update/auto-update-engine";
 import { createElectronAutoUpdater, isAutoUpdateSupported } from "./update/electron-auto-updater";
 import { DEFAULT_UPDATE_FEED_URL, fetchUpdateFeedJson } from "./update/update-feed-fetch";
 import { UpdatePrefsStore, updatePrefsPath } from "./update/update-prefs-store";
 import { UpdateService } from "./update/update-service";
-import { readAiSettings } from "./vault/ai-settings-store";
+import { type AiSettings, defaultAiSettings, readAiSettings } from "./vault/ai-settings-store";
 import { appActivityIdleSeconds, noteAppActivity } from "./vault/app-activity-tracker";
-import { createAppLockWatcher } from "./vault/app-lock-watcher";
+import { createAppLockWatcher, createBackgroundedClock } from "./vault/app-lock-watcher";
 import { readRegistry, writeRegistry } from "./vault/registry";
 import {
 	ROOT_FOLDER_ENTITY_ID,
 	type VaultSession,
 	activeVaultHasPin,
+	drainActiveVaultSession,
+	followActiveVaultSession,
 	getActiveVaultAutoLockMinutes,
 	getActiveVaultSession,
 	isVaultLocked,
 	lockOnBootIfPinSet,
 	onActiveVaultSessionChanged,
+	onActiveVaultSessionReleasing,
 } from "./vault/session";
 import { activateVault, getDefaultVault } from "./vault/vault";
 import { CAPTURE_BOOKMARK_ENTITY_TYPE, captureBookmarkProperties } from "./web/web-capture";
@@ -406,6 +446,13 @@ import { toExtractedText } from "./web/web-live-dom";
 import { createWebPrivacyRuntime } from "./web/web-privacy-runtime";
 import { createLockedWebView } from "./web/web-view-factory";
 import { PERSISTENT_WEB_PARTITION, makeWebViewServiceHandler } from "./web/web-view-service";
+import {
+	BackgroundPrefsStore,
+	DEFAULT_BACKGROUND_PREFS,
+	backgroundPrefsPath,
+	shouldQuitWhenAllWindowsClosed,
+	supportsCloseToTray,
+} from "./window/background-prefs";
 import { brainstormChromeOptions } from "./window/chrome-options";
 import { DockActivation, resolveDockActivation } from "./window/dashboard-activation";
 import { focusStealingDisabled, revealWindow, surfaceWindow } from "./window/reveal-window";
@@ -1447,6 +1494,9 @@ setupSingleInstance();
 // arrive before then — a cold-start `open-url` on macOS, or the launch argv —
 // queue here and flush once ready.
 const pendingDeepLinks: string[] = [];
+// Collab-C7 — the single, short-lived slot an invite deep link fills. The link
+// only PRE-FILLS the share dialog; see `sharing/pending-invite.ts`.
+const pendingInviteSlot = new PendingInviteSlot();
 let deepLinkRouter: ((url: string) => void) | null = null;
 function handleInboundDeepLink(url: string): void {
 	if (deepLinkRouter) deepLinkRouter(url);
@@ -1471,6 +1521,11 @@ app.on("open-url", (event, url) => {
 
 let workers: WorkersHandle | null = null;
 let dashboardWindow: BrowserWindow | null = null;
+/** Provenance `importedBy` for objects a backup restore brings back. */
+const BACKUP_RESTORE_AUTHOR = "shell:backup-restore";
+
+/** 7.16 — loaded in `whenReady`; `window-all-closed` reads its cache. */
+let backgroundPrefs: BackgroundPrefsStore | null = null;
 
 const FULLSCREEN_CHANNEL = "window:fullscreen-changed" as const;
 
@@ -1673,14 +1728,45 @@ void app.whenReady().then(async () => {
 	// dashboard, and dispatch an `open` for that entity through the same ladder
 	// a dashboard link uses (shell-sourced). Then flush any links queued during
 	// boot + the cold-start launch argv.
-	deepLinkRouter = (url: string) => {
-		const entityId = parseEntityDeepLink(url);
-		if (!entityId) return;
+	const surfaceDashboardForLink = () => {
 		if (dashboardWindow && !dashboardWindow.isDestroyed()) {
 			if (dashboardWindow.isMinimized()) dashboardWindow.restore();
 			revealWindow(dashboardWindow);
 			if (!focusStealingDisabled()) dashboardWindow.focus();
 		}
+	};
+	deepLinkRouter = (url: string) => {
+		// Collab-C7 — an invite link. Strictly parsed + verified, then parked
+		// for the share dialog to pre-fill; it never shares anything itself.
+		if (url.startsWith(INVITE_LINK_PREFIX)) {
+			const offer = pendingInviteSlot.offerLink(url, Date.now());
+			if (offer.outcome === InviteOfferOutcome.Refused) {
+				console.warn("[deep-link] refused a malformed or unverifiable invite link");
+				return;
+			}
+			surfaceDashboardForLink();
+			const { pending } = offer;
+			const from = pending.label ? `${pending.label} (${pending.fingerprint})` : pending.fingerprint;
+			if (offer.outcome === InviteOfferOutcome.Busy) {
+				getUiNotifyHost().post({
+					appId: "io.brainstorm.shell",
+					kind: "warning",
+					title: "Another invite is already waiting",
+					body: `The invite from ${from} is still waiting, so the new link was ignored. Open Share to use the waiting invite first, then open the new link again.`,
+				});
+				return;
+			}
+			getUiNotifyHost().post({
+				appId: "io.brainstorm.shell",
+				kind: "info",
+				title: "Invite link received",
+				body: `${from} sent you an invite. Open Share on the object you want to share: the code is filled in, and nothing is shared until you choose a role and press Add.`,
+			});
+			return;
+		}
+		const entityId = parseEntityDeepLink(url);
+		if (!entityId) return;
+		surfaceDashboardForLink();
 		void launchSetup
 			.getIntents()
 			.then((intents) =>
@@ -1845,12 +1931,13 @@ void app.whenReady().then(async () => {
 	// the live audit log.
 	const networkAuditPath = join(app.getPath("userData"), "network-audit.jsonl");
 	const aiUsagePath = join(app.getPath("userData"), "ai-usage.jsonl");
-	// 11.9 — late-bound to the provider registry (built further down), so a
-	// routing-default change from Settings → AI takes effect live. Null until
-	// the registry exists; an already-open vault is applied post-registry below.
-	let applyAiDefaultProvider: ((id: string | null) => void) | null = null;
+	// 11.9 / Agent-14 — late-bound to the provider registry (built further
+	// down), so a Settings → AI change (routing default, custom endpoints,
+	// Ollama) takes effect live. Null until the registry exists; an
+	// already-open vault is applied post-registry below.
+	let applyAiSettingsLive: ((settings: AiSettings) => void) | null = null;
 	registerAiSettingsHandlers({
-		applyDefaultProvider: (id) => applyAiDefaultProvider?.(id),
+		applySettings: (settings) => applyAiSettingsLive?.(settings),
 	});
 	// Agent-12d — Settings → AI → Agent activity (dashboard-privileged, not
 	// broker; OQ-AO-2 shell-surfaces-only). Bounded projections over the
@@ -2940,6 +3027,9 @@ void app.whenReady().then(async () => {
 			return null;
 		}
 	};
+	// 6.15 — remembered "Don't ask again" confirmation choices + the Settings
+	// reset, over the same per-device settings store apps write their own to.
+	registerConfirmationsHandlers(ipcMain, makeConfirmationsApi(getSettingsRepoForActiveSession));
 
 	const SEARCH_INDEX_OP_ID = "search-index";
 	const INDEXING_ACTIVITY_DELAY_MS = 500;
@@ -3533,10 +3623,10 @@ void app.whenReady().then(async () => {
 			// the starter content without a reopen.
 			broadcastVaultEntitiesStaleSignal(launchSetup.getLauncherSync()?.allWindows() ?? []);
 		}
-		// 11.9 — apply this vault's AI routing default to the provider registry.
-		if (session && applyAiDefaultProvider) {
+		// 11.9 / Agent-14 — apply this vault's AI settings to the provider registry.
+		if (session && applyAiSettingsLive) {
 			try {
-				applyAiDefaultProvider((await readAiSettings(session.vaultPath)).defaultProvider);
+				applyAiSettingsLive(await readAiSettings(session.vaultPath));
 			} catch (error) {
 				console.warn(`[brainstorm] AI settings load failed: ${(error as Error).message}`);
 			}
@@ -3643,6 +3733,9 @@ void app.whenReady().then(async () => {
 			clear: (runId) => activityStore.clear(`agent-run:${runId}`),
 		},
 	});
+	// Agent-15 — bound by the entities service below; read lazily so the
+	// trace service and Settings both reach the same ops.
+	let agentRunOps: AgentRunOps | null = null;
 	workers.broker.registerService(
 		AGENT_TRACE_SERVICE,
 		makeAgentTraceServiceHandler({
@@ -3651,6 +3744,7 @@ void app.whenReady().then(async () => {
 				const session = getActiveVaultSession();
 				return session ? await session.agentTraceRepo() : null;
 			},
+			getRunOps: () => agentRunOps,
 		}),
 	);
 	// The chat-surface chokepoint: every identity-verified envelope an app
@@ -3675,7 +3769,60 @@ void app.whenReady().then(async () => {
 	// here at construction; the live-sync engine's `applyRemoteUpdate` routes
 	// inbound decrypted frames through it (off the broker — never app-callable).
 	let applyRemoteDocFn: ApplyRemoteDocFn | null = null;
+	// 10.16 — version history. The restore closure comes out of the entities
+	// service at construction (off the broker); the engine is per session.
+	let restoreEntityFn: RestoreEntityFn | null = null;
+	const callYDocWorker = async (method: string, args: Record<string, unknown>): Promise<unknown> => {
+		const handler = workersRef.broker.getServiceHandler("ydoc");
+		if (!handler) throw new Error("ydoc worker service unavailable");
+		return handler({
+			v: 1,
+			msg: `ydoc_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+			app: "io.brainstorm.shell",
+			service: "ydoc",
+			method,
+			args: [args],
+			caps: [],
+		});
+	};
+	const historySelf = (): ChangeSetPrincipal | null => {
+		const session = getActiveVaultSession();
+		return session ? memberPrincipal(bytesToBase64Url(session.identity.publicKey)) : null;
+	};
+	const historyBinding = bindSessionHistory(
+		{ follow: followActiveVaultSession, onReleasing: onActiveVaultSessionReleasing },
+		(session) =>
+			createSessionHistory({
+				session,
+				callWorker: callYDocWorker,
+				getRestorer: () => restoreEntityFn,
+			}),
+	);
+	// After history has flushed (hooks drain in order): drop the outgoing
+	// vault's docs and stores from the ydoc worker's caches.
+	onActiveVaultSessionReleasing(async (session) => {
+		await callYDocWorker("releaseVault", { vaultPath: session.vaultPath });
+	});
+	let inverseBackfillFn: InverseBackfillFn | null = null;
+	// 9.12.25 — the catalog is read on every entity write; rebuild it only when
+	// the store changes (a full snapshot per write was the perf trap), and keep
+	// one array identity per change so the service's memo holds.
+	const propertyDefsByStore = new WeakMap<object, ReadonlyArray<PropertyDef>>();
+	const getVaultPropertyDefs = async (): Promise<ReadonlyArray<PropertyDef> | null> => {
+		const session = getActiveVaultSession();
+		if (!session) return null;
+		const store = await session.propertiesStore();
+		if (!propertyDefsByStore.has(store)) {
+			store.subscribe((snap) => propertyDefsByStore.set(store, Object.values(snap.properties)));
+		}
+		return propertyDefsByStore.get(store) ?? [];
+	};
 	const entitiesHandler = makeEntitiesServiceHandler({
+		// 9.12.25 — `inverseOf` pairs make relations two-way.
+		getPropertyDefs: getVaultPropertyDefs,
+		bindInverseBackfill: (fn) => {
+			inverseBackfillFn = fn;
+		},
 		onEntityChange: (change) => automationsChangeEmitter.emit(change),
 		// Agent-12a — a provenance-carrying create IS the approve gesture:
 		// record `proposal-approved` on the caller's latest run in that
@@ -3687,6 +3834,16 @@ void app.whenReady().then(async () => {
 				approved: true,
 				entityId,
 			});
+		},
+		// Agent-15 — journal agent-attributed writes against the run they
+		// belong to, and hand the diff/undo ops to the trace service + Settings.
+		resolveAgentRun: (app, conversationId) => agentTraceRecorder.latestRunIdFor(app, conversationId),
+		bindAgentRunOps: (ops) => {
+			agentRunOps = ops;
+			bindAgentActivityRunOps(ops);
+		},
+		onAgentRunUndone: (runId) => {
+			void agentTraceRecorder.event(runId, { kind: AgentEventKind.RunUndone });
 		},
 		// Asset-B4 — the local asset-kind lookup that drives + gates the implicit
 		// asset-ref bind writer (a null result skips a dangling/remote URL).
@@ -3701,6 +3858,18 @@ void app.whenReady().then(async () => {
 		onAssetBound: (entityId, assetId) => {
 			void uploadBoundAssetNow(entityId, assetId);
 			void ensureThumbnailNow(entityId, assetId);
+		},
+		bindRestoreEntity: (fn) => {
+			restoreEntityFn = fn;
+		},
+		// 10.16 — attribute every committed local write, server-side: an agent
+		// write (provenance-carrying) to the agent, anything else to this vault's
+		// own identity.
+		onLocalWrite: (entityId, _type, writer) => {
+			const self = historySelf();
+			const history = historyBinding.current();
+			if (!history || !self) return;
+			history.noteWrite(entityId, [writer.agent ? agentPrincipal(writer.app) : self]);
 		},
 		bindApplyRemoteDoc: (fn) => {
 			applyRemoteDocFn = fn;
@@ -3819,6 +3988,9 @@ void app.whenReady().then(async () => {
 				// container. Opened once per session alongside the DEK store.
 				const entitiesDb = await session.dataStores.open("entities");
 				const entitiesRepo = new EntitiesRepository(entitiesDb);
+				// Collab-C7 — the sync path records who last edited each shared
+				// object (verified inbound sender, or this device on a local edit).
+				const lastEditRecorder = new LastEditRecorder(entitiesRepo.lastEdits);
 				const shareInvites = new ShareInvitesRepository(entitiesDb);
 				// Collab-C5 - see `authorizesWrapInstall`: a DEK ROTATION must come
 				// from an Owner (or ourselves), or any member could re-key an entity
@@ -3855,6 +4027,7 @@ void app.whenReady().then(async () => {
 				};
 				const engine = installLiveSyncEngine({
 					getRelay: () => getActiveRelay(),
+					onEdit: (entityId, editor) => lastEditRecorder.note(entityId, editor),
 					dekStore,
 					devicePub: session.identity.publicKey,
 					deviceSign: (bytes) => session.signPayload(bytes),
@@ -3929,8 +4102,9 @@ void app.whenReady().then(async () => {
 							doc.destroy();
 						}
 					},
-					applyRemoteUpdate: async (entityId, _type, update) => {
+					applyRemoteUpdate: async (entityId, _type, update, sender) => {
 						await applyRemoteDocFn?.(entityId, Buffer.from(update).toString("base64"));
+						if (sender) historyBinding.current()?.noteWrite(entityId, [memberPrincipal(sender)]);
 					},
 					// PRES-2b — a decrypted remote AWARENESS frame (cursors / "who's
 					// here") for a tracked entity. Route it into this session's presence
@@ -4137,6 +4311,23 @@ void app.whenReady().then(async () => {
 		// run + events for every channel mention turn.
 		trace: agentTraceRecorder,
 	};
+	workers.broker.registerService(
+		HISTORY_SERVICE,
+		makeHistoryServiceHandler({
+			getHistory: () => historyBinding.current(),
+			getRepo: getEntitiesRepoForActiveSession,
+			getLedger: async () => {
+				const session = getActiveVaultSession();
+				return session ? await session.capabilityLedger() : null;
+			},
+			resolveRole: async (entityId) => {
+				const session = getActiveVaultSession();
+				if (!session) throw new Error("no active vault");
+				return resolveLocalHistoryRole(session, entityId);
+			},
+			selfPrincipal: historySelf,
+		}),
+	);
 	workers.broker.registerService("entities", async (envelope) => {
 		const result = await entitiesHandler(envelope);
 		if (
@@ -4260,6 +4451,11 @@ void app.whenReady().then(async () => {
 	const appLockWatcher = createAppLockWatcher({
 		getIdleSeconds: () => powerMonitor.getSystemIdleTime(),
 		getAppIdleSeconds: () => appActivityIdleSeconds(),
+		// Closed to the tray (7.16) the vault would otherwise stay unlocked for
+		// as long as the user keeps using other apps.
+		getBackgroundedSeconds: createBackgroundedClock(() =>
+			BaseWindow.getAllWindows().some((w) => !w.isDestroyed() && w.isVisible()),
+		),
 		getAutoLockMinutes: () => getActiveVaultAutoLockMinutes(),
 		hasPin: () => activeVaultHasPin(),
 		isLocked: () => isVaultLocked(),
@@ -4316,12 +4512,7 @@ void app.whenReady().then(async () => {
 		// The vault property catalog drives the catalog-driven reference
 		// edges (any `entityRef` property → a graph link). Best-effort: a
 		// failure degrades to "no ref edges", never an empty snapshot.
-		getPropertyDefs: async () => {
-			const session = getActiveVaultSession();
-			if (!session) return null;
-			const store = await session.propertiesStore();
-			return Object.values(store.snapshot().properties);
-		},
+		getPropertyDefs: getVaultPropertyDefs,
 	});
 	workers.broker.registerService("vault-entities", vaultEntitiesHandler);
 
@@ -4332,6 +4523,17 @@ void app.whenReady().then(async () => {
 				const session = getActiveVaultSession();
 				if (!session) return null;
 				return await session.propertiesStore();
+			},
+			backfillInverse: (app, def) =>
+				inverseBackfillFn ? inverseBackfillFn(app, def) : Promise.resolve(0),
+			canWriteType: async (app, type) => {
+				const session = getActiveVaultSession();
+				if (!session) return false;
+				try {
+					return (await session.capabilityLedger()).has(app, `entities.write:${type}`);
+				} catch {
+					return false;
+				}
 			},
 		}),
 	);
@@ -4505,9 +4707,16 @@ void app.whenReady().then(async () => {
 				if (!session) return null;
 				return new ContactsStore({ path: contactsStorePath(session.vaultPath) });
 			},
+			// Collab-C7 — the deep-link invite slot, the default share role, and
+			// the last-editor read.
+			takePendingInvite: () => pendingInviteSlot.take(Date.now()),
+			getSettingsRepo: getSettingsRepoForActiveSession,
+			getEntitiesRepo: getEntitiesRepoForActiveSession,
 			now: () => Date.now(),
 		}),
 	);
+	onActiveVaultSessionChanged(() => pendingInviteSlot.clear());
+	registerSharingSettingsHandlers({ getSettingsRepo: getSettingsRepoForActiveSession });
 
 	// PRES-2b — the `presence` service: the sandbox surface for live presence
 	// (avatar stack + remote cursors). `publish` is re-checked against
@@ -4673,37 +4882,67 @@ void app.whenReady().then(async () => {
 	// broker's `executeNetworkFetch` with `allowPrivate` so the shell can
 	// POST to `localhost:11434` (apps never hold raw network reach for AI —
 	// the gate is `ai.use`, enforced by the broker before this runs).
-	// Endpoint + default model are dev/BYO config; the app-facing contract
-	// is provider-agnostic.
-	const ollamaHttp: OllamaHttp = async ({ url, bodyJson }) => {
-		const res = await executeNetworkFetch(
-			{
-				appId: "_shell.ai",
-				url,
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: new TextEncoder().encode(JSON.stringify(bodyJson)),
-				allowPrivate: true,
-				timeoutMs: 120_000,
-				sizeCapBytes: 8 * 1024 * 1024,
-			},
-			{
-				fetchImpl: productionFetchImpl,
-				lookupHost: productionLookupHost,
-				auditSink: makeFileAuditSink(networkAuditPath),
-			},
-		);
-		return { status: res.status, text: new TextDecoder().decode(res.body) };
-	};
+	// Endpoint + default model are Settings → AI config (env as the default);
+	// the app-facing contract is provider-agnostic.
+	//
+	// ONE transport for every provider — POST JSON over the network broker
+	// (SSRF floor, DNS pinning, shared proxy, egress audit; the auth header is
+	// forwarded but never logged). `allowPrivate` is set only for the local
+	// model server and for user-added endpoints whose host is loopback/LAN.
+	const aiBrokerHttp =
+		({ allowPrivate }: { allowPrivate: boolean }) =>
+		async ({
+			url,
+			headers,
+			bodyJson,
+		}: { url: string; headers?: Record<string, string>; bodyJson: unknown }) => {
+			const res = await executeNetworkFetch(
+				{
+					appId: "_shell.ai",
+					url,
+					method: "POST",
+					headers: { "Content-Type": "application/json", ...headers },
+					body: new TextEncoder().encode(JSON.stringify(bodyJson)),
+					...(allowPrivate ? { allowPrivate: true } : {}),
+					// The body is the transcript and the headers carry the key: a
+					// redirect may not re-send them, drop TLS, or wander onto the LAN.
+					redirectPolicy: RedirectPolicy.Strict,
+					timeoutMs: 120_000,
+					sizeCapBytes: 8 * 1024 * 1024,
+				},
+				{
+					fetchImpl: productionFetchImpl,
+					lookupHost: productionLookupHost,
+					auditSink: makeFileAuditSink(networkAuditPath),
+				},
+			);
+			return { status: res.status, text: new TextDecoder().decode(res.body) };
+		};
 	const aiProviders = new ProviderRegistry();
-	aiProviders.register(
-		createOllamaProvider({
-			endpoint: process.env.BRAINSTORM_OLLAMA_ENDPOINT ?? "http://localhost:11434",
-			defaultModel: process.env.BRAINSTORM_OLLAMA_MODEL ?? "llama3.2",
-			http: ollamaHttp,
-		}),
-		{ default: true },
-	);
+	// In capture-only demo mode the built-in fallback IS the scripted provider —
+	// otherwise a vault open with no persisted default resets routing to Ollama
+	// and the demo turn fails "no model reached".
+	const fallbackProviderId = process.env.BRAINSTORM_DEMO_AGENT
+		? DEMO_AGENT_PROVIDER_ID
+		: OLLAMA_PROVIDER_ID;
+	const aiConfigDeps: ApplyAiSettingsDeps = {
+		registry: aiProviders,
+		openAiHttp: aiBrokerHttp,
+		ollamaHttp: aiBrokerHttp,
+		// A custom endpoint's optional key — the active vault's Tier-2
+		// credential, read in main per request; never crosses IPC.
+		getApiKey: async (providerId) => {
+			const session = getActiveVaultSession();
+			return session ? await readAiProviderKey(session.credentials, providerId) : null;
+		},
+		ollamaEnv: {
+			endpoint: process.env.BRAINSTORM_OLLAMA_ENDPOINT,
+			model: process.env.BRAINSTORM_OLLAMA_MODEL,
+		},
+		fallbackProviderId,
+	};
+	// Registers Ollama (env / built-in endpoint) as the first provider + default.
+	applyAiSettings(defaultAiSettings(), aiConfigDeps);
 	// Capture-only: the scripted demo provider powers the Agent-11 propose→approve
 	// promo reel without a live model (the rig is deterministic + model-free).
 	// Gated behind BRAINSTORM_DEMO_AGENT — never registered in normal dev/prod;
@@ -4726,28 +4965,13 @@ void app.whenReady().then(async () => {
 	// closed (`Unavailable`); registered always so a pinned `provider:"anthropic"`
 	// resolves, but Ollama stays the default. The Settings AI panel (11.9) writes
 	// the credential via `writeAiProviderKey`.
-	// Shared transport for every cloud provider — POST JSON over the network
-	// broker (public host, no `allowPrivate`; the auth header is forwarded but
-	// never logged). The provider-specific Http types are structurally identical.
-	const cloudHttp: AnthropicHttp = async ({ url, headers, bodyJson }) => {
-		const res = await executeNetworkFetch(
-			{
-				appId: "_shell.ai",
-				url,
-				method: "POST",
-				headers: { "Content-Type": "application/json", ...headers },
-				body: new TextEncoder().encode(JSON.stringify(bodyJson)),
-				timeoutMs: 120_000,
-				sizeCapBytes: 8 * 1024 * 1024,
-			},
-			{
-				fetchImpl: productionFetchImpl,
-				lookupHost: productionLookupHost,
-				auditSink: makeFileAuditSink(networkAuditPath),
-			},
-		);
-		return { status: res.status, text: new TextDecoder().decode(res.body) };
-	};
+	const cloudHttp = aiBrokerHttp({ allowPrivate: false });
+	const anthropicModel = process.env.BRAINSTORM_ANTHROPIC_MODEL ?? "claude-opus-4-8";
+	const openAiModel = process.env.BRAINSTORM_OPENAI_MODEL ?? "gpt-4o-mini";
+	const glmModel = process.env.BRAINSTORM_GLM_MODEL ?? "glm-5.2";
+	const mistralModel = process.env.BRAINSTORM_MISTRAL_MODEL ?? "mistral-large-latest";
+	const solheimModel = process.env.BRAINSTORM_SOLHEIM_MODEL ?? "qwen3.6-35b-a3b";
+	const geminiModel = process.env.BRAINSTORM_GEMINI_MODEL ?? "gemini-2.0-flash";
 	// Resolve a provider's BYO key: the active vault's Tier-2 credential first,
 	// then a dev-only env fallback. Read in main only; never crosses IPC.
 	const cloudKey = (providerId: string, envVar: string) => async (): Promise<string | null> => {
@@ -4760,10 +4984,11 @@ void app.whenReady().then(async () => {
 	};
 	aiProviders.register(
 		createAnthropicProvider({
-			defaultModel: process.env.BRAINSTORM_ANTHROPIC_MODEL ?? "claude-opus-4-8",
+			defaultModel: anthropicModel,
 			getApiKey: cloudKey(ANTHROPIC_PROVIDER_ID, "BRAINSTORM_ANTHROPIC_API_KEY"),
 			http: cloudHttp,
 		}),
+		{ info: builtinInfo(ANTHROPIC_PROVIDER_ID, "Anthropic", anthropicModel) },
 	);
 	// OpenAI-compatible (configurable base URL → OpenAI / OpenRouter / Together /
 	// Groq / local LM Studio). Pinned only by the key being present.
@@ -4772,10 +4997,11 @@ void app.whenReady().then(async () => {
 			...(process.env.BRAINSTORM_OPENAI_BASE_URL
 				? { baseUrl: process.env.BRAINSTORM_OPENAI_BASE_URL }
 				: {}),
-			defaultModel: process.env.BRAINSTORM_OPENAI_MODEL ?? "gpt-4o-mini",
+			defaultModel: openAiModel,
 			getApiKey: cloudKey(OPENAI_PROVIDER_ID, "BRAINSTORM_OPENAI_API_KEY"),
 			http: cloudHttp,
 		}),
+		{ info: builtinInfo(OPENAI_PROVIDER_ID, "OpenAI", openAiModel) },
 	);
 	// z.ai GLM — OpenAI-compatible Chat Completions under z.ai's base URL, so it
 	// rides the OpenAI provider with its own id, key custody, and default model.
@@ -4784,10 +5010,11 @@ void app.whenReady().then(async () => {
 			id: GLM_PROVIDER_ID,
 			label: "GLM",
 			baseUrl: process.env.BRAINSTORM_GLM_BASE_URL ?? "https://api.z.ai/api/paas/v4",
-			defaultModel: process.env.BRAINSTORM_GLM_MODEL ?? "glm-5.2",
+			defaultModel: glmModel,
 			getApiKey: cloudKey(GLM_PROVIDER_ID, "BRAINSTORM_GLM_API_KEY"),
 			http: cloudHttp,
 		}),
+		{ info: builtinInfo(GLM_PROVIDER_ID, "GLM", glmModel) },
 	);
 	// Mistral AI (European) — OpenAI-compatible Chat Completions under la Plateforme's
 	// base URL, so it rides the OpenAI provider with its own id, key custody, and model.
@@ -4796,10 +5023,11 @@ void app.whenReady().then(async () => {
 			id: MISTRAL_PROVIDER_ID,
 			label: "Mistral",
 			baseUrl: process.env.BRAINSTORM_MISTRAL_BASE_URL ?? "https://api.mistral.ai/v1",
-			defaultModel: process.env.BRAINSTORM_MISTRAL_MODEL ?? "mistral-large-latest",
+			defaultModel: mistralModel,
 			getApiKey: cloudKey(MISTRAL_PROVIDER_ID, "BRAINSTORM_MISTRAL_API_KEY"),
 			http: cloudHttp,
 		}),
+		{ info: builtinInfo(MISTRAL_PROVIDER_ID, "Mistral", mistralModel) },
 	);
 	// Solheim (EU-hosted, single-tenant open-weight instance) — OpenAI-compatible
 	// Chat Completions, so it rides the OpenAI provider with its own id, key
@@ -4811,39 +5039,33 @@ void app.whenReady().then(async () => {
 			id: SOLHEIM_PROVIDER_ID,
 			label: "Solheim",
 			baseUrl: process.env.BRAINSTORM_SOLHEIM_BASE_URL ?? "https://api.solheim.ai/v1",
-			defaultModel: process.env.BRAINSTORM_SOLHEIM_MODEL ?? "qwen3.6-35b-a3b",
+			defaultModel: solheimModel,
 			getApiKey: cloudKey(SOLHEIM_PROVIDER_ID, "BRAINSTORM_SOLHEIM_API_KEY"),
 			http: cloudHttp,
 		}),
+		{ info: builtinInfo(SOLHEIM_PROVIDER_ID, "Solheim", solheimModel) },
 	);
 	aiProviders.register(
 		createGeminiProvider({
 			...(process.env.BRAINSTORM_GEMINI_BASE_URL
 				? { baseUrl: process.env.BRAINSTORM_GEMINI_BASE_URL }
 				: {}),
-			defaultModel: process.env.BRAINSTORM_GEMINI_MODEL ?? "gemini-2.0-flash",
+			defaultModel: geminiModel,
 			getApiKey: cloudKey(GEMINI_PROVIDER_ID, "BRAINSTORM_GEMINI_API_KEY"),
 			http: cloudHttp,
 		}),
+		{ info: builtinInfo(GEMINI_PROVIDER_ID, "Gemini", geminiModel) },
 	);
-	// 11.9 — bind the routing applier now that the registry exists. A persisted
-	// `defaultProvider` (Settings → AI) pins routing; `null` restores the
-	// built-in default (local Ollama, registered first). Applied per vault open
-	// (onVaultOpened) + immediately for an already-open vault.
-	// In capture-only demo mode the built-in fallback IS the scripted provider —
-	// otherwise a vault open with no persisted default resets routing to Ollama
-	// and the demo turn fails "no model reached".
-	const fallbackProviderId = process.env.BRAINSTORM_DEMO_AGENT
-		? DEMO_AGENT_PROVIDER_ID
-		: OLLAMA_PROVIDER_ID;
-	applyAiDefaultProvider = (id) => {
-		aiProviders.setDefault(id && aiProviders.has(id) ? id : fallbackProviderId);
-	};
+	// 11.9 / Agent-14 — bind the settings applier now that the registry
+	// exists. A persisted `defaultProvider` pins routing (`null` restores the
+	// built-in default); custom endpoints register/unregister; Ollama re-points.
+	// Applied per vault open (onVaultOpened) + immediately for an open vault.
+	applyAiSettingsLive = (settings) => applyAiSettings(settings, aiConfigDeps);
 	{
 		const openSession = getActiveVaultSession();
 		if (openSession) {
 			void readAiSettings(openSession.vaultPath)
-				.then((s) => applyAiDefaultProvider?.(s.defaultProvider))
+				.then((s) => applyAiSettingsLive?.(s))
 				.catch(() => {});
 		}
 	}
@@ -4889,25 +5111,34 @@ void app.whenReady().then(async () => {
 	});
 	workers.broker.registerService(
 		"ai",
-		makeAiServiceHandler({
-			getProvider: (id) => aiProviders.get(id),
-			quota: aiQuota,
-			onUsage: (rec) => {
-				void recordAiUsage(aiUsageSink, rec);
-				void aiQuota.recordUsage(rec);
-			},
-			// 11.5 `extract({ intoType })` — resolve a registered entity type's
-			// inline JSON-Schema to extract fields (registry-coupled). Best-effort:
-			// an unknown type / no schema returns null → the handler fails closed.
-			resolveTypeFields: async (typeId) => {
-				const session = getActiveVaultSession();
-				if (!session) return null;
-				const registry = await session.dataStores.open("registry");
-				const record = new EntityTypesRepository(registry).get(typeId);
-				if (!record?.schemaInline) return null;
-				return extractFieldsFromTypeSchema(record.schemaInline as TypeSchemaForExtract);
-			},
-		}),
+		pinCustomDefaultProvider(
+			makeAiServiceHandler({
+				getProvider: (id) => aiProviders.get(id),
+				quota: aiQuota,
+				listProviders: () => aiProviders.list(),
+				appHoldsCapability: async (appId, capability) => {
+					const session = getActiveVaultSession();
+					if (!session) return false;
+					return (await session.capabilityLedger()).has(appId, capability);
+				},
+				onUsage: (rec) => {
+					void recordAiUsage(aiUsageSink, rec);
+					void aiQuota.recordUsage(rec);
+				},
+				// 11.5 `extract({ intoType })` — resolve a registered entity type's
+				// inline JSON-Schema to extract fields (registry-coupled). Best-effort:
+				// an unknown type / no schema returns null → the handler fails closed.
+				resolveTypeFields: async (typeId) => {
+					const session = getActiveVaultSession();
+					if (!session) return null;
+					const registry = await session.dataStores.open("registry");
+					const record = new EntityTypesRepository(registry).get(typeId);
+					if (!record?.schemaInline) return null;
+					return extractFieldsFromTypeSchema(record.schemaInline as TypeSchemaForExtract);
+				},
+			}),
+			() => aiProviders.defaultProviderId(),
+		),
 	);
 
 	// 14.1 — the billing service. Reports the current plan + entitlement from
@@ -6022,8 +6253,41 @@ void app.whenReady().then(async () => {
 			);
 			return pickIndexable(entities).length;
 		},
+		countBacklinks: async (ids) => {
+			const repo = await getEntitiesRepoForActiveSession();
+			return repo ? repo.countBacklinks(ids) : new Map();
+		},
+		getLauncherMemory: async () => {
+			const repo = await getSettingsRepoForActiveSession();
+			return repo ? new LauncherMemory(repo) : null;
+		},
 	});
 	registerIntentHandlers(() => launchSetup.getIntents());
+
+	// IE-14 — scheduled backups. The service reads the ACTIVE vault on every
+	// call, so one instance + one timer serve every vault the user opens.
+	const backupService = new BackupService({
+		getVault: async () => {
+			const session = getActiveVaultSession();
+			if (!session) return null;
+			const settings = await getSettingsRepoForActiveSession();
+			if (!settings) return null;
+			return {
+				vaultId: session.vaultId,
+				settings,
+				exportBundle: () =>
+					exportVaultBundle(session, {
+						scope: { kind: BundleExportScopeKind.WholeVault },
+						now: Date.now(),
+					}),
+				importBundle: (bytes) =>
+					importVaultBundle(session, bytes, { now: Date.now(), importedBy: BACKUP_RESTORE_AUTHOR }),
+			};
+		},
+		onRestored: rebuildSearchIndex,
+	});
+	registerBackupHandlers({ service: backupService, getDashboard: () => dashboardWindow });
+	backupService.start();
 
 	let dashboardWebContentsId: number | null = null;
 	const promptHost = getCapabilityPromptHost();
@@ -6118,6 +6382,19 @@ void app.whenReady().then(async () => {
 	const shortcuts = createShortcutSetup({
 		getDashboard: () => dashboardWindow?.webContents ?? null,
 		getWindowCount: () => launchSetup.getWindowIndexSync()?.list().length ?? 0,
+		runWindowAction: (id, webContentsId) => {
+			if (!isSplitShortcut(id)) return false;
+			return runSplitShortcut(id, webContentsId, {
+				containerFor: (wcId) =>
+					launchSetup.getLauncherSync()?.containerForTabSender(wcId)?.container ?? null,
+				openSide: (containerId, appId, launch) => {
+					const orchestrator = launchSetup.getOrchestratorSync();
+					void orchestrator?.openSidePane(containerId, { appId, launch }).catch((error) => {
+						console.warn("[split] open to the side failed:", error);
+					});
+				},
+			});
+		},
 	});
 	// The boot session may have opened before the registry existed (the
 	// `onVaultOpened` hook is wired earlier than this); run the migration +
@@ -6187,9 +6464,36 @@ void app.whenReady().then(async () => {
 	dashboardWindow.once("ready-to-show", () => bootStage("dashboard-window-shown"));
 	dashboardWindow.webContents.once("dom-ready", () => bootStage("dashboard-renderer-domready"));
 	dashboardWindow.webContents.once("did-finish-load", () => bootStage("dashboard-renderer-paint"));
-	dashboardWindow.on("closed", () => {
-		attachDashboardHosts(null);
-	});
+	// Every dashboard (the boot one AND each reopen) drops the prompt hosts
+	// reference when it closes: under close-to-tray the process can run for
+	// hours windowless, and a host holding a destroyed WebContents both pins it
+	// and posts prompts into nothing.
+	const detachHostsOnClose = (win: BrowserWindow): void => {
+		const senderId = win.webContents.id;
+		win.on("closed", () => {
+			if (dashboardWebContentsId === senderId) attachDashboardHosts(null);
+		});
+	};
+	detachHostsOnClose(dashboardWindow);
+
+	// Bring the dashboard back: surface the live one, or recreate it after the
+	// user closed it (dock activation, the close-to-tray "Open" item).
+	function reopenDashboard(): void {
+		if (dashboardWindow && !dashboardWindow.isDestroyed()) {
+			surfaceWindow(dashboardWindow);
+			return;
+		}
+		dashboardWindow = createDashboardWindow();
+		registerAndTrack(dashboardWindow);
+		shortcuts.attach(dashboardWindow.webContents);
+		// Re-bind the prompt hosts. Without this a close/reopen left every
+		// dashboard-owned prompt pointing at a dead renderer: capability
+		// requests, OS-handoff consent, the open-with picker and tool
+		// approval all refused silently.
+		attachDashboardHosts(dashboardWindow.webContents);
+		detachHostsOnClose(dashboardWindow);
+		wireDashboardLinkRouting(dashboardWindow.webContents);
+	}
 
 	// 7.8 — render the pure tray model into a single OS `Tray`. The host
 	// owns *what* the menu is; this owns the Electron object's lifecycle:
@@ -6220,6 +6524,15 @@ void app.whenReady().then(async () => {
 		tray.setToolTip(composed.tooltip);
 		const template = composed.entries.map((entry) => {
 			if (entry.kind === "separator") return { type: "separator" as const };
+			if (entry.kind === "shell") {
+				return {
+					label: entry.label,
+					click: () => {
+						if (entry.action === TrayShellAction.Quit) app.quit();
+						else reopenDashboard();
+					},
+				};
+			}
 			if (entry.kind === "header") return { label: entry.appId, enabled: false };
 			return {
 				label: entry.label,
@@ -6235,6 +6548,34 @@ void app.whenReady().then(async () => {
 		tray.setContextMenu(Menu.buildFromTemplate(template));
 	};
 	trayHost.setListener(renderTray);
+	// 7.16 — close to tray. While "Keep running in the background" is on (never
+	// on macOS, whose dock already keeps a windowless app alive), the tray
+	// always carries Open / Quit so the process is never unreachable.
+	const closeToTrayPrefs = new BackgroundPrefsStore(backgroundPrefsPath(app.getPath("userData")));
+	backgroundPrefs = closeToTrayPrefs;
+	const applyCloseToTray = (): void => {
+		const keep = supportsCloseToTray(process.platform) && closeToTrayPrefs.cached.keepRunning;
+		trayHost.setShellItems(
+			keep
+				? [
+						{ action: TrayShellAction.Open, label: "Open Brainstorm" },
+						{ action: TrayShellAction.Quit, label: "Quit Brainstorm" },
+					]
+				: [],
+		);
+	};
+	await closeToTrayPrefs.load();
+	applyCloseToTray();
+	ipcMain.handle("background:get-prefs", () => ({
+		supported: supportsCloseToTray(process.platform),
+		keepRunning: closeToTrayPrefs.cached.keepRunning,
+	}));
+	ipcMain.handle("background:set-prefs", async (_event, keepRunning: unknown) => {
+		if (typeof keepRunning !== "boolean") throw new Error("background:set-prefs: boolean expected");
+		await closeToTrayPrefs.set(keepRunning);
+		applyCloseToTray();
+		return { supported: supportsCloseToTray(process.platform), keepRunning };
+	});
 	// 7.14 follow-up — the OS dock/taskbar badge single owner: BOTH signals
 	// (notification unread via `dashboard-handlers.updateNotificationBadge`,
 	// app badges via the BadgeHost listener below) report to the aggregator,
@@ -6571,15 +6912,7 @@ void app.whenReady().then(async () => {
 		// parked; gating on it left the app running with only unreachable hidden
 		// windows and no way back to the dashboard.
 		if (decision.action === DockActivation.CreateDashboard) {
-			dashboardWindow = createDashboardWindow();
-			registerAndTrack(dashboardWindow);
-			shortcuts.attach(dashboardWindow.webContents);
-			// Re-bind the prompt hosts. Without this a close/reopen left every
-			// dashboard-owned prompt pointing at a dead renderer: capability
-			// requests, OS-handoff consent, the open-with picker and tool
-			// approval all refused silently.
-			attachDashboardHosts(dashboardWindow.webContents);
-			wireDashboardLinkRouting(dashboardWindow.webContents);
+			reopenDashboard();
 		} else if (dashboardWindow) {
 			surfaceWindow(dashboardWindow);
 		}
@@ -6587,9 +6920,24 @@ void app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => {
-	if (!isMac) {
+	if (
+		shouldQuitWhenAllWindowsClosed(
+			process.platform,
+			backgroundPrefs?.cached ?? DEFAULT_BACKGROUND_PREFS,
+		)
+	) {
 		app.quit();
 	}
+});
+
+// Release drains (10.16 history's pending checkpoints) need the vault still
+// open, so the first quit waits for them once, bounded, then quits for real.
+let quitDrained = false;
+app.on("before-quit", (event) => {
+	if (quitDrained) return;
+	quitDrained = true;
+	event.preventDefault();
+	void drainActiveVaultSession().finally(() => app.quit());
 });
 
 app.on("will-quit", () => {

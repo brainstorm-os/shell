@@ -84,7 +84,19 @@ export type NetworkFetchRequest = {
 	 *  false (public internet only) keeps every existing caller working
 	 *  with zero regression. */
 	readonly allowPrivate?: boolean;
+	/** How a 3xx is treated. Default {@link RedirectPolicy.Follow}. */
+	readonly redirectPolicy?: RedirectPolicy;
 };
+
+export enum RedirectPolicy {
+	/** Follow up to {@link MAX_REDIRECTS} hops, each through the SSRF gate. */
+	Follow = "follow",
+	/** For credential- or transcript-bearing calls. A hop is refused when it
+	 *  would re-send a request body, downgrade https → http, or land on a
+	 *  private address the ORIGINAL origin was not granted — `allowPrivate` is
+	 *  the user trusting one LAN endpoint, not every host it bounces to. */
+	Strict = "strict",
+}
 
 export type NetworkFetchResponse = {
 	/** Final HTTP status code. */
@@ -110,6 +122,8 @@ export enum NetworkFetchErrorKind {
 	Timeout = "timeout",
 	/** Too many Location redirects. */
 	TooManyRedirects = "too-many-redirects",
+	/** A redirect {@link RedirectPolicy.Strict} does not allow. */
+	RedirectRefused = "redirect-refused",
 	/** Underlying fetch threw (TLS / connect / read). */
 	TransportError = "transport-error",
 }
@@ -123,6 +137,25 @@ export class NetworkFetchError extends Error {
 		this.kind = kind;
 		this.detail = detail;
 	}
+}
+
+function strictRedirectRefusal(
+	method: string,
+	body: Uint8Array | undefined,
+	fromUrl: string,
+	toUrl: string,
+): string | null {
+	if ((body !== undefined && body.length > 0) || (method !== "GET" && method !== "HEAD")) {
+		return "redirect-would-resend-body";
+	}
+	try {
+		if (new URL(fromUrl).protocol === "https:" && new URL(toUrl).protocol !== "https:") {
+			return "redirect-downgrades-tls";
+		}
+	} catch {
+		return "redirect-malformed";
+	}
+	return null;
 }
 
 /** Headers the broker manages itself — overriding any caller-supplied value. */
@@ -268,7 +301,11 @@ export async function executeNetworkFetch(
 			// `LocalHostname` pattern rejections; the rest of the floor
 			// (non-HTTP scheme, malformed URL, blocked port, IDN decode)
 			// still wins — `.private` only trades local network for the cap.
-			const preCheck = checkUrl(currentUrl, { allowPrivate: request.allowPrivate ?? false });
+			const strict = request.redirectPolicy === RedirectPolicy.Strict;
+			const allowPrivate =
+				(request.allowPrivate ?? false) &&
+				(!strict || redirectCount === 0 || safeOrigin(currentUrl) === requestOrigin);
+			const preCheck = checkUrl(currentUrl, { allowPrivate });
 			if (!preCheck.ok) {
 				await writeAudit(currentUrl, 0, 0, NetworkAuditOutcome.Refused, preCheck.reason);
 				throw new NetworkFetchError(
@@ -298,7 +335,7 @@ export async function executeNetworkFetch(
 			let pinnedIp: string | null = null;
 			let lastRejection: SsrfCheck | null = null;
 			for (const ip of resolvedIps) {
-				const ipCheck = checkResolvedIp(ip, { allowPrivate: request.allowPrivate ?? false });
+				const ipCheck = checkResolvedIp(ip, { allowPrivate });
 				if (ipCheck.ok) {
 					// Pin to the first valid IP. We could try the others — but
 					// the contract says "every resolved IP must pass", so the
@@ -390,7 +427,15 @@ export async function executeNetworkFetch(
 							`exceeded ${MAX_REDIRECTS}`,
 						);
 					}
-					currentUrl = resolveRelativeUrl(currentUrl, location);
+					const nextUrl = resolveRelativeUrl(currentUrl, location);
+					if (strict) {
+						const refusal = strictRedirectRefusal(method, request.body, currentUrl, nextUrl);
+						if (refusal) {
+							await writeAudit(currentUrl, impl.status, 0, NetworkAuditOutcome.Refused, refusal);
+							throw new NetworkFetchError(NetworkFetchErrorKind.RedirectRefused, refusal);
+						}
+					}
+					currentUrl = nextUrl;
 					continue;
 				}
 			}

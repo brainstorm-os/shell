@@ -4,3 +4,7 @@
 	color: var(--color-text-primary);
 	line-height: var(--text-line-height-normal);
 }
+
+.confirm__remember {
+	margin-top: var(--space-3);
+}

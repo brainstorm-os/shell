@@ -149,6 +149,7 @@ async function openCollectionPicker(
 	}
 	const items: AnchoredMenuItem[] = options.map((opt) => ({
 		label: opt.name,
+		...(opt.description ? { description: opt.description } : {}),
 		...(opt.isMember ? { icon: IconName.CheckCircle } : {}),
 		onSelect: () => {
 			void toggleCollectionMembership(

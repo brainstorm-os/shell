@@ -107,6 +107,11 @@ export default defineConfig({
 				"packages/sdk/src/tool-outcome/tool-outcome.css",
 			),
 			"@brainstorm-os/sdk/tool-outcome": resolve(__dirname, "packages/sdk/src/tool-outcome/index.ts"),
+			"@brainstorm-os/sdk/run-changes.css": resolve(
+				__dirname,
+				"packages/sdk/src/run-changes/run-changes.css",
+			),
+			"@brainstorm-os/sdk/run-changes": resolve(__dirname, "packages/sdk/src/run-changes/index.ts"),
 			"@brainstorm-os/sdk/proposal-tray.css": resolve(
 				__dirname,
 				"packages/sdk/src/proposal-tray/proposal-tray.css",
@@ -217,7 +222,12 @@ export default defineConfig({
 			"@brainstorm-os/sdk/lock-button": resolve(__dirname, "packages/sdk/src/lock-button/index.ts"),
 			"@brainstorm-os/sdk/entity-icon": resolve(__dirname, "packages/sdk/src/entity-icon.ts"),
 			"@brainstorm-os/sdk/entity-title": resolve(__dirname, "packages/sdk/src/entity-title.ts"),
+			"@brainstorm-os/sdk/entity-authorship": resolve(
+				__dirname,
+				"packages/sdk/src/entity-authorship.ts",
+			),
 			"@brainstorm-os/sdk/entity-lock": resolve(__dirname, "packages/sdk/src/entity-lock.ts"),
+			"@brainstorm-os/sdk/task-state": resolve(__dirname, "packages/sdk/src/task-state.ts"),
 			"@brainstorm-os/sdk/tab-identity": resolve(__dirname, "packages/sdk/src/tab-identity.ts"),
 			"@brainstorm-os/sdk/entity-cover": resolve(__dirname, "packages/sdk/src/entity-cover.ts"),
 			"@brainstorm-os/sdk/entity-body-copy": resolve(
@@ -226,6 +236,8 @@ export default defineConfig({
 			),
 			"@brainstorm-os/sdk/templates": resolve(__dirname, "packages/sdk/src/templates.ts"),
 			"@brainstorm-os/sdk/entity-drag": resolve(__dirname, "packages/sdk/src/entity-drag.ts"),
+			"@brainstorm-os/sdk/os-file-drop": resolve(__dirname, "packages/sdk/src/os-file-drop/index.ts"),
+			"@brainstorm-os/sdk/backlinks": resolve(__dirname, "packages/sdk/src/backlinks.ts"),
 			"@brainstorm-os/sdk/object-dnd": resolve(__dirname, "packages/sdk/src/object-dnd/index.ts"),
 			"@brainstorm-os/sdk/icon-picker": resolve(__dirname, "packages/sdk/src/icon-picker/index.ts"),
 			"@brainstorm-os/sdk/cover-picker": resolve(__dirname, "packages/sdk/src/cover-picker/index.ts"),
@@ -289,6 +301,14 @@ export default defineConfig({
 			"@brainstorm-os/sdk/typography": resolve(__dirname, "packages/sdk/src/typography/index.ts"),
 			"@brainstorm-os/sdk/popover": resolve(__dirname, "packages/sdk/src/popover/index.ts"),
 			// `.css` precedes the bare JS alias so the longer prefix wins.
+			"@brainstorm-os/sdk/version-history.css": resolve(
+				__dirname,
+				"packages/sdk/src/version-history/version-history.css",
+			),
+			"@brainstorm-os/sdk/version-history": resolve(
+				__dirname,
+				"packages/sdk/src/version-history/index.ts",
+			),
 			"@brainstorm-os/sdk/share-dialog.css": resolve(
 				__dirname,
 				"packages/sdk/src/share-dialog/share-dialog.css",
@@ -302,6 +322,11 @@ export default defineConfig({
 			"@brainstorm-os/sdk/date-grid": resolve(__dirname, "packages/sdk/src/date-grid/index.ts"),
 			"@brainstorm-os/sdk/calendar": resolve(__dirname, "packages/sdk/src/calendar/index.ts"),
 			"@brainstorm-os/sdk/panel-toggle": resolve(__dirname, "packages/sdk/src/panel-toggle/index.ts"),
+			"@brainstorm-os/sdk/confirm-memory": resolve(__dirname, "packages/sdk/src/confirm-memory.ts"),
+			"@brainstorm-os/sdk/icon-recents": resolve(
+				__dirname,
+				"packages/sdk/src/icon-picker/recent-icons.ts",
+			),
 			"@brainstorm-os/sdk/pdf-engine": resolve(__dirname, "packages/sdk/src/pdf-engine/index.ts"),
 			"@brainstorm-os/sdk/checkbox": resolve(__dirname, "packages/sdk/src/checkbox/index.ts"),
 			"@brainstorm-os/sdk/count-badge": resolve(__dirname, "packages/sdk/src/count-badge/index.ts"),

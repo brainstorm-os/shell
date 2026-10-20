@@ -118,6 +118,16 @@ export type Tokens = {
 		focus: {
 			ring: string;
 		};
+		/** The emphasised text-cursor face behind Settings → Appearance →
+		 *  "Text cursor & selection" (12.18). Only painted while the root carries
+		 *  `data-bs-text-emphasis`; the default caret / selection stay native.
+		 *  `caret` aliases accent-as-text (AA on the page by the contrast ratchet)
+		 *  and `selection` is a translucent accent wash that keeps primary text
+		 *  at AA over it in every theme (`visibility.test.ts`). */
+		emphasis: {
+			caret: string;
+			selection: string;
+		};
 		/** Interactive overlay colors — applied to icon buttons, list rows,
 		 *  any clickable surface that needs a hover / active treatment that
 		 *  works equally well over solid backgrounds and glass surfaces. */
@@ -151,6 +161,23 @@ export type Tokens = {
 		 *  outside the current pattern. Per the
 		 *  [[apps-inherit-shell-theme]] memory: the graph app reads these
 		 *  via CSS vars (no parallel palette in the app). */
+		/** Block-level background tints (B11.23) — the editor's paragraph /
+		 *  heading / callout / table-cell backgrounds. A tint sits BEHIND body
+		 *  text, so light themes carry a pale wash under dark ink and dark
+		 *  themes a deep tint under light ink; every hue clears `text.primary`
+		 *  at AA in every theme (themes-contrast ratchet). Same hue set as the
+		 *  editor's inline swatches. */
+		blockBackground: {
+			gray: string;
+			brown: string;
+			orange: string;
+			yellow: string;
+			green: string;
+			blue: string;
+			purple: string;
+			pink: string;
+			red: string;
+		};
 		graph: {
 			subject: {
 				"1": string;

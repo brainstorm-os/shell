@@ -44,7 +44,12 @@ import {
 	openAnchoredMenu,
 	openObjectMenu,
 } from "@brainstorm-os/sdk/object-menu";
-import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import {
+	type AutoHidePanelProps,
+	PanelSide,
+	PanelToggleButton,
+	useAutoHidePanel,
+} from "@brainstorm-os/sdk/panel-toggle";
 import { openCoverPicker, openIconPicker } from "@brainstorm-os/sdk/picker-host";
 import { attachResizable } from "@brainstorm-os/sdk/resizable";
 import { useShortcut } from "@brainstorm-os/sdk/shortcut";
@@ -781,6 +786,7 @@ export function BookmarksApp() {
 			return next;
 		});
 	}, []);
+	const navAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !navOpen });
 	const toggleProps = useCallback(() => {
 		setPropsOpen((open) => {
 			const next = !open;
@@ -1134,7 +1140,10 @@ export function BookmarksApp() {
 					onSelectCollection={selectCollection}
 					onSaveCollection={saveCurrentViewAsCollection}
 					onRemoveCollection={removeCollection}
+					open={navAutoHide.visible}
+					autoHide={navAutoHide.panelProps}
 				/>
+				{navAutoHide.edgeProps && <div {...navAutoHide.edgeProps} />}
 				<MainPane
 					openBookmark={openBookmark}
 					surface={surface}
@@ -1237,6 +1246,9 @@ type SidebarProps = {
 	onSelectCollection: (id: string) => void;
 	onSaveCollection: () => void;
 	onRemoveCollection: (id: string) => void;
+	/** The sidebar is on screen — pinned open, or revealed by auto-hide (7.15). */
+	open: boolean;
+	autoHide: AutoHidePanelProps;
 };
 
 function Sidebar({
@@ -1251,8 +1263,18 @@ function Sidebar({
 	onSelectCollection,
 	onSaveCollection,
 	onRemoveCollection,
+	open,
+	autoHide,
 }: SidebarProps) {
 	const scrollRef = useRef<HTMLElement | null>(null);
+	const autoHideRef = autoHide.ref;
+	const setSidebarRef = useCallback(
+		(el: HTMLElement | null) => {
+			scrollRef.current = el;
+			autoHideRef?.(el);
+		},
+		[autoHideRef],
+	);
 	const tagListRef = useRef<HTMLUListElement | null>(null);
 
 	const surfaceCount = useCallback(
@@ -1308,7 +1330,13 @@ function Sidebar({
 	});
 
 	return (
-		<aside className="bookmarks__sidebar" ref={scrollRef}>
+		<aside
+			{...autoHide}
+			className="bookmarks__sidebar"
+			ref={setSidebarRef}
+			aria-hidden={open ? undefined : true}
+			inert={open ? undefined : true}
+		>
 			<nav className="bookmarks__nav" aria-label={t("nav.surfaces")}>
 				{BOOKMARK_SURFACES.map((s) => (
 					<button

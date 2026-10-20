@@ -37,6 +37,7 @@ body {
 }
 
 .agent__body {
+	position: relative; /* anchor for the auto-hide sidebar overlay (7.15) */
 	flex: 1;
 	display: grid;
 	grid-template-columns: 248px 1fr;
@@ -47,8 +48,12 @@ body {
 	grid-template-columns: 1fr;
 }
 
-.agent__body[data-sidebar-open="false"] .agent__sidebar {
+.agent__body[data-sidebar-open="false"] .agent__sidebar:not([data-bs-autohide]) {
 	display: none;
+}
+
+.agent__sidebar[data-bs-autohide] {
+	inline-size: 248px;
 }
 
 /* ── Sidebar (a real left track) ── */
@@ -413,6 +418,13 @@ body {
 	padding: var(--space-2) 0 0;
 }
 
+.agent__run-changes {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	padding: var(--space-2) 0 0;
+}
+
 .agent__created-label {
 	font-size: var(--text-size-xs);
 	color: var(--color-text-secondary);
@@ -626,6 +638,12 @@ body {
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2);
+}
+
+.agent-settings__error {
+	margin: 0;
+	font-size: var(--text-size-xs);
+	color: var(--danger);
 }
 
 .agent-settings__spent {

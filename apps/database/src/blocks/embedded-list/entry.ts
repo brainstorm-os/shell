@@ -7,8 +7,11 @@
  * over the BP graph module).
  *
  * Data flow: the host hands us the embedded entity id (a `brainstorm/List/v1`).
- * We `getEntity` it for the title + membership, resolve its rows (explicit
- * `members.include`, else a type query against `source`), derive a small
+ * We `getEntity` it for the title + membership, resolve its rows the way the
+ * Database app does — source ∪ include \ exclude, then the default view's
+ * filter + sort, with the host document as the `$host` context so a
+ * contextual filter ("author contains this page") resolves against the page
+ * the block sits in (`./resolve-rows.ts`, 9.12.24) — derive a small
  * column set from the rows' properties, resolve any referenced entities'
  * titles, and paint a grid. A row click asks the host to open that entity
  * (`navigate`); a host `refresh` ping re-queries. Pure DOM — no framework in
@@ -17,7 +20,9 @@
  */
 
 import { type BlockRuntimeContext, startBlock } from "@brainstorm-os/sdk/block-runtime";
+import { isLockedProperties } from "@brainstorm-os/sdk/entity-lock";
 import { entityTitleOr, resolveEntityTitle } from "@brainstorm-os/sdk/entity-title";
+import { createEmbeddedRow } from "./create-row";
 import {
 	EMPTY_REF_TITLES,
 	MAX_ROWS,
@@ -28,68 +33,8 @@ import {
 	formatCell,
 	plainText,
 } from "./format";
-
-interface BpEntity {
-	entityId: string;
-	entityTypeId: string;
-	properties: Record<string, unknown>;
-	updatedAt: number;
-}
-
-interface QueryResult {
-	results?: { vertices?: Record<string, [BpEntity]> };
-}
-
-function asId(member: unknown): string | null {
-	if (typeof member === "string") return member;
-	if (member && typeof member === "object") {
-		const id =
-			(member as { id?: unknown; entityId?: unknown }).id ??
-			(member as { entityId?: unknown }).entityId;
-		if (typeof id === "string") return id;
-	}
-	return null;
-}
-
-/** Best-effort read of a type id from a List's `source` object (the
- *  type-derived list case). Defensive: the shape is app-internal and may
- *  evolve, so unknown shapes resolve to null (→ empty grid, not a throw). */
-function sourceType(list: BpEntity): string | null {
-	const source = list.properties.source as
-		| { type?: unknown; query?: { type?: unknown } }
-		| null
-		| undefined;
-	if (!source || typeof source !== "object") return null;
-	if (typeof source.type === "string") return source.type;
-	if (source.query && typeof source.query.type === "string") return source.query.type;
-	return null;
-}
-
-async function resolveRows(
-	graph: <T>(m: string, d: unknown) => Promise<T>,
-	list: BpEntity,
-): Promise<BpEntity[]> {
-	const members = (list.properties.members as { include?: unknown } | undefined)?.include;
-	if (Array.isArray(members) && members.length > 0) {
-		const ids = members
-			.map(asId)
-			.filter((x): x is string => x !== null)
-			.slice(0, MAX_ROWS);
-		const got = await Promise.all(
-			ids.map((entityId) => graph<BpEntity>("getEntity", { entityId }).catch(() => null)),
-		);
-		return got.filter((x): x is BpEntity => x !== null);
-	}
-	const type = sourceType(list);
-	if (type) {
-		const res = await graph<QueryResult>("queryEntities", { operation: { entityTypeId: type } });
-		const vertices = res.results?.vertices ?? {};
-		return Object.values(vertices)
-			.map((v) => v[0])
-			.slice(0, MAX_ROWS);
-	}
-	return [];
-}
+import { type BpEntity, resolveEmbedded } from "./resolve-rows";
+import { t } from "./strings";
 
 /** Resolve stored ref-like ids to their entities' titles via the graph.
  *  Entity ids (`ent_…`) resolve; catalog ids (`di_…` dictionary options the
@@ -129,6 +74,9 @@ const STYLES = `
 body { margin: 0; }
 .bsdb { font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--color-text-primary, light-dark(#1c1c1e, #f7f7f7)); }
 .bsdb__title { font-weight: 600; font-size: 13px; padding: 8px 12px 6px; display: flex; align-items: center; gap: 8px; }
+.bsdb__new { margin-left: auto; font: inherit; font-weight: 500; font-size: 12px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--color-border-subtle, rgba(127,127,127,.24)); background: transparent; color: var(--color-text-secondary, light-dark(#6b6b70, #f7f7f7)); cursor: pointer; }
+.bsdb__new:hover { background: var(--color-accent-subtle, rgba(127,127,127,.07)); }
+.bsdb__new:disabled { opacity: .6; cursor: default; }
 .bsdb__count { color: var(--color-text-tertiary, light-dark(#8a8a8e, rgba(247,247,247,.62))); font-weight: 400; }
 .bsdb__scroll { overflow-x: auto; border-top: 1px solid var(--color-border-subtle, rgba(127,127,127,.16)); }
 .bsdb__table { border-collapse: collapse; width: 100%; }
@@ -155,20 +103,46 @@ export function bootEmbeddedList(ctx: BlockRuntimeContext): void {
 
 	const report = (): void => ctx.reportHeight(ctx.root.scrollHeight);
 
-	ctx.onLoad(async () => {
+	const loadOnce = async (): Promise<void> => {
 		try {
 			const list = await ctx.graph<BpEntity>("getEntity", { entityId: ctx.entityId });
-			const rows = await resolveRows(ctx.graph, list);
+			const host = ctx.hostEntityId();
+			const { rows, view } = await resolveEmbedded(ctx.graph, list, host);
 			const columns = deriveColumns(rows);
 			const titles = await resolveRefTitles(ctx.graph, collectRefIds(rows, columns));
-			renderGrid(ctx.root, list, rows, columns, titles, (row) =>
-				ctx.navigate(row.entityId, row.entityTypeId),
-			);
+			renderGrid(ctx.root, list, rows, columns, titles, {
+				onOpenRow: (row) => ctx.navigate(row.entityId, row.entityTypeId),
+				onNew: async () => {
+					const created = await createEmbeddedRow(ctx.graph, list, view, host);
+					await load();
+					ctx.navigate(created.entityId, created.entityTypeId);
+				},
+			});
 		} catch {
 			renderError(ctx.root);
 		}
 		report();
-	});
+	};
+	// A reload asked for while one is in flight (onLoad + "New" + a host
+	// refresh) runs once after it, never as a parallel duplicate resolve.
+	let inFlight: Promise<void> | null = null;
+	let again = false;
+	const load = (): Promise<void> => {
+		if (inFlight) {
+			again = true;
+			return inFlight;
+		}
+		inFlight = (async () => {
+			do {
+				again = false;
+				await loadOnce();
+			} while (again);
+		})().finally(() => {
+			inFlight = null;
+		});
+		return inFlight;
+	};
+	ctx.onLoad(load);
 }
 
 startBlock(bootEmbeddedList);
@@ -179,25 +153,46 @@ function renderGrid(
 	rows: BpEntity[],
 	columns: string[],
 	titles: RefTitles,
-	onOpenRow: (row: BpEntity) => void,
+	actions: { onOpenRow: (row: BpEntity) => void; onNew: () => Promise<void> },
 ): void {
+	const { onOpenRow } = actions;
 	const doc = root.ownerDocument;
 	root.replaceChildren();
 
 	const title = doc.createElement("div");
 	title.className = "bsdb__title";
-	const name = entityTitleOr(list.properties, "Database");
+	const name = entityTitleOr(list.properties, t("embed.fallbackTitle"));
 	title.append(name);
 	const count = doc.createElement("span");
 	count.className = "bsdb__count";
 	count.textContent = `· ${rows.length}`;
 	title.append(count);
+	const add = doc.createElement("button");
+	add.type = "button";
+	add.className = "bsdb__new";
+	add.textContent = t("embed.new");
+	add.setAttribute("aria-label", t("embed.newIn", { name }));
+	if (isLockedProperties(list.properties)) {
+		// A disabled control fires no pointer events, so the native title is the
+		// one place the reason can live.
+		add.disabled = true;
+		add.title = t("embed.locked", { name });
+		add.setAttribute("aria-label", t("embed.locked", { name }));
+	}
+	add.addEventListener("click", () => {
+		add.disabled = true;
+		actions.onNew().catch(() => {
+			add.disabled = false;
+			add.textContent = t("embed.createFailed");
+		});
+	});
+	title.append(add);
 	root.append(title);
 
 	if (rows.length === 0) {
 		const empty = doc.createElement("div");
 		empty.className = "bsdb__empty";
-		empty.textContent = "No items yet";
+		empty.textContent = t("embed.empty");
 		root.append(empty);
 		return;
 	}
@@ -244,6 +239,6 @@ function renderError(root: HTMLElement): void {
 	root.replaceChildren();
 	const err = doc.createElement("div");
 	err.className = "bsdb__error";
-	err.textContent = "Couldn't load this database.";
+	err.textContent = t("embed.loadFailed");
 	root.append(err);
 }

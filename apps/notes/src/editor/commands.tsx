@@ -27,12 +27,16 @@ import {
 	SwatchColor,
 	TocIcon,
 	TodoListIcon,
+	TurnIntoPageIcon,
 	applySwatchToBlocks,
+	createBlockBackgroundActions,
 	createEditorT,
 	createEntityEmbedCommand,
+	createInsertBlockActions,
 	createMediaBlockCommands,
 	createStandardBlockActions,
 	createStandardBlockCommands,
+	createTaskCommand,
 	createTransclusionCommand,
 	getBlockAnchorsController,
 	insertSnippet,
@@ -60,8 +64,10 @@ import {
 } from "lexical";
 import type { ReactNode } from "react";
 import { t } from "../i18n/t";
+import { plantSerializedStateIntoDoc } from "../store/migrate-body";
 import { newNoteId } from "../store/note";
 import { getBrainstorm } from "../store/runtime";
+import { getYDocResolverApi } from "../store/ydoc-resolver";
 import { AddPropertyTargetKind, addPropertyStore } from "./add-property-store";
 import { copyBlockLink } from "./block-link";
 import { $createBookmarkNode } from "./nodes/bookmark-node";
@@ -73,6 +79,7 @@ import { $createPageRefNode } from "./nodes/page-ref-node";
 import { $createSelectFieldNode } from "./nodes/select-field-node";
 import { $createTableOfContentsNode } from "./nodes/toc-node";
 import { deriveSnippetName, templatesToSnippetOptions } from "./template-snippet";
+import { turnBlocksIntoPage } from "./turn-into-page";
 
 /** The Notes entity type — a child sub-page is just another Note. Keep
  *  in sync with the same constant in mention-node.tsx. */
@@ -121,7 +128,7 @@ const PALETTE_STRUCTURE: readonly string[] = [
 	"block.toggleHeading3",
 	"block.table",
 ];
-const PALETTE_LAYOUT: readonly string[] = ["block.columns2", "block.columns3"];
+const PALETTE_LAYOUT: readonly string[] = ["block.columns2", "block.columns3", "block.tabs"];
 
 /** The full ordered shared-id palette (F-070 rung (b)) — exported for the
  *  drift-fence test against the shared catalogue. */
@@ -361,6 +368,9 @@ const NOTES_EMBED_COMMANDS: readonly BlockCommand[] = [
 
 export const BLOCK_COMMANDS: readonly BlockCommand[] = [
 	...shared(PALETTE_TEXT),
+	// `/task` (B11.24) — a real Task/v1 entity, inlined as a live-checkbox
+	// chip; Notes wires the `entities` editor host in main.tsx.
+	createTaskCommand(editorT),
 	...NOTES_MEDIA_COMMANDS,
 	NOTES_PROPERTY_COMMAND,
 	...shared(PALETTE_STRUCTURE),
@@ -463,6 +473,17 @@ const SAVE_AS_TEMPLATE_ACTION: BlockCommand = {
 	},
 };
 
+/** "Turn into → Page" (B11.25): the selected blocks become a new sub-page. */
+const TURN_INTO_PAGE_ACTION: BlockCommand = {
+	id: "block.turn.page",
+	category: CommandCategory.TurnInto,
+	label: t("notes.action.turnIntoPage.label"),
+	description: t("notes.action.turnIntoPage.description"),
+	icon: <TurnIntoPageIcon />,
+	keywords: ["page", "subpage", "sub-page", "turn", "convert", "extract", "move"],
+	run: ({ editor, blockKeys }) => runTurnIntoPage(editor, blockKeys),
+};
+
 const sharedActions = createStandardBlockActions(editorT);
 const deleteActionIndex = sharedActions.findIndex((c) => c.id === "block.action.delete");
 
@@ -471,6 +492,8 @@ const deleteActionIndex = sharedActions.findIndex((c) => c.id === "block.action.
  *  add-property actions slotted before Delete, plus the colour /
  *  highlight swatch rows. */
 export const BLOCK_ACTIONS: readonly BlockCommand[] = [
+	...createInsertBlockActions(editorT, BLOCK_COMMANDS),
+	TURN_INTO_PAGE_ACTION,
 	...sharedActions.slice(0, deleteActionIndex),
 	COPY_LINK_ACTION,
 	ADD_PROPERTY_ACTION,
@@ -478,6 +501,7 @@ export const BLOCK_ACTIONS: readonly BlockCommand[] = [
 	...sharedActions.slice(deleteActionIndex),
 	...SWATCH_COLORS.map((color) => colorAction(ColorTarget.Text, color)),
 	...SWATCH_COLORS.map((color) => colorAction(ColorTarget.Highlight, color)),
+	...createBlockBackgroundActions(editorT),
 ];
 
 /** Slash-trigger path: the caller's paragraph (the one with `/property`)
@@ -634,6 +658,32 @@ function firstBlockText(editor: LexicalEditor, blockKeys: ReadonlySet<NodeKey>):
 		}
 	});
 	return text;
+}
+
+async function runTurnIntoPage(
+	editor: LexicalEditor,
+	blockKeys: ReadonlySet<NodeKey> | undefined,
+): Promise<void> {
+	if (!blockKeys || blockKeys.size === 0 || !editor.isEditable()) return;
+	const entities = getBrainstorm()?.services.entities;
+	const resolver = getYDocResolverApi();
+	if (!entities || !resolver) {
+		console.warn(
+			"[notes/turn-into-page] entities / ydoc services unavailable — can't create a page.",
+		);
+		return;
+	}
+	try {
+		await turnBlocksIntoPage(editor, blockKeys, {
+			create: (type, properties, id) => entities.create(type, properties, id),
+			resolve: resolver.resolve,
+			whenLoaded: resolver.whenLoaded,
+			plant: plantSerializedStateIntoDoc,
+			newId: newNoteId,
+		});
+	} catch (error) {
+		console.warn("[notes/turn-into-page] failed — the document is unchanged:", error);
+	}
 }
 
 function insertSubPage(editor: LexicalEditor): void {

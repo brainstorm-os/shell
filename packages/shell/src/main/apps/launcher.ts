@@ -31,8 +31,10 @@ import { focusStealingDisabled, revealWindow } from "../window/reveal-window";
 import {
 	type BaseWindowHandle,
 	type Tab,
+	type TabSpec,
 	type TabViewFactory,
 	WindowContainer,
+	appSelfManagesTabs,
 } from "./window-container";
 
 export type LaunchOptions = {
@@ -68,6 +70,9 @@ export type LaunchOptions = {
 	/** Active regional-format context. Rides the handshake so a freshly-launched
 	 *  window formats dates / numbers per Settings → Regional (12.15 15f). */
 	format?: FormatContext;
+	/** Visibility preferences (12.18) as `encodeDisplayPrefs` output, passed
+	 *  via `--brainstorm-display=<names>` for the first paint. */
+	display?: string;
 };
 
 /** Public per-tab record consumed by the window index, intents bus, and the
@@ -196,6 +201,8 @@ export class AppLauncher {
 		for (const record of this.containers.values()) {
 			if (record.parked) continue;
 			out.add(record.appId);
+			const side = record.container.sidePane();
+			if (side) out.add(side.appId);
 		}
 		return [...out];
 	}
@@ -246,8 +253,27 @@ export class AppLauncher {
 	addTabToContainer(containerId: string, opts: LaunchOptions): AppWindow {
 		const record = this.recordByContainerId.get(containerId);
 		if (!record || record.container.baseWindow.isDestroyed()) return this.openInNewWindow(opts);
+		// Strip tabs are intra-app: another app's launch never joins this strip.
+		if (record.appId !== opts.appId) return this.openInNewWindow(opts);
 		if (record.parked) this.unpark(record.key, record);
 		const tab = this.addTabFor(record, opts);
+		this.bringToFront(record.container.baseWindow);
+		this.notifyWindowsChanged();
+		return this.snapshot(record, tab);
+	}
+
+	/** Open the launch context beside the active tab of an existing container
+	 *  (split view, 6.14). The side pane is its OWN renderer registered under
+	 *  its own app id, whatever app the container belongs to. Returns null when
+	 *  the window can't be split — gone, or a self-tabbing app on either side
+	 *  (the Browser positions page views against the full window body). */
+	openSidePane(containerId: string, opts: LaunchOptions): AppWindow | null {
+		const record = this.recordByContainerId.get(containerId);
+		if (!record || record.container.baseWindow.isDestroyed()) return null;
+		if (appSelfManagesTabs(record.appId) || appSelfManagesTabs(opts.appId)) return null;
+		const spec = this.tabSpecFor(opts);
+		if (record.parked) this.unpark(record.key, record);
+		const tab = record.container.openSidePane({ ...spec, appId: opts.appId });
 		this.bringToFront(record.container.baseWindow);
 		this.notifyWindowsChanged();
 		return this.snapshot(record, tab);
@@ -269,10 +295,10 @@ export class AppLauncher {
 	focusTabByRoute(route: string): AppWindow | null {
 		for (const record of this.containers.values()) {
 			if (record.container.baseWindow.isDestroyed()) continue;
-			for (const tab of record.container.tabs()) {
+			for (const tab of record.container.panes()) {
 				if (!tab.route || !routesEquivalent(tab.route, route)) continue;
 				if (record.parked) this.unpark(record.key, record);
-				record.container.activateTab(tab.tabId);
+				this.activatePane(record, tab.tabId);
 				this.bringToFront(record.container.baseWindow);
 				return this.snapshot(record, tab);
 			}
@@ -294,9 +320,9 @@ export class AppLauncher {
 		const { record, tabId } = hit;
 		if (record.container.baseWindow.isDestroyed()) return null;
 		if (record.parked) this.unpark(record.key, record);
-		record.container.activateTab(tabId);
+		this.activatePane(record, tabId);
 		this.bringToFront(record.container.baseWindow);
-		const tab = record.container.tabById(tabId);
+		const tab = record.container.panes().find((t) => t.tabId === tabId);
 		return tab ? this.snapshot(record, tab) : null;
 	}
 
@@ -304,7 +330,17 @@ export class AppLauncher {
 	closeApp(appId: string): void {
 		let removed = false;
 		for (const [key, record] of [...this.containers]) {
-			if (record.appId !== appId) continue;
+			if (record.appId !== appId) {
+				if (record.container.sidePane()?.appId === appId) {
+					record.container.closeSidePane();
+					removed = true;
+				}
+				continue;
+			}
+			// The side pane is another app's live renderer; uninstalling or
+			// updating THIS app is no reason to kill it.
+			const side = record.container.sidePane();
+			if (side && side.appId !== appId) this.rehomeSidePane(record);
 			this.evict(key, record);
 			removed = true;
 		}
@@ -322,9 +358,10 @@ export class AppLauncher {
 	windowsFor(appId: string): AppWindow[] {
 		const out: AppWindow[] = [];
 		for (const record of this.containers.values()) {
-			if (record.appId !== appId) continue;
 			if (record.container.baseWindow.isDestroyed()) continue;
-			for (const tab of record.container.tabs()) out.push(this.snapshot(record, tab));
+			for (const tab of record.container.panes()) {
+				if (tab.appId === appId) out.push(this.snapshot(record, tab));
+			}
 		}
 		return out;
 	}
@@ -344,7 +381,7 @@ export class AppLauncher {
 		const out: AppWindow[] = [];
 		for (const record of this.containers.values()) {
 			if (record.container.baseWindow.isDestroyed()) continue;
-			for (const tab of record.container.tabs()) out.push(this.snapshot(record, tab));
+			for (const tab of record.container.panes()) out.push(this.snapshot(record, tab));
 		}
 		return out;
 	}
@@ -383,17 +420,17 @@ export class AppLauncher {
 
 	/** Resolve the container owning a TAB renderer's webContents — used by the
 	 *  "New Tab" menu action to target the focused window (the focused
-	 *  webContents is the active tab's view, not the strip). */
+	 *  webContents is the active tab's view, not the strip). `appId` is the
+	 *  SENDER's app: in a split window the side pane is a different app from
+	 *  the container, and its Cmd+T must open that app, not the primary. */
 	containerForTabSender(
 		webContentsId: number,
 	): { container: WindowContainer; appId: string; windowId: string } | null {
 		const hit = this.tabIndex.get(webContentsId);
 		if (!hit || hit.record.container.baseWindow.isDestroyed()) return null;
-		return {
-			container: hit.record.container,
-			appId: hit.record.appId,
-			windowId: hit.record.windowId,
-		};
+		const tab = hit.record.container.panes().find((t) => t.tabId === hit.tabId);
+		if (!tab) return null;
+		return { container: hit.record.container, appId: tab.appId, windowId: hit.record.windowId };
 	}
 
 	// ── internal ───────────────────────────────────────────────────────────
@@ -421,18 +458,20 @@ export class AppLauncher {
 			tabViewFactory: this.options.tabViewFactory,
 			nextTabId: () => `tab-${++this.tabSeq}`,
 			reveal: (w) => revealWindow(w),
+			// Identity is the TAB's app, never the container's: a side pane in a
+			// split window is a different app's renderer and must be attributed
+			// to that app by the broker.
 			onTabCreated: (_c, tab) => {
-				this.options.identities.register(tab.webContentsId, appId);
-				this.options.appCalls?.attach(appId, tab.webContentsId, tab.view.webContents);
+				this.options.identities.register(tab.webContentsId, tab.appId);
+				this.options.appCalls?.attach(tab.appId, tab.webContentsId, tab.view.webContents);
 				this.tabIndex.set(tab.webContentsId, { record, tabId: tab.tabId });
 			},
-			onTabClosed: (_c, tab) => {
-				this.options.identities.unregister(tab.webContentsId);
-				this.options.appCalls?.detach(appId, tab.webContentsId);
-				this.tabIndex.delete(tab.webContentsId);
-			},
+			onTabClosed: (_c, tab) => this.forgetTab(tab),
 			onChanged: () => this.notifyWindowsChanged(),
-			onEmpty: () => this.evict(key, record),
+			onEmpty: () => {
+				this.rehomeSidePane(record);
+				this.evict(key, record);
+			},
 		});
 		this.containers.set(key, record);
 		this.recordByContainerId.set(record.container.id, record);
@@ -455,11 +494,7 @@ export class AppLauncher {
 			this.park(key, record);
 		};
 		const onClosed = () => {
-			for (const tab of record.container.tabs()) {
-				this.options.identities.unregister(tab.webContentsId);
-				this.options.appCalls?.detach(appId, tab.webContentsId);
-				this.tabIndex.delete(tab.webContentsId);
-			}
+			for (const tab of record.container.panes()) this.forgetTab(tab);
 			if (record.chromeWcId !== null) this.chromeIndex.delete(record.chromeWcId);
 			this.containers.delete(key);
 			this.recordByContainerId.delete(record.container.id);
@@ -475,6 +510,33 @@ export class AppLauncher {
 		return record;
 	}
 
+	private forgetTab(tab: Tab): void {
+		this.options.identities.unregister(tab.webContentsId);
+		this.options.appCalls?.detach(tab.appId, tab.webContentsId);
+		this.tabIndex.delete(tab.webContentsId);
+	}
+
+	private activatePane(record: ContainerRecord, tabId: string): void {
+		if (record.container.sidePane()?.tabId === tabId) record.container.focusSidePane();
+		else record.container.activateTab(tabId);
+	}
+
+	/** The primary pane's last tab closed while a different-app side pane is
+	 *  open: move that live renderer into a fresh window of its own app at the
+	 *  same place, instead of killing it with the container. */
+	private rehomeSidePane(from: ContainerRecord): void {
+		const side = from.container.sidePane();
+		if (!side) return;
+		const bounds = safeBounds(from.container.baseWindow);
+		const detached = from.container.detachSidePane();
+		if (!detached) return;
+		const record = this.createContainer(detached.appId, `win-${++this.windowSeq}`);
+		if (bounds) record.container.baseWindow.setBounds(bounds);
+		this.tabIndex.set(detached.webContentsId, { record, tabId: detached.tabId });
+		record.container.adoptTab(detached);
+		this.notifyWindowsChanged();
+	}
+
 	private resolveAppRecord(opts: LaunchOptions): ReturnType<AppsRepository["getActive"]> {
 		const appRecord = this.options.appsRepo.getActive(opts.appId);
 		if (!appRecord) throw new Error(`AppLauncher: app ${opts.appId} is not installed`);
@@ -487,6 +549,10 @@ export class AppLauncher {
 	}
 
 	private addTabFor(record: ContainerRecord, opts: LaunchOptions): Tab {
+		return record.container.addTab(this.tabSpecFor(opts));
+	}
+
+	private tabSpecFor(opts: LaunchOptions): TabSpec {
 		const appRecord = this.resolveAppRecord(opts);
 		if (!appRecord) throw new Error(`AppLauncher: app ${opts.appId} is not installed`);
 		const preloadPath = join(this.options.mainDir, "../preload/app-preload.js");
@@ -505,22 +571,23 @@ export class AppLauncher {
 		];
 		if (opts.theme) additionalArguments.push(`--brainstorm-theme=${opts.theme}`);
 		if (opts.wallpaperUrl) additionalArguments.push(`--brainstorm-wallpaper=${opts.wallpaperUrl}`);
+		if (opts.display) additionalArguments.push(`--brainstorm-display=${opts.display}`);
 		console.info(
 			`[shell] launch ${opts.appId} v${opts.version} build ${buildSha} dir ${appRecord.bundleDir}`,
 		);
-		return record.container.addTab({
+		return {
 			entryUrl: this.entryUrl(appRecord.bundleDir, opts.entryPath, appRecord.bundleSha256),
 			preloadPath,
 			additionalArguments,
 			backgroundColor: backgroundColorForTheme(opts.theme),
 			route: routeForLaunch(opts.launch),
 			title: this.options.resolveAppName?.(opts.appId) ?? opts.appId,
-		});
+		};
 	}
 
 	private snapshot(record: ContainerRecord, tab: Tab): AppWindow {
 		return {
-			appId: record.appId,
+			appId: tab.appId,
 			windowId: record.windowId,
 			tabId: tab.tabId,
 			webContentsId: tab.webContentsId,
@@ -532,6 +599,11 @@ export class AppLauncher {
 
 	private park(key: string, record: ContainerRecord): void {
 		record.parked = true;
+		// A different app's side pane does not park with the window: kept alive
+		// hidden, `windowsFor` / intents would route that app's opens into an
+		// invisible window instead of one of its own.
+		const side = record.container.sidePane();
+		if (side && side.appId !== record.appId) record.container.closeSidePane();
 		const window = record.container.baseWindow;
 		const hideAndHandOff = () => {
 			if (!record.parked) return; // unparked while leaving fullscreen
@@ -627,6 +699,15 @@ export class AppLauncher {
 		// `?v=<bundle sha>` busts Chromium's file:// cache so a reinstall that
 		// rewrites the bundle in place (dev reseed) serves fresh entry HTML.
 		return `file://${join(bundleDir, entryPath)}?v=${bundleSha256.slice(0, 8)}`;
+	}
+}
+
+function safeBounds(window: BaseWindowHandle): ReturnType<BaseWindowHandle["getBounds"]> | null {
+	if (window.isDestroyed()) return null;
+	try {
+		return window.getBounds();
+	} catch {
+		return null;
 	}
 }
 

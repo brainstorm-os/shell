@@ -133,5 +133,11 @@
   "chrome.meta": "Creado / modificado",
   "chrome.windowControls": "Controles de ventana",
   "chrome.entityHeader": "Encabezado (icono + título + acciones)",
-  "chrome.tabs": "Pestañas"
+  "chrome.tabs": "Pestañas",
+  "action.applyToType": "Aplicar al tipo",
+  "action.applyToTypeHint": "Usar como diseño predeterminado para las nuevas entidades {type}",
+  "status.applying": "Aplicando…",
+  "status.appliedToType": "Aplicado como diseño predeterminado para {type}.",
+  "status.applyInvalid": "Este diseño no se puede aplicar: corrígelo primero en el editor.",
+  "status.applyFailed": "No se pudo aplicar el diseño."
 }

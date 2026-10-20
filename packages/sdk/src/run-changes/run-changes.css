@@ -1,0 +1,111 @@
+/**
+ * Agent-15 run-changes list. Imported once per host
+ * (`import "@brainstorm-os/sdk/run-changes.css"`). Only theme tokens, so the
+ * same sheet reads correctly in the shell renderer and in sandboxed apps.
+ */
+
+.bs-run-changes {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	min-width: 0;
+}
+
+.bs-run-changes__heading {
+	margin: 0;
+	font-size: var(--text-size-sm);
+	font-weight: 600;
+	color: var(--color-text-secondary);
+}
+
+.bs-run-changes__empty,
+.bs-run-changes__note,
+.bs-run-changes__status {
+	margin: 0;
+	font-size: var(--text-size-sm);
+	color: var(--color-text-secondary);
+}
+
+.bs-run-changes__list,
+.bs-run-changes__fields {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+	min-width: 0;
+}
+
+.bs-run-changes__item {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+	padding: var(--space-2);
+	border: 1px solid var(--color-border-subtle);
+	border-radius: var(--radius-md);
+	min-width: 0;
+}
+
+.bs-run-changes__item-head {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	min-width: 0;
+	color: var(--color-text-primary);
+}
+
+.bs-run-changes__kind {
+	flex-shrink: 0;
+	font-size: var(--text-size-sm);
+	color: var(--color-text-secondary);
+}
+
+.bs-run-changes__title {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font: inherit;
+	font-size: var(--text-size-md);
+	color: inherit;
+	background: none;
+	border: 0;
+	padding: 0;
+	text-align: start;
+}
+
+button.bs-run-changes__title {
+	cursor: pointer;
+	text-decoration: underline;
+	text-decoration-color: var(--color-border-subtle);
+}
+
+button.bs-run-changes__title:focus-visible {
+	outline: 2px solid var(--color-focus-ring);
+	outline-offset: 2px;
+}
+
+.bs-run-changes__fields {
+	padding-inline-start: var(--space-4);
+}
+
+.bs-run-changes__field {
+	display: flex;
+	gap: var(--space-2);
+	font-size: var(--text-size-sm);
+	color: var(--color-text-secondary);
+	overflow-wrap: anywhere;
+}
+
+.bs-run-changes__lines {
+	flex-shrink: 0;
+	font-variant-numeric: tabular-nums;
+}
+
+.bs-run-changes__actions {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	flex-wrap: wrap;
+}

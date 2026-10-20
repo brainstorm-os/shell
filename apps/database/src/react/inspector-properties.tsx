@@ -14,7 +14,7 @@
  * Link editors reach the vault catalog.
  */
 
-import { type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
+import { CellPresentation, type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
 import { PropertiesPanel, type PropertiesPanelRow } from "@brainstorm-os/sdk/properties-panel";
 import type { ReactElement } from "react";
 import { effectiveColumnDef } from "../logic/effective-def";
@@ -60,7 +60,14 @@ export function InspectorProperties({
 			def: labelDef,
 			value: readPropertyPath(entity, key),
 			valueNode: (
-				<EditableCell entity={entity} propertyId={key} def={def} layout="cell" onEdit={onEdit} />
+				<EditableCell
+					entity={entity}
+					propertyId={key}
+					def={def}
+					layout="cell"
+					onEdit={onEdit}
+					presentation={CellPresentation.Expanded}
+				/>
 			),
 		};
 	});
@@ -72,7 +79,14 @@ export function InspectorProperties({
 			def,
 			value: readPropertyPath(entity, def.key),
 			valueNode: (
-				<EditableCell entity={entity} propertyId={def.key} def={def} layout="cell" onEdit={onEdit} />
+				<EditableCell
+					entity={entity}
+					propertyId={def.key}
+					def={def}
+					layout="cell"
+					onEdit={onEdit}
+					presentation={CellPresentation.Expanded}
+				/>
 			),
 		});
 	}

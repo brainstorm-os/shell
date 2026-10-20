@@ -26,7 +26,9 @@ import {
 import { announce } from "@brainstorm-os/sdk/a11y";
 import { isEntityLocked, lockRefusesWrite, lockTogglePatch } from "@brainstorm-os/sdk/entity-lock";
 import { entityTitleOr } from "@brainstorm-os/sdk/entity-title";
+import { formatBytes } from "@brainstorm-os/sdk/format-bytes";
 import { type NavHistory, createNavHistory } from "@brainstorm-os/sdk/nav-history";
+import { importDroppedOsFiles, mimeFromName } from "@brainstorm-os/sdk/os-file-drop";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { plural, t } from "../i18n";
 import { type BreadcrumbSegment, deriveBreadcrumbs } from "../logic/breadcrumbs";
@@ -36,7 +38,14 @@ import {
 	openerFromHandlers,
 	unresolvedTypes,
 } from "../logic/browsable-types";
+import { findDuplicateGroups } from "../logic/duplicates";
 import { type EntityLink, partitionLinksForEntity } from "../logic/entity-links";
+import {
+	DEFAULT_FILE_FILTERS,
+	type FileFilters,
+	applyFileFilters,
+	collectExtensions,
+} from "../logic/filters";
 import { FolderTree } from "../logic/folder-tree";
 import { DEFAULT_GROUP_KEY, type EntityGroup, GroupKey, groupEntities } from "../logic/group";
 import { DEFAULT_LIST_COLUMNS, type ListColumn, toggleListColumn } from "../logic/list-columns";
@@ -63,7 +72,7 @@ import {
 	defaultDirectionFor,
 	sortEntities,
 } from "../logic/sort";
-import { collisionName, mimeFromName, sha256Hex } from "../logic/upload";
+import { collisionName, sha256Hex } from "../logic/upload";
 import { type RetainedMembersMap, buildVaultFileTree } from "../logic/vault-tree";
 import {
 	applyViewOptionsToAllFolders,
@@ -240,6 +249,11 @@ export function useFilesStore() {
 	const [searchQuery, setSearchQuery] = useState("");
 	const [searchScope, setSearchScope] = useState<SearchScope>(SearchScope.ActiveFolder);
 	const [smartFolders, setSmartFolders] = useState<SmartFolder[]>([]);
+	// 9.8.16 — property filters are session state that survives navigation
+	// (a "show me PDFs" narrowing follows the user folder to folder);
+	// the Duplicates view is a vault-wide location any folder nav leaves.
+	const [filters, setFilters] = useState<FileFilters>(DEFAULT_FILE_FILTERS);
+	const [duplicatesActive, setDuplicatesActive] = useState(false);
 	const [sortKey, setSortKeyState] = useState<SortKey>(DEFAULT_SORT_KEY);
 	const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_SORT_DIRECTION);
 	const [groupKey, setGroupKeyState] = useState<GroupKey>(DEFAULT_GROUP_KEY);
@@ -358,24 +372,41 @@ export function useFilesStore() {
 	// triggers `rerender` on every mutation (create/rename/move/delete),
 	// so a fresh read here always reflects the latest snapshot. The list
 	// is row-virtualised downstream, so this stays cheap.
-	const searching = searchQuery.trim() !== "";
-	const sortedRows: Entity[] = searching
-		? runSearch({
-				tree,
-				// Vault scope walks from the ROOT folder, not the folder the user
-				// happens to be in (9.8.9) — a Vault-scoped smart folder re-run
-				// must see the whole tree.
-				folderId: searchScope === SearchScope.Vault ? ROOT_FOLDER_ID : nav.current,
-				query: searchQuery,
-				scope: searchScope,
-			})
-		: sortEntities(tree.listFolderMembers(nav.current), sortKey, sortDirection);
+	const searching = !duplicatesActive && searchQuery.trim() !== "";
+	const unfilteredRows: Entity[] = duplicatesActive
+		? tree.listByType(FILE_TYPE)
+		: searching
+			? runSearch({
+					tree,
+					// Vault scope walks from the ROOT folder, not the folder the user
+					// happens to be in (9.8.9) — a Vault-scoped smart folder re-run
+					// must see the whole tree.
+					folderId: searchScope === SearchScope.Vault ? ROOT_FOLDER_ID : nav.current,
+					query: searchQuery,
+					scope: searchScope,
+				})
+			: sortEntities(tree.listFolderMembers(nav.current), sortKey, sortDirection);
+	const availableExtensions = collectExtensions(unfilteredRows, filters.extension);
+	const sortedRows = applyFileFilters(unfilteredRows, filters, Date.now());
+	// Duplicates group AFTER filtering, so "duplicate PDFs" means ≥2 PDFs
+	// sharing bytes — a group a filter thins to one row is not a duplicate.
+	const duplicateGroups = duplicatesActive ? findDuplicateGroups(sortedRows) : null;
 	// Group-by (9.8.11): sections re-order the flat row list (group-major,
 	// sorted within), so selection / keyboard / preview-siblings — which all
 	// consume `visibleRows` order — stay coherent with what's on screen.
 	// Search results are never grouped (relevance order IS the result).
-	const visibleGroups: EntityGroup[] | null =
-		!searching && groupKey !== GroupKey.None
+	const visibleGroups: EntityGroup[] | null = duplicateGroups
+		? duplicateGroups.map((group) => ({
+				key: `dup:${group.hash}`,
+				label: plural(
+					group.entities.length,
+					"brainstorm.files.duplicates.group.one",
+					"brainstorm.files.duplicates.group.other",
+					{ size: formatBytes(group.size) },
+				),
+				entities: group.entities,
+			}))
+		: !searching && groupKey !== GroupKey.None
 			? groupEntities(sortedRows, groupKey, {
 					folders: t("brainstorm.files.group.folders"),
 					noExtension: t("brainstorm.files.group.noExtension"),
@@ -428,6 +459,7 @@ export function useFilesStore() {
 	// `<NavButtons>` (and back/forward chords) call this after the
 	// controller has already walked the stack, so it must not re-`push`.
 	const applyFolderLocation = useCallback((id: string) => {
+		setDuplicatesActive(false);
 		setExpandedFolders((s) => new Set(s).add(id));
 		setSelection(EMPTY_SELECTION);
 		setSearchQuery("");
@@ -436,7 +468,10 @@ export function useFilesStore() {
 
 	const navigateToFolder = useCallback(
 		(id: string) => {
-			if (id === navHist.current()) return;
+			if (id === navHist.current()) {
+				setDuplicatesActive(false);
+				return;
+			}
 			const entity = tree.get(id);
 			if (!entity || entity.type !== FOLDER_TYPE) return;
 			navHist.push(id);
@@ -503,6 +538,25 @@ export function useFilesStore() {
 		},
 		[tree, navigateToFolder],
 	);
+
+	// ─── Collection view: filters + duplicates (9.8.16) ───────────────────
+
+	const setFilter = useCallback((patch: Partial<FileFilters>) => {
+		setFilters((current) => ({ ...current, ...patch }));
+		setSelection(EMPTY_SELECTION);
+	}, []);
+
+	const clearFilters = useCallback(() => {
+		setFilters(DEFAULT_FILE_FILTERS);
+		setSelection(EMPTY_SELECTION);
+	}, []);
+
+	const showDuplicates = useCallback(() => {
+		setDuplicatesActive(true);
+		setSelection(EMPTY_SELECTION);
+		setSearchQuery("");
+		setSearchScope(SearchScope.ActiveFolder);
+	}, []);
 
 	const toggleFolderExpansion = useCallback((id: string) => {
 		setExpandedFolders((s) => {
@@ -779,24 +833,25 @@ export function useFilesStore() {
 				return;
 			}
 			const parentId = navRef.current.current;
-			const createdIds: string[] = [];
 			uploadInFlightRef.current = true;
-			for (const file of dropped) {
-				let stored: StoredUpload;
-				try {
-					const bytes = new Uint8Array(await file.arrayBuffer());
-					const reply = await filesSvc.import({ name: file.name, bytes });
-					stored = {
-						size: reply.size,
-						hash: reply.contentHash,
-						assetId: reply.assetId,
-						assetMime: reply.mime,
-					};
-				} catch (error) {
-					console.warn(`[files] ${t("brainstorm.files.upload.readFailed", { name: file.name })}`, error);
-					continue;
-				}
-				const id = ingestStoredFile(file.name, stored, parentId);
+			const imported = await importDroppedOsFiles(
+				dropped,
+				{ import: filesSvc.import.bind(filesSvc) },
+				{
+					onError: (file, error) =>
+						console.warn(
+							`[files] ${t("brainstorm.files.upload.readFailed", { name: file.name })}`,
+							error,
+						),
+				},
+			);
+			const createdIds: string[] = [];
+			for (const file of imported) {
+				const id = ingestStoredFile(
+					file.name,
+					{ size: file.size, hash: file.hash, assetId: file.assetId, assetMime: file.assetMime },
+					parentId,
+				);
 				if (id) createdIds.push(id);
 			}
 			finishUpload(parentId, createdIds);
@@ -1353,6 +1408,13 @@ export function useFilesStore() {
 		deleteSmartFolderById,
 		renameSmartFolderById,
 		activateSmartFolder,
+		filters,
+		setFilter,
+		clearFilters,
+		availableExtensions,
+		duplicatesActive,
+		duplicateGroups,
+		showDuplicates,
 		sortKey,
 		sortDirection,
 		setSortKey,

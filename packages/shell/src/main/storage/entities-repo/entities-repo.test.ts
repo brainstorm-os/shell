@@ -106,6 +106,28 @@ describe("EntitiesRepository", () => {
 		);
 	});
 
+	it("countBacklinks counts distinct live referrers per target in one batched read", () => {
+		for (const id of ["a", "b", "c", "gone", "t"]) seed({ id, properties: {} });
+		const link = (id: string, source: string, dest: string, linkType = "rel") =>
+			env.repo.putLink({ id, sourceEntityId: source, destEntityId: dest, linkType, createdAt: 1 });
+		link("at", "a", "t");
+		link("at2", "a", "t", "mention");
+		link("bt", "b", "t");
+		link("tt", "t", "t");
+		link("gt", "gone", "t");
+		link("ct", "c", "t");
+		link("ab", "a", "b");
+		env.repo.deleteLink("ct", 5);
+		env.repo.softDelete("gone", 6);
+		expect(env.repo.countBacklinks([]).size).toBe(0);
+		const counts = env.repo.countBacklinks(["t", "b", "c", "missing"]);
+		expect(counts.get("t")).toBe(2);
+		expect(counts.get("b")).toBe(1);
+		expect(counts.has("c")).toBe(false);
+		const many = Array.from({ length: 130 }, (_, i) => `x${i}`);
+		expect(env.repo.countBacklinks([...many, "t"]).get("t")).toBe(2);
+	});
+
 	it("listIdsWithPropertyIn batches value lookups, filters soft-deleted, ignores empty input", () => {
 		seed({ id: "a", properties: { ext: "k1" } });
 		seed({ id: "b", properties: { ext: "k2" } });
@@ -162,6 +184,25 @@ describe("EntitiesRepository", () => {
 		expect(env.repo.query({ type: [] })).toEqual([]);
 	});
 
+	it("Agent-16: projects createdByAgent from the stamp on read, never stores it, and filters on it", () => {
+		const stamp = { agent: "io.brainstorm.agent", conversationId: "c1", createdAt: 1 };
+		seed({ id: "a", properties: { title: "by agent", agentProvenance: stamp } });
+		// A forged flat value with no stamp behind it never surfaces.
+		seed({ id: "h", properties: { title: "by me", createdByAgent: "io.brainstorm.agent" } });
+		expect(env.repo.get("a")?.properties.createdByAgent).toBe("io.brainstorm.agent");
+		expect(env.repo.get("h")?.properties).not.toHaveProperty("createdByAgent");
+		const stored = env.db.prepare("SELECT properties FROM entities WHERE id = ?").get("a") as {
+			properties: string;
+		};
+		expect(JSON.parse(stored.properties)).not.toHaveProperty("createdByAgent");
+		// An update carrying the projected bag back does not persist the key.
+		env.repo.update("a", { title: "renamed", createdByAgent: "io.evil" }, 2);
+		expect(env.repo.get("a")?.properties.createdByAgent).toBe("io.brainstorm.agent");
+		expect(
+			env.repo.query({ where: { $eq: { createdByAgent: "io.brainstorm.agent" } } }).map((e) => e.id),
+		).toEqual(["a"]);
+	});
+
 	it("query compiles property predicates", () => {
 		seed({ id: "a", properties: { n: 5, s: "hello", flag: true } });
 		seed({ id: "b", properties: { n: 50, s: "world" } });
@@ -178,6 +219,22 @@ describe("EntitiesRepository", () => {
 		expect(ids({ where: { $exists: { flag: true } } })).toEqual(["a"]);
 		expect(ids({ where: { $or: [{ $eq: { n: 5 } }, { $eq: { n: 50 } }] } })).toEqual(["a", "b"]);
 		expect(ids({ where: { $and: [{ $gt: { n: 1 } }, { $lt: { n: 10 } }] } })).toEqual(["a"]);
+	});
+
+	it("a $host-relative predicate matches nothing — no host exists at the SQL layer (9.12.24)", () => {
+		seed({ id: "a", properties: { author: "page_1", n: 5 } });
+		seed({ id: "b", properties: { author: "page_2", n: 50 } });
+		const ids = (q: Parameters<EntitiesRepository["query"]>[0]) =>
+			env.repo
+				.query(q)
+				.map((e) => e.id)
+				.sort();
+		const host = { $host: true } as const;
+		expect(ids({ where: { $eq: { author: host } } })).toEqual([]);
+		expect(ids({ where: { $contains: { author: host } } })).toEqual([]);
+		expect(ids({ where: { $gt: { n: host } } })).toEqual([]);
+		expect(ids({ where: { $or: [{ $eq: { n: 5 } }, { $eq: { author: host } }] } })).toEqual([]);
+		expect(ids({ where: { $contains: { author: { $prop: "n" } } } })).toEqual([]);
 	});
 
 	it("query compiles comparison refs ($now / $prop) (9.12.21)", () => {

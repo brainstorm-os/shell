@@ -1,0 +1,134 @@
+/*
+ * Shared History section (10.16). Lives inside an inspector body, so it never
+ * owns a container: it scrolls with its host. `:root`-prefixed per convention.
+ */
+
+:root .bs-history {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	padding: var(--space-2) var(--space-4);
+	color: var(--text);
+}
+
+:root .bs-history__title {
+	margin: 0;
+	font-size: var(--text-size-md);
+	font-weight: var(--text-weight-semibold);
+}
+
+:root .bs-history__day-label {
+	margin: var(--space-2) 0 var(--space-1);
+	font-size: var(--text-size-sm);
+	font-weight: var(--text-weight-semibold);
+	color: var(--text-dim);
+}
+
+:root .bs-history__list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-0);
+}
+
+:root .bs-history__row {
+	display: grid;
+	grid-template-columns: auto 1fr auto;
+	gap: var(--space-2);
+	align-items: baseline;
+	width: 100%;
+	padding: var(--space-1) var(--space-2);
+	border: 0;
+	border-radius: var(--radius-sm);
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	text-align: start;
+}
+
+:root button.bs-history__row {
+	cursor: pointer;
+}
+
+:root button.bs-history__row:hover {
+	background: var(--hover);
+}
+
+:root .bs-history__time {
+	font-variant-numeric: tabular-nums;
+	color: var(--text-dim);
+	font-size: var(--text-size-sm);
+}
+
+:root .bs-history__who {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+:root .bs-history__cause {
+	color: var(--text-dim);
+	font-size: var(--text-size-sm);
+}
+
+:root .bs-history__hint,
+:root .bs-history__notice {
+	margin: 0;
+	color: var(--text-dim);
+	font-size: var(--text-size-sm);
+}
+
+:root .bs-history__detail {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+}
+
+:root .bs-history__detail-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-2);
+}
+
+:root .bs-history__diff {
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+}
+
+:root .bs-history__diff-row dt {
+	font-weight: var(--text-weight-semibold);
+}
+
+:root .bs-history__diff-row dd {
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	overflow-wrap: anywhere;
+}
+
+:root .bs-history__now {
+	color: var(--text-dim);
+	text-decoration: line-through;
+}
+
+:root .bs-history__body {
+	margin: 0;
+	padding: var(--space-2);
+	border: var(--border-width) solid var(--color-border-subtle);
+	border-radius: var(--radius-md);
+	max-height: 240px;
+	overflow: auto;
+	white-space: pre-wrap;
+	font: inherit;
+	font-size: var(--text-size-sm);
+}
+
+:root .bs-history__restore {
+	align-self: flex-start;
+	margin-top: var(--space-2);
+}

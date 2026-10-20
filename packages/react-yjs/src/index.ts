@@ -89,6 +89,10 @@ export {
 	vaultSnapshotEquals,
 } from "./vault-entities";
 export {
+	type BodyMedia,
+	BodyMediaKind,
+	firstBodyMedia,
+	firstBodyMediaFromUpdate,
 	getUniversalBody,
 	isUniversalBodyEmpty,
 	universalBodyBlockCount,

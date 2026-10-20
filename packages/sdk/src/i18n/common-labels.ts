@@ -19,6 +19,8 @@ export type IconPickerLabels = {
 	remove: string;
 	search: string;
 	noMatch: string;
+	/** Heading of the recent emoji / icons row (8.11). */
+	recent: string;
 	tabEmoji: string;
 	tabIcon: string;
 	tabUpload: string;
@@ -111,6 +113,10 @@ export type FindLabels = {
 	wholeWord: string;
 	regex: string;
 	inSelection: string;
+	/** Counter when the search stopped at its budget (`{total}` = found so far). */
+	matchCountTruncated: string;
+	invalidPattern: string;
+	unsafePattern: string;
 };
 
 export const DEFAULT_FIND_LABELS: FindLabels = {
@@ -128,6 +134,9 @@ export const DEFAULT_FIND_LABELS: FindLabels = {
 	wholeWord: "Whole word",
 	regex: "Regular expression",
 	inSelection: "In selection",
+	matchCountTruncated: "{current} of {total}+",
+	invalidPattern: "Invalid pattern",
+	unsafePattern: "Pattern too complex",
 };
 
 export const DEFAULT_ICON_PICKER_LABELS: IconPickerLabels = {
@@ -136,6 +145,7 @@ export const DEFAULT_ICON_PICKER_LABELS: IconPickerLabels = {
 	remove: "Remove icon",
 	search: "Search",
 	noMatch: "No matches",
+	recent: "Recent",
 	tabEmoji: "Emoji",
 	tabIcon: "Icon",
 	tabUpload: "Upload",
@@ -206,6 +216,7 @@ export type InlinePropertyFormLabels = {
 	formatUrl: string;
 	formatEmail: string;
 	formatPhone: string;
+	formatRichText: string;
 	formatCurrency: string;
 	formatPercent: string;
 	formatDuration: string;
@@ -215,6 +226,13 @@ export type InlinePropertyFormLabels = {
 	optionsHint: string;
 	relationTargetLabel: string;
 	relationTargetAny: string;
+	/** Two-way relation picker (9.12.25 follow-up). Optional so hosts that
+	 *  never pass `inverseCandidates` need not supply them. */
+	inverseLabel?: string;
+	inverseNone?: string;
+	inverseSelf?: string;
+	inverseNew?: string;
+	inverseNewNameLabel?: string;
 };
 
 export const DEFAULT_INLINE_PROPERTY_FORM_LABELS: InlinePropertyFormLabels = {
@@ -243,6 +261,7 @@ export const DEFAULT_INLINE_PROPERTY_FORM_LABELS: InlinePropertyFormLabels = {
 	formatUrl: "URL",
 	formatEmail: "Email",
 	formatPhone: "Phone",
+	formatRichText: "Rich text",
 	formatCurrency: "Currency",
 	formatPercent: "Percent",
 	formatDuration: "Duration",
@@ -252,6 +271,11 @@ export const DEFAULT_INLINE_PROPERTY_FORM_LABELS: InlinePropertyFormLabels = {
 	optionsHint: "One per line, or comma-separated.",
 	relationTargetLabel: "Links to",
 	relationTargetAny: "Anything",
+	inverseLabel: "Two-way with",
+	inverseNone: "One-way",
+	inverseSelf: "Itself (symmetric)",
+	inverseNew: "New paired property…",
+	inverseNewNameLabel: "Paired property name",
 };
 
 /** Every user-visible string in the shared add-property picker chrome.
@@ -326,6 +350,21 @@ export const DEFAULT_ADD_PROPERTY_PICKER_LABELS: AddPropertyPickerLabels = {
  * key; an unknown key (only reachable via a cast) degrades to the key
  * string so a missing translation is visible, never a crash.
  */
+/** Agent-16 / Collab-C7 — the authorship rows the shared properties panel
+ *  renders ("Created by <agent>", "Last edited by <member> · <time>"). */
+export type AuthorshipLabels = {
+	createdBy: string;
+	lastEdited: string;
+	/** `{name}` / `{time}` substituted by the panel. */
+	lastEditedValue: string;
+};
+
+export const DEFAULT_AUTHORSHIP_LABELS: AuthorshipLabels = {
+	createdBy: "Created by",
+	lastEdited: "Last edited",
+	lastEditedValue: "{name} · {time}",
+};
+
 export type TParams = Record<string, string | number>;
 
 export type TFunction<M extends Record<string, string>> = (

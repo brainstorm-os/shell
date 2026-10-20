@@ -29,6 +29,7 @@ function makeCtx(
 	const ctx = {
 		entityId: "hl-1",
 		capabilities: () => [],
+		hostEntityId: () => null,
 		root,
 		graph: ((m: string, d: unknown) => getEntity(m, d as { entityId: string })) as unknown as <T>(
 			m: string,

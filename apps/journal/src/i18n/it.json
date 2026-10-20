@@ -92,5 +92,16 @@
   "properties.meta.dateKey": "Data",
   "properties.openInNotesHint": "Usi Notes per la modifica avanzata delle proprietà.",
   "widget.noEntryToday": "Ancora nessuna voce oggi",
-  "widget.writeToday": "Scrivi la voce di oggi"
+  "widget.writeToday": "Scrivi la voce di oggi",
+  "bodyDamagedTitle": "Manca una parte di questa voce",
+  "bodyDamagedHint": "Parte di quanto scritto qui è andata persa prima di raggiungere il disco e non può essere recuperata. Tutto ciò che scrivi ora viene salvato normalmente.",
+  "captureLabel": "Annotazione rapida",
+  "capturePlaceholder": "Annota un pensiero — Invio lo aggiunge a oggi",
+  "capturePlaceholderTagged": "Annota un pensiero — aggiungi #raccolta per archiviarlo lì",
+  "captureSubmit": "Aggiungi",
+  "captureAppended": "Aggiunto a oggi",
+  "captureFiled": "Archiviato in {collection} e collegato da oggi",
+  "captureFiledWithoutMembership": "Creato e collegato da oggi, ma non è stato possibile aggiungerlo a {collection}",
+  "captureFileFailed": "Impossibile archiviarlo in {collection} — mantenuto come riga in oggi",
+  "captureUnavailable": "La voce di oggi non è ancora pronta per la scrittura"
 }

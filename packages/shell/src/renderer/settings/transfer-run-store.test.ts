@@ -84,6 +84,20 @@ describe("transfer-run store", () => {
 		dismissTransferRun();
 	});
 
+	it("a Markdown export run lands its path under its own section (IE-13)", async () => {
+		const started = startExportRun(
+			() => Promise.resolve({ path: "/tmp/Brainstorm export" }),
+			TransferRunSection.MarkdownExport,
+		);
+		expect(started).toBe(true);
+		await settle();
+		const state = getTransferRunState();
+		expect(state.status).toBe(TransferRunStatus.Done);
+		expect(state.section).toBe(TransferRunSection.MarkdownExport);
+		expect(state.exportPath).toBe("/tmp/Brainstorm export");
+		dismissTransferRun();
+	});
+
 	it("a rejected import parks in Failed and frees the slot", async () => {
 		const started = startImportRun(TransferRunSection.Notion, () =>
 			Promise.reject(new Error("boom")),

@@ -48,6 +48,26 @@ describe("apps/journal/manifest.json", () => {
 		expect(caps).toContain("entities.write:io.brainstorm.journal/Entry/v1");
 	});
 
+	it("quick capture (9.16.14) files into a collection with the two narrow writes it needs, no wider", () => {
+		// A `#collection` capture mints a generic Object (the shared
+		// `decideRowCreate` member type for a manual collection) and pins it
+		// into the List's manual members. A typed list is offered only for a
+		// type Journal can write: Task/v1 (granted for `/task`, B11.24), never
+		// Notes or other apps' types.
+		const result = validateManifest(readManifest());
+		if (!result.ok) throw new Error(result.reason);
+		const caps = result.manifest.capabilities;
+		expect(caps).toContain("entities.write:brainstorm/Object/v1");
+		expect(caps).toContain("entities.write:brainstorm/List/v1");
+		expect(caps.filter((c) => c.startsWith("entities.write:")).sort()).toEqual([
+			"entities.write:brainstorm/Comment/v1",
+			"entities.write:brainstorm/List/v1",
+			"entities.write:brainstorm/Object/v1",
+			"entities.write:brainstorm/Task/v1",
+			"entities.write:io.brainstorm.journal/Entry/v1",
+		]);
+	});
+
 	it("requests `entities.read:*` for backlinks-panel cross-app rendering (B6.3 channel)", () => {
 		// 9.16.3's backlinks panel needs to walk every `@`-mention of the
 		// day's journal entry — that's a vault-wide read.
@@ -72,5 +92,13 @@ describe("apps/journal/manifest.json", () => {
 			kind: "primary",
 			entityType: "io.brainstorm.journal/Entry/v1",
 		});
+	});
+
+	it("requests narrowly-scoped Task write — `/task` in the day body creates + completes a Task/v1 (B11.24)", () => {
+		const result = validateManifest(readManifest());
+		if (!result.ok) throw new Error(result.reason);
+		const caps = result.manifest.capabilities;
+		expect(caps).toContain("entities.write:brainstorm/Task/v1");
+		expect(caps).not.toContain("entities.write:*");
 	});
 });

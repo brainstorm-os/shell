@@ -123,6 +123,37 @@ describe("IntentsBus", () => {
 		expect(result.rung).toBe(OpenRung.InVaultOpeners);
 	});
 
+	it("reports a delivered entity open to onEntityOpened (9.22.7 recents), never a refused one", async () => {
+		env.repos.intents.insert({
+			appId: "io.example.editor",
+			verb: "open",
+			entityType: "io.example/Note/v1",
+			mime: null,
+			format: null,
+			kind: null,
+			blockId: null,
+			label: null,
+			priority: "primary",
+			registeredAt: 1,
+		});
+		const opened: string[] = [];
+		const bus = new IntentsBus({
+			intents: env.repos.intents,
+			orchestrator: env.orchestrator,
+			onEntityOpened: (id) => {
+				opened.push(id);
+				throw new Error("a failing observer must not fail the open");
+			},
+		});
+		const delivered = await bus.dispatch(
+			{ verb: "open", payload: { entityId: "ent_7", entityType: "io.example/Note/v1" } },
+			{ app: "shell" },
+		);
+		expect(delivered.handled).toBe(true);
+		await bus.dispatch({ verb: "open", payload: { entityId: "ent_404" } }, { app: "shell" });
+		expect(opened).toEqual(["ent_7"]);
+	});
+
 	it("dispatch entity-open with no handler returns no-handler (no rung stamped)", async () => {
 		// The entity-flow rung stamp wraps a successful launchInto;
 		// a no-handler outcome is returned before launchInto runs, so
@@ -2094,6 +2125,58 @@ describe("IntentsBus — navigation modes", () => {
 		const r = await bus.dispatch(openNote(), { app: "io.example.notes" });
 		expect(r.handled).toBe(true);
 		expect(launch).toHaveBeenCalled();
+	});
+	it("side mode splits the SOURCE renderer's window, skipping focus-existing", async () => {
+		const focusTabByRoute = vi.fn(() => win());
+		const containerIdForWebContents = vi.fn(() => "src-container");
+		const openSidePane = vi.fn(async () => win({ tabId: "side" }));
+		const bus = buildBus({ focusTabByRoute, containerIdForWebContents }, { openSidePane });
+		const r = await bus.dispatch(openNote("new-panel"), {
+			app: "io.example.notes",
+			webContentsId: 33,
+		});
+		expect(r.handled).toBe(true);
+		expect(focusTabByRoute).not.toHaveBeenCalled();
+		expect(containerIdForWebContents).toHaveBeenCalledWith(33);
+		expect(openSidePane).toHaveBeenCalledWith(
+			"src-container",
+			expect.objectContaining({
+				appId: "io.example.editor",
+				launch: { reason: "open-entity", entityId: "ent_42" },
+			}),
+		);
+	});
+
+	it("side mode without a source window (dashboard) falls back to a new tab", async () => {
+		const openSidePane = vi.fn(async () => win());
+		const addTab = vi.fn(async () => win());
+		const bus = buildBus(
+			{ getExistingWindow: () => win(), containerIdForWebContents: () => null },
+			{ openSidePane, addTab },
+		);
+		const r = await bus.dispatch(openNote("new-panel"), { app: "io.example.notes" });
+		expect(r.handled).toBe(true);
+		expect(openSidePane).not.toHaveBeenCalled();
+		expect(addTab).toHaveBeenCalledWith(
+			"c1",
+			expect.objectContaining({ appId: "io.example.editor" }),
+		);
+	});
+
+	it("side mode falls back to a new tab when the window refuses a split", async () => {
+		const openSidePane = vi.fn(async () => null);
+		const addTab = vi.fn(async () => win());
+		const bus = buildBus(
+			{ getExistingWindow: () => win(), containerIdForWebContents: () => "browser-window" },
+			{ openSidePane, addTab },
+		);
+		const r = await bus.dispatch(openNote("new-panel"), {
+			app: "io.example.notes",
+			webContentsId: 5,
+		});
+		expect(r.handled).toBe(true);
+		expect(openSidePane).toHaveBeenCalled();
+		expect(addTab).toHaveBeenCalled();
 	});
 });
 

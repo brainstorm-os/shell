@@ -18,6 +18,7 @@
  * is what persists.
  */
 
+import { RICH_TEXT_STATE_MAX_CHARS } from "@brainstorm-os/sdk-types";
 import { CodeNode } from "@lexical/code";
 import { $generateHtmlFromNodes, $generateNodesFromDOM } from "@lexical/html";
 import { AutoLinkNode, LinkNode } from "@lexical/link";
@@ -156,6 +157,13 @@ export type CompactEditorProps = {
 	children?: ReactNode;
 	/** Host overrides for editor-internal strings (inline toolbar labels). */
 	i18nOverrides?: Partial<EditorManifest>;
+	/** Seed content: a serialized Lexical state (a previously-read
+	 *  `CompactEditorPayload.state`). Read once at mount; a state that does
+	 *  not parse falls back to `initialText`. */
+	initialState?: string;
+	/** Seed content as plain text, used when there is no usable
+	 *  `initialState`. Read once at mount. */
+	initialText?: string;
 };
 
 /** The composer node set: links + the Slack-sized blocks (lists / quote /
@@ -227,6 +235,63 @@ function nodesForRoot(nodes: readonly LexicalNode[]): LexicalNode[] {
 		}
 	}
 	return out;
+}
+
+/** Node types Lexical registers on every editor, whatever `nodes` says. */
+const CORE_NODE_TYPES = ["root", "paragraph", "text", "linebreak", "tab"] as const;
+
+/** The node types an editor built from `nodes` can deserialize. */
+export function registeredNodeTypes(nodes: ReadonlyArray<Klass<LexicalNode>>): ReadonlySet<string> {
+	return new Set<string>([...CORE_NODE_TYPES, ...nodes.map((klass) => klass.getType())]);
+}
+
+/** Whether a stored serialized state is safe to hand Lexical as a seed: within
+ *  the size cap, well-formed, and made ONLY of node types this editor
+ *  registers. Lexical throws on an unregistered type mid-parse, which takes
+ *  the whole render tree down — a state written by a richer editor, pasted,
+ *  or sent by a peer must degrade to its plain text instead. */
+export function isSeedableState(state: string, registered: ReadonlySet<string>): boolean {
+	if (state.length > RICH_TEXT_STATE_MAX_CHARS) return false;
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(state);
+	} catch {
+		return false;
+	}
+	const root = (parsed as { root?: unknown } | null)?.root;
+	if (!root || typeof root !== "object" || (root as { type?: unknown }).type !== "root") {
+		return false;
+	}
+	const stack: unknown[] = [root];
+	while (stack.length > 0) {
+		const node = stack.pop();
+		if (!node || typeof node !== "object") return false;
+		const { type, children } = node as { type?: unknown; children?: unknown };
+		if (typeof type !== "string" || !registered.has(type)) return false;
+		if (children === undefined) continue;
+		if (!Array.isArray(children)) return false;
+		for (const child of children) stack.push(child);
+	}
+	return true;
+}
+
+/** The composer's `editorState` seed: a seedable serialized state as-is,
+ *  else a single paragraph per line of plain text, else nothing. */
+function seedEditorState(
+	state: string | undefined,
+	text: string | undefined,
+	registered: ReadonlySet<string>,
+): string | (() => void) | undefined {
+	if (state && isSeedableState(state, registered)) return state;
+	if (!text) return undefined;
+	return () => {
+		const root = $getRoot();
+		for (const line of text.split("\n")) {
+			const paragraph = $createParagraphNode();
+			if (line) paragraph.append($createTextNode(line));
+			root.append(paragraph);
+		}
+	};
 }
 
 function readPayload(editor: LexicalEditor): CompactEditorPayload {
@@ -399,16 +464,31 @@ export const CompactEditor = forwardRef<CompactEditorHandle, CompactEditorProps>
 			additionalNodes,
 			children,
 			i18nOverrides,
+			initialState,
+			initialText,
 		} = props;
 
 		// `editable` is reconciled live by the behaviour plugin's `setEditable`
 		// effect, so the static config is always editable — rebuilding it on a
 		// `disabled` flip would remount the composer and lose draft content.
+		// biome-ignore lint/correctness/useExhaustiveDependencies: the seed is read once at mount — re-seeding on a prop change would remount the composer mid-edit
+		const seed = useMemo(
+			() =>
+				seedEditorState(
+					initialState,
+					initialText,
+					registeredNodeTypes(
+						additionalNodes ? [...COMPOSER_BASELINE_NODES, ...additionalNodes] : COMPOSER_BASELINE_NODES,
+					),
+				),
+			[],
+		);
 		const initialConfig = useMemo(
 			() => ({
 				namespace: "brainstorm-compact-editor",
 				theme: mergeTheme(),
 				editable: true,
+				...(seed !== undefined ? { editorState: seed } : {}),
 				nodes: additionalNodes
 					? [...COMPOSER_BASELINE_NODES, ...additionalNodes]
 					: COMPOSER_BASELINE_NODES,
@@ -416,7 +496,7 @@ export const CompactEditor = forwardRef<CompactEditorHandle, CompactEditorProps>
 					console.error("[brainstorm-compact-editor]", error);
 				},
 			}),
-			[additionalNodes],
+			[additionalNodes, seed],
 		);
 
 		return (

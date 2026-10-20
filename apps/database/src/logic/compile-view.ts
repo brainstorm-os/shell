@@ -155,7 +155,7 @@ function handleEmpty(a: unknown, b: unknown, placement: EmptyPlacement): number 
 	return ae ? -1 : 1;
 }
 
-function groupRows(
+export function groupRows(
 	rows: ReadonlyArray<EntityRow>,
 	propertyId: string,
 	labelFor?: (key: string) => string | undefined,
@@ -199,7 +199,7 @@ function groupRows(
 	});
 }
 
-function readGroupKey(entity: EntityRow, propertyId: string): string | null {
+export function readGroupKey(entity: EntityRow, propertyId: string): string | null {
 	const v = readPropertyPath(entity, propertyId);
 	if (v === undefined || v === null) return null;
 	if (typeof v === "string") return v === "" ? null : v;

@@ -40,6 +40,7 @@ export enum TransferRunSection {
 	NotionApi = "notion-api",
 	Anytype = "anytype",
 	Export = "export",
+	MarkdownExport = "markdown-export",
 }
 
 export type TransferRunState = {
@@ -145,8 +146,11 @@ export function startImportRun(
 /** Start the vault-export run. A null result (save dialog cancelled, or the
  *  run stopped) returns the store to Idle — nothing was written. Returns
  *  false when another run is already active. */
-export function startExportRun(run: () => Promise<{ path: string } | null>): boolean {
-	const stopProgress = claimRun(TransferRunKind.Export, TransferRunSection.Export);
+export function startExportRun(
+	run: () => Promise<{ path: string } | null>,
+	section: TransferRunSection = TransferRunSection.Export,
+): boolean {
+	const stopProgress = claimRun(TransferRunKind.Export, section);
 	if (!stopProgress) return false;
 	run()
 		.then((result) => {
@@ -159,14 +163,14 @@ export function startExportRun(run: () => Promise<{ path: string } | null>): boo
 				...IDLE,
 				status: TransferRunStatus.Done,
 				kind: TransferRunKind.Export,
-				section: TransferRunSection.Export,
+				section,
 				exportPath: result.path,
 			});
 			notifyExportDone(result.path);
 		})
 		.catch((e: unknown) => {
 			stopProgress();
-			parkFailed(TransferRunKind.Export, TransferRunSection.Export, e);
+			parkFailed(TransferRunKind.Export, section, e);
 		});
 	return true;
 }

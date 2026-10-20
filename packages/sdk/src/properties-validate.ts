@@ -38,6 +38,9 @@ export type ValidationResult = { ok: true } | { ok: false; errors: readonly stri
 
 const HEX_COLOUR = /^#[0-9a-f]{6}$/;
 const KNOWN_VALUE_TYPES: ReadonlySet<string> = new Set(Object.values(ValueType));
+// A catalog is read back into a plain record keyed by def key; these keys
+// would land on the record's prototype instead of in it.
+const PROTOTYPE_KEYS: ReadonlySet<string> = new Set(["__proto__", "constructor", "prototype"]);
 const KNOWN_FORMATS: ReadonlySet<string> = new Set(Object.values(PropertyFormat));
 
 /** Which formats are valid for a given valueType. `text` accepts the
@@ -78,6 +81,10 @@ export function validatePropertyDef(def: PropertyDef): ValidationResult {
 	const errors: string[] = [];
 
 	if (!def.key || typeof def.key !== "string") errors.push("key must be a non-empty string");
+	else if (PROTOTYPE_KEYS.has(def.key)) errors.push("key must not be a prototype key");
+	if (def.inverseOf !== undefined && PROTOTYPE_KEYS.has(def.inverseOf)) {
+		errors.push("inverseOf must not be a prototype key");
+	}
 	if (typeof def.name !== "string" || def.name.trim().length === 0) {
 		errors.push("name must be non-empty");
 	}
@@ -180,6 +187,14 @@ export function validatePropertyDef(def: PropertyDef): ValidationResult {
 		errors.push("entityFilter is only valid for entityRef");
 	}
 
+	if (def.inverseOf !== undefined) {
+		if (def.valueType !== ValueType.EntityRef) {
+			errors.push("inverseOf is only valid for entityRef");
+		} else if (typeof def.inverseOf !== "string" || def.inverseOf.length === 0) {
+			errors.push("inverseOf must be a non-empty property key");
+		}
+	}
+
 	// Pattern — text only.
 	if (def.pattern !== undefined && def.valueType !== ValueType.Text) {
 		errors.push("pattern is only valid for text");
@@ -189,6 +204,15 @@ export function validatePropertyDef(def: PropertyDef): ValidationResult {
 	if (def.currency !== undefined) {
 		if (def.valueType !== ValueType.Number || def.format !== PropertyFormat.Currency) {
 			errors.push("currency is only valid when valueType=number AND format=currency");
+		}
+	}
+
+	// Unit suffix — plain number only, short display text (9.12.33).
+	if (def.unit !== undefined) {
+		if (def.valueType !== ValueType.Number || def.format !== undefined) {
+			errors.push("unit is only valid for a plain number");
+		} else if (typeof def.unit !== "string" || def.unit.trim().length === 0 || def.unit.length > 16) {
+			errors.push("unit must be 1–16 characters");
 		}
 	}
 

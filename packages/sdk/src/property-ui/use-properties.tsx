@@ -42,6 +42,7 @@ import {
 	type EntityTitleSource,
 	type EscapeMatcher,
 	type PropertyUiLabels,
+	type RichTextEditorComponent,
 	defaultCommitMatcher,
 	defaultEscapeMatcher,
 } from "./seams";
@@ -63,6 +64,7 @@ export type PropertiesContextValue = {
 	commitMatcher: CommitMatcher;
 	entityTitleSource: EntityTitleSource;
 	dictionaryEditorMatchers: DictionaryEditorMatchers;
+	richTextEditor: RichTextEditorComponent | null;
 };
 
 /** The host seams alone (no stores) — the return of
@@ -73,6 +75,7 @@ export type PropertyUiSeams = {
 	commitMatcher: CommitMatcher;
 	entityTitleSource: EntityTitleSource;
 	dictionaryEditorMatchers: DictionaryEditorMatchers;
+	richTextEditor: RichTextEditorComponent | null;
 };
 
 type SeamKeys =
@@ -80,7 +83,8 @@ type SeamKeys =
 	| "escapeMatcher"
 	| "commitMatcher"
 	| "entityTitleSource"
-	| "dictionaryEditorMatchers";
+	| "dictionaryEditorMatchers"
+	| "richTextEditor";
 
 /** Exposed so test harnesses can hand-craft stores + ready flag without
  *  building a full mock runtime. Production code should use the
@@ -106,6 +110,8 @@ export type PropertiesProviderProps = {
 	entityTitleSource?: EntityTitleSource;
 	/** DictionaryEditor chord predicates (defaults to bare keys). */
 	dictionaryEditorMatchers?: DictionaryEditorMatchers;
+	/** The RichText cell's editing surface (defaults to none → plain text). */
+	richTextEditor?: RichTextEditorComponent | null;
 	/** Entity values backing the auto-mounted dictionary editor's usage
 	 *  badges + delete/merge rewrites. Omit for read-only counts. */
 	dictionaryEntities?: DictionaryEditorHostProps["entities"];
@@ -123,6 +129,7 @@ export function PropertiesProvider({
 	commitMatcher = defaultCommitMatcher,
 	entityTitleSource = EMPTY_ENTITY_TITLE_SOURCE,
 	dictionaryEditorMatchers = DEFAULT_DICTIONARY_EDITOR_MATCHERS,
+	richTextEditor = null,
 	dictionaryEntities,
 	onRewriteDictionaryEntities,
 	dictionarySortStorage,
@@ -242,6 +249,7 @@ export function PropertiesProvider({
 			commitMatcher,
 			entityTitleSource,
 			dictionaryEditorMatchers,
+			richTextEditor,
 		}),
 		[
 			stores,
@@ -251,6 +259,7 @@ export function PropertiesProvider({
 			commitMatcher,
 			entityTitleSource,
 			dictionaryEditorMatchers,
+			richTextEditor,
 		],
 	);
 
@@ -283,6 +292,7 @@ function usePropertiesContext(): PropertiesContextValue {
 		commitMatcher: ctx.commitMatcher ?? defaultCommitMatcher,
 		entityTitleSource: ctx.entityTitleSource ?? EMPTY_ENTITY_TITLE_SOURCE,
 		dictionaryEditorMatchers: ctx.dictionaryEditorMatchers ?? DEFAULT_DICTIONARY_EDITOR_MATCHERS,
+		richTextEditor: ctx.richTextEditor ?? null,
 	};
 }
 
@@ -301,6 +311,7 @@ export function usePropertyUiSeams(): PropertyUiSeams {
 		commitMatcher: ctx?.commitMatcher ?? defaultCommitMatcher,
 		entityTitleSource: ctx?.entityTitleSource ?? EMPTY_ENTITY_TITLE_SOURCE,
 		dictionaryEditorMatchers: ctx?.dictionaryEditorMatchers ?? DEFAULT_DICTIONARY_EDITOR_MATCHERS,
+		richTextEditor: ctx?.richTextEditor ?? null,
 	};
 }
 

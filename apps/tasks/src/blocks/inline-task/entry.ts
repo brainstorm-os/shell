@@ -9,6 +9,12 @@
 
 import { type BlockRuntimeContext, startBlock } from "@brainstorm-os/sdk/block-runtime";
 import { entityTitleOr } from "@brainstorm-os/sdk/entity-title";
+import {
+	CompletionState,
+	completionPatch,
+	completionStateOf,
+	nextCompletionState,
+} from "../../logic/task-status";
 import { TaskStatus } from "../../types/task";
 
 interface BpEntity {
@@ -18,8 +24,32 @@ interface BpEntity {
 	updatedAt: number;
 }
 
-function isDone(props: Record<string, unknown>): boolean {
-	return props.completedAt != null || props.statusKey === TaskStatus.Done;
+/** The block reads the raw property bag, so it normalises the two fields
+ *  the shared completion model keys on. A Done status with no stamp (an
+ *  older write path) still reads as done. */
+function completionOf(props: Record<string, unknown>): CompletionState {
+	const statusKey = typeof props.statusKey === "string" ? props.statusKey : null;
+	const completedAt =
+		typeof props.completedAt === "number"
+			? props.completedAt
+			: statusKey === TaskStatus.Done
+				? 0
+				: null;
+	return completionStateOf({ completedAt, statusKey });
+}
+
+const COMPLETION_ARIA: Record<CompletionState, string> = {
+	[CompletionState.Open]: "Open — mark done",
+	[CompletionState.Done]: "Done — mark won't do",
+	[CompletionState.WontDo]: "Won't do — reopen",
+};
+
+function paintCompletion(root: HTMLElement, check: HTMLInputElement, state: CompletionState): void {
+	check.checked = state === CompletionState.Done;
+	check.indeterminate = state === CompletionState.WontDo;
+	check.setAttribute("aria-label", COMPLETION_ARIA[state]);
+	root.classList.toggle("bstask--done", state === CompletionState.Done);
+	root.classList.toggle("bstask--wont-do", state === CompletionState.WontDo);
 }
 
 function taskTitle(props: Record<string, unknown>): string {
@@ -50,6 +80,9 @@ body { margin: 0; }
 .bstask__title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .bstask__title:hover { text-decoration: underline; }
 .bstask--done .bstask__title { color: var(--color-text-tertiary, #8a8a8e); text-decoration: line-through; }
+.bstask__check:indeterminate { border-style: dashed; }
+.bstask__check:indeterminate::after { content: ""; position: absolute; left: 3px; right: 3px; top: 6px; height: 1.5px; background: var(--color-text-tertiary, #8a8a8e); }
+.bstask--wont-do .bstask__title { color: var(--color-text-tertiary, #8a8a8e); text-decoration: line-through; font-style: italic; }
 .bstask__due { flex: 0 0 auto; color: var(--color-text-tertiary, #8a8a8e); font-size: 12px; }
 .bstask__error { padding: 8px 10px; color: var(--color-text-tertiary, #8a8a8e); font: 13px -apple-system, sans-serif; }
 `;
@@ -99,26 +132,28 @@ function renderTask(
 	task: BpEntity,
 ): void {
 	const doc = ctx.root.ownerDocument;
-	const done = isDone(task.properties);
-	ctx.root.className = done ? "bstask bstask--done" : "bstask";
+	let state = completionOf(task.properties);
+	let statusKey = typeof task.properties.statusKey === "string" ? task.properties.statusKey : null;
+	ctx.root.className = "bstask";
 
 	const check = doc.createElement("input");
 	check.type = "checkbox";
 	check.className = "bstask__check";
-	check.checked = done;
+	paintCompletion(ctx.root, check, state);
+	// 9.14.17 — the same three-state cycle as the Tasks app: open → done →
+	// won't do → open. The native toggle is overridden with the cycle's
+	// next face. Optimistic: reflect it immediately, then write back; a
+	// denied write is corrected by the next refresh ping re-reading the row.
 	check.addEventListener("change", () => {
-		const next = check.checked;
-		// Optimistic: reflect the toggle immediately, then write back. A denied
-		// write (host app lacks entities.write for this type) leaves the UI as
-		// toggled until the next refresh ping re-reads the true state.
-		ctx.root.classList.toggle("bstask--done", next);
+		state = nextCompletionState(state);
+		paintCompletion(ctx.root, check, state);
+		const patch = completionPatch(statusKey, state, Date.now());
+		statusKey = patch.statusKey;
 		void ctx
 			.graph("updateEntity", {
 				entityId: task.entityId,
 				entityTypeId: task.entityTypeId,
-				properties: next
-					? { statusKey: TaskStatus.Done, completedAt: Date.now() }
-					: { statusKey: null, completedAt: null },
+				properties: patch,
 			})
 			.catch(() => {
 				/* revert handled by the next refresh ping. */

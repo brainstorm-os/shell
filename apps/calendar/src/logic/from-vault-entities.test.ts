@@ -165,6 +165,19 @@ describe("entityToScheduledItems (catalog-driven)", () => {
 		expect(open?.done).toBe(false);
 	});
 
+	it("reads a won't-do task as closed (done face), but not a cancelled non-task", () => {
+		const [wont] = entityToScheduledItems(
+			task({ id: "t3", properties: { name: "T", scheduledAt: MAY_2026, statusKey: "cancelled" } }),
+			FALLBACK_KEYS,
+		);
+		expect(wont?.done).toBe(true);
+		const [other] = entityToScheduledItems(
+			person({ id: "p9", properties: { name: "P", birthday: MAY_2026, statusKey: "cancelled" } }),
+			FALLBACK_KEYS,
+		);
+		expect(other?.done ?? false).toBe(false);
+	});
+
 	it("projects a locked source entity as readonly on every date property", () => {
 		// A locked task/note is read-only fleet-wide; the calendar must not
 		// rewrite its date properties via chip drag (`onReschedule` keys off

@@ -1192,6 +1192,45 @@ body.is-resizing .db-inspector__resize {
 	color: var(--text-faint);
 }
 
+/* Per-column wrap override (9.12.29) — a column's own setting beats the
+ * view's Wrap toggle in either direction. */
+.dbv-grid__cell[data-wrap="true"] {
+	white-space: normal;
+	overflow: visible;
+	text-overflow: clip;
+	align-items: flex-start;
+	word-break: break-word;
+}
+
+.dbv-grid[data-wrap="true"] .dbv-grid__cell[data-wrap="false"] {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	align-items: center;
+	word-break: normal;
+}
+
+.dbv-grid__cell[data-wrap="false"] .dbv-tags {
+	flex-wrap: nowrap;
+	overflow: hidden;
+}
+
+.dbv-grid__cell[data-wrap="true"] .dbv-tags {
+	flex-wrap: wrap;
+	overflow: visible;
+}
+
+/* Icon-only header (9.12.29): the kind glyph, centred. */
+.dbv-grid__cell--head[data-icon-only="true"] {
+	justify-content: center;
+	color: var(--text-dim);
+}
+
+.db-popover__column-alias {
+	flex: 1;
+	min-width: 0;
+}
+
 /* Wrap toggle (view settings). Default is single-line + ellipsis;
  * `data-wrap="true"` lets cell content flow onto multiple lines and the
  * row grow to fit (top-aligned so wrapped text reads naturally). */
@@ -1331,7 +1370,11 @@ body.is-resizing .db-inspector__resize {
  * during horizontal scroll. Opaque backgrounds let other columns scroll
  * underneath; the row state (hover / selected) is mirrored onto the pinned
  * cell so it doesn't read as detached. The header title cell needs the
- * highest z to win the top-left corner against the sticky header row. */
+ * highest z to win the top-left corner against the sticky header row.
+ * `--hover` / `--accent-soft` are translucent tints meant to sit on a
+ * surface, so the mirrored faces layer them over the page colour — painted
+ * bare, the cells scrolling underneath showed through the pinned cell
+ * (F-509). */
 .dbv-grid[data-pinned="true"] .dbv-grid__cell[data-col="title"] {
 	position: sticky;
 	left: 0;
@@ -1340,11 +1383,11 @@ body.is-resizing .db-inspector__resize {
 }
 
 .dbv-grid[data-pinned="true"] .dbv-grid__row:not(.dbv-grid__row--head):hover .dbv-grid__cell[data-col="title"] {
-	background: var(--hover);
+	background: linear-gradient(var(--hover), var(--hover)), var(--bg);
 }
 
 .dbv-grid[data-pinned="true"] .dbv-grid__row[data-selected="true"] .dbv-grid__cell[data-col="title"] {
-	background: var(--accent-soft);
+	background: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--bg);
 }
 
 .dbv-grid[data-pinned="true"] .dbv-grid__row--head .dbv-grid__cell[data-col="title"] {
@@ -1621,6 +1664,35 @@ body.is-resizing .db-inspector__resize {
 	min-width: 0;
 }
 
+/* Values-only cards (9.12.31): the field name leaves the layout but stays the
+ * accessible label of its value. */
+.dbv-card__fields[data-hide-labels="true"] .dbv-card__field {
+	grid-template-columns: minmax(0, 1fr);
+}
+
+.dbv-card__fields[data-hide-labels="true"] .dbv-card__field-label {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.dbv-card__url {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	max-width: 100%;
+	text-decoration: none;
+}
+
+.dbv-card__url-host {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 /* ── Board view ───────────────────────────────────────────────────────── */
 
 .dbv-board {
@@ -1802,6 +1874,369 @@ body.is-resizing .db-inspector__resize {
 .dbv-board__add-column:hover {
 	background: var(--hover);
 	color: var(--text);
+}
+
+/* Column / lane collapse (9.12.28). */
+.dbv-board__collapse {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	padding: 0;
+	border: 0;
+	border-radius: var(--radius-sm);
+	background: transparent;
+	color: var(--text-dim);
+	cursor: pointer;
+	flex-shrink: 0;
+}
+
+.dbv-board__collapse:hover {
+	background: var(--hover);
+	color: var(--text);
+}
+
+.dbv-board__collapse-glyph {
+	display: inline-flex;
+}
+
+.dbv-board__column[data-collapsed="true"] {
+	width: 44px;
+}
+
+.dbv-board__column[data-collapsed="true"] .dbv-board__header {
+	flex-direction: column;
+	border-bottom: 0;
+	padding: var(--space-2) var(--space-1);
+}
+
+.dbv-board__column[data-collapsed="true"] .dbv-board__label {
+	writing-mode: vertical-rl;
+	white-space: nowrap;
+}
+
+.dbv-board__column[data-collapsed="true"] .dbv-board__count {
+	margin-inline-start: 0;
+}
+
+/* Swimlanes (9.12.28): one sticky column-header strip, then a row of
+ * per-column cells per lane. */
+.dbv-board__lanes {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3);
+	min-width: max-content;
+	padding-inline-end: var(--space-4);
+}
+
+.dbv-board__lane-head,
+.dbv-board__lane-row {
+	display: flex;
+	gap: var(--space-3);
+	align-items: stretch;
+}
+
+.dbv-board__lane-head {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	background: var(--bg);
+}
+
+.dbv-board__column[data-header-only="true"] {
+	max-height: none;
+}
+
+.dbv-board__column[data-header-only="true"] .dbv-board__header {
+	border-bottom: 0;
+}
+
+.dbv-board__lane-header {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	padding: var(--space-1) var(--space-1);
+	border-bottom: var(--border-width) solid var(--border);
+}
+
+.dbv-board__cell {
+	width: var(--dbv-board-col-w);
+	background: var(--bg-elev);
+	border: var(--border-width) solid var(--border);
+	border-radius: var(--radius-lg);
+	display: flex;
+	flex-direction: column;
+	max-height: 420px;
+	min-height: 56px;
+}
+
+.dbv-board__cell[data-collapsed="true"] {
+	width: 44px;
+	align-items: center;
+	justify-content: center;
+}
+
+.dbv-board__cell[data-dropping="true"],
+.dbv-board__column[data-dropping="true"] {
+	box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.dbv-board__cell-count {
+	font-size: var(--text-size-xs);
+	color: var(--text-dim);
+	font-variant-numeric: tabular-nums;
+}
+
+/* ── Chart view (9.12.30) ─────────────────────────────────────────── */
+
+.dbv-chart {
+	padding: var(--space-4);
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3);
+	min-width: 0;
+}
+
+.dbv-chart__head {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
+}
+
+.dbv-chart__title {
+	margin: 0;
+	font-size: var(--text-size-md);
+	font-weight: var(--text-weight-semibold);
+	color: var(--text);
+}
+
+.dbv-chart__toggle {
+	margin-inline-start: auto;
+}
+
+.dbv-chart__plot {
+	position: relative;
+	min-width: 0;
+}
+
+.dbv-chart__svg {
+	display: block;
+	overflow: visible;
+}
+
+.dbv-chart__label,
+.dbv-chart__value,
+.dbv-chart__axis {
+	font-size: var(--text-size-xs);
+	fill: var(--text-dim);
+}
+
+.dbv-chart__value {
+	fill: var(--text);
+	font-variant-numeric: tabular-nums;
+}
+
+.dbv-chart__axis {
+	font-variant-numeric: tabular-nums;
+}
+
+.dbv-chart__grid {
+	stroke: var(--border);
+	stroke-width: 1;
+}
+
+.dbv-chart__crosshair {
+	stroke: var(--text-faint);
+	stroke-width: 1;
+}
+
+.dbv-chart__dot {
+	stroke: var(--bg);
+	stroke-width: 2;
+}
+
+/* A 2px surface gap between adjacent slices. */
+.dbv-chart__slice {
+	stroke: var(--bg);
+	stroke-width: 2;
+}
+
+.dbv-chart__tooltip {
+	position: absolute;
+	transform: translate(-50%, calc(-100% - 8px));
+	pointer-events: none;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-0_5);
+	padding: var(--space-1) var(--space-2);
+	background: var(--bg-elev);
+	border: var(--border-width) solid var(--border);
+	border-radius: var(--radius-md);
+	box-shadow: var(--shadow-md, none);
+	font-size: var(--text-size-xs);
+	white-space: nowrap;
+	z-index: 2;
+}
+
+.dbv-chart__tooltip-label {
+	color: var(--text-dim);
+}
+
+.dbv-chart__tooltip-value {
+	color: var(--text);
+	font-weight: var(--text-weight-semibold);
+	font-variant-numeric: tabular-nums;
+}
+
+.dbv-chart__pie {
+	display: flex;
+	align-items: center;
+	gap: var(--space-4);
+	flex-wrap: wrap;
+}
+
+.dbv-chart__legend {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+	min-width: 0;
+}
+
+.dbv-chart__legend-item {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	font-size: var(--text-size-sm);
+	color: var(--text);
+}
+
+.dbv-chart__swatch {
+	width: 10px;
+	height: 10px;
+	border-radius: var(--radius-sm);
+	flex-shrink: 0;
+}
+
+.dbv-chart__legend-value {
+	margin-inline-start: auto;
+	padding-inline-start: var(--space-3);
+	color: var(--text-dim);
+	font-variant-numeric: tabular-nums;
+}
+
+.dbv-chart__hero {
+	padding: var(--space-4) 0;
+}
+
+.dbv-chart__hero-value {
+	font-size: var(--text-size-3xl, var(--text-size-xl));
+	font-weight: var(--text-weight-semibold);
+	color: var(--text);
+	font-variant-numeric: tabular-nums;
+}
+
+.dbv-chart__table {
+	border-collapse: collapse;
+	width: 100%;
+	max-width: 560px;
+	font-size: var(--text-size-sm);
+}
+
+.dbv-chart__table th,
+.dbv-chart__table td {
+	text-align: start;
+	padding: var(--space-1) var(--space-2);
+	border-bottom: var(--border-width) solid var(--border);
+	font-weight: var(--text-weight-regular);
+}
+
+.dbv-chart__table thead th {
+	color: var(--text-dim);
+	font-weight: var(--text-weight-medium);
+}
+
+.dbv-chart__num {
+	text-align: end;
+	font-variant-numeric: tabular-nums;
+}
+
+.dbv-chart__table .dbv-chart__num {
+	text-align: end;
+}
+
+.dbv-chart__empty {
+	margin: 0;
+	color: var(--text-dim);
+	font-size: var(--text-size-sm);
+}
+
+/* Chart dashboard widget (9.12.30). */
+.dbv-chart-widget {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	padding: var(--space-2);
+	min-width: 0;
+}
+
+.dbv-chart-widget__toolbar {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+}
+
+.dbv-chart-widget__open {
+	display: block;
+	width: 100%;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	text-align: start;
+	cursor: pointer;
+	border-radius: var(--radius-md);
+}
+
+.dbv-chart-widget__open:hover {
+	background: var(--hover);
+}
+
+.dbv-chart[data-compact="true"] {
+	padding: var(--space-2);
+	gap: var(--space-2);
+}
+
+/* Change-type preview (9.12.33) — rides the import modal chrome. */
+.db-change-type__heading {
+	margin: var(--space-3) 0 var(--space-1);
+	font-size: var(--text-size-sm);
+	font-weight: var(--text-weight-semibold);
+	color: var(--text);
+}
+
+.db-change-type__list {
+	margin: 0;
+	padding-inline-start: var(--space-4);
+	max-height: 180px;
+	overflow: auto;
+	font-size: var(--text-size-sm);
+	color: var(--text-dim);
+}
+
+.db-change-type__more {
+	list-style: none;
+	color: var(--text-faint);
+}
+
+/* OS file drag hovering the stage (9.8.17) — an accent ring, the same
+ * drop-the-object-here face as the board's cross-app column target. */
+.db-stage__body[data-os-drop="true"] {
+	box-shadow: inset 0 0 0 2px var(--accent);
 }
 
 /* ── Calendar view ────────────────────────────────────────────────────── */
@@ -2222,8 +2657,15 @@ body.is-resizing .dbv-tl__labels-resize {
 	display: contents;
 }
 
+/* The title is the ONE header item that gives way: it grows into the free
+ * space and shrinks to an ellipsis, so the controls after it keep their
+ * width. Without `min-width: 0` + a no-shrink nav slot the flex algorithm
+ * squeezed the "3 of 4" counter onto three lines under a long title
+ * (F-510). */
 .db-inspector__title {
 	margin: 0;
+	flex: 1 1 auto;
+	min-width: 0;
 	font-size: var(--text-size-md);
 	font-weight: var(--text-weight-semibold);
 	overflow: hidden;
@@ -2231,6 +2673,35 @@ body.is-resizing .dbv-tl__labels-resize {
 	white-space: nowrap;
 }
 
+/* Prev / next object walk (9.12.34). */
+.db-inspector__nav-slot {
+	display: inline-flex;
+	align-items: center;
+	flex-shrink: 0;
+	gap: var(--space-0_5);
+	margin-inline-start: auto;
+}
+
+.db-inspector__nav-slot:empty {
+	display: none;
+}
+
+.db-inspector__nav-count {
+	flex-shrink: 0;
+	white-space: nowrap;
+	font-size: var(--text-size-xs);
+	color: var(--text-dim);
+	font-variant-numeric: tabular-nums;
+	padding-inline: var(--space-1);
+}
+
+.db-inspector__nav-btn:disabled {
+	color: var(--text-faint);
+	cursor: default;
+	background: transparent;
+}
+
+.db-inspector__nav-btn,
 .db-inspector__close {
 	width: var(--control-height-sm, 24px);
 	height: var(--control-height-sm, 24px);
@@ -2244,6 +2715,7 @@ body.is-resizing .dbv-tl__labels-resize {
 	border-radius: var(--radius-sm);
 }
 
+.db-inspector__nav-btn:not(:disabled):hover,
 .db-inspector__close:hover {
 	background: var(--hover);
 	color: var(--text);
@@ -3101,6 +3573,11 @@ body.is-resizing .dbv-tl__labels-resize {
 	margin-top: var(--space-0_5);
 }
 
+.db-popover__row--actions {
+	justify-content: flex-start;
+	gap: var(--space-2);
+}
+
 .db-popover__row--toggle {
 	justify-content: space-between;
 	cursor: pointer;
@@ -3135,7 +3612,7 @@ body.is-resizing .dbv-tl__labels-resize {
 }
 
 .db-popover__segment {
-	padding: var(--space-0_5);
+	padding: var(--space-1) var(--space-2);
 	background: transparent;
 	border: 0;
 	color: var(--text-dim);
@@ -3261,7 +3738,8 @@ body.is-resizing .dbv-tl__labels-resize {
 
 /* Remove-column affordance (F-022): dim, brightens on row hover; sits at the
  * trailing edge after the flex-grown name. */
-.db-popover__column-remove {
+.db-popover__column-remove,
+.db-popover__column-more {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -3278,11 +3756,15 @@ body.is-resizing .dbv-tl__labels-resize {
 }
 
 .db-popover__column-row:hover .db-popover__column-remove,
-.db-popover__column-remove:focus-visible {
+.db-popover__column-remove:focus-visible,
+.db-popover__column-row:hover .db-popover__column-more,
+.db-popover__column-more:focus-visible,
+.db-popover__column-more[aria-expanded="true"] {
 	opacity: 1;
 }
 
-.db-popover__column-remove:hover {
+.db-popover__column-remove:hover,
+.db-popover__column-more:hover {
 	background: var(--color-accent-subtle, var(--hover));
 	color: var(--text);
 }
@@ -3583,6 +4065,36 @@ body.is-resizing .dbv-tl__labels-resize {
 	display: none;
 }
 
+/* An editable description (9.12.27) stays out of the way while empty, but is
+ * revealed — as a faint "Add a description…" placeholder — when the header is
+ * hovered or the field is focused (keyboard users reach it by Tab: an empty
+ * contenteditable keeps its tab stop at zero height). */
+.db-stage__description[contenteditable="plaintext-only"] {
+	border-radius: var(--radius-sm);
+	outline: none;
+	cursor: text;
+}
+
+.db-stage__description[contenteditable="plaintext-only"]:empty {
+	display: block;
+	height: 0;
+	overflow: hidden;
+}
+
+.db-stage__header:hover .db-stage__description[contenteditable="plaintext-only"]:empty,
+.db-stage__description[contenteditable="plaintext-only"]:focus {
+	height: auto;
+}
+
+.db-stage__description[contenteditable="plaintext-only"]:empty::before {
+	content: attr(data-placeholder);
+	color: var(--text-faint);
+}
+
+.db-stage__description[contenteditable="plaintext-only"]:focus {
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-focus-ring) 55%, transparent);
+}
+
 /* ── Empty vault / no-selection placeholder (9.12.2) ──────────────── */
 
 .db-stage__empty {
@@ -3676,7 +4188,7 @@ body.is-resizing .dbv-tl__labels-resize {
 
 .db-import-modal__cancel {
 	background: transparent;
-	border: var(--border-width) solid var(--border-subtle);
+	border: var(--border-width) solid var(--border);
 	color: var(--text);
 }
 
@@ -3715,7 +4227,7 @@ body.is-resizing .dbv-tl__labels-resize {
 }
 
 .db-import-row {
-	border: var(--border-width) solid var(--border-subtle);
+	border: var(--border-width) solid var(--border);
 	border-radius: var(--radius-md);
 	background: var(--bg-elevated, var(--bg));
 }
@@ -3735,7 +4247,7 @@ body.is-resizing .dbv-tl__labels-resize {
 	flex: 0 0 auto;
 	min-width: 56px;
 	padding: var(--space-0_5);
-	border: var(--border-width) solid var(--border-subtle);
+	border: var(--border-width) solid var(--border);
 	border-radius: var(--radius-full);
 	background: var(--hover);
 	color: var(--text-dim);
@@ -3773,7 +4285,7 @@ body.is-resizing .dbv-tl__labels-resize {
 .db-import-row__expand {
 	flex: 0 0 auto;
 	padding: var(--space-0_5);
-	border: var(--border-width) solid var(--border-subtle);
+	border: var(--border-width) solid var(--border);
 	border-radius: var(--radius-sm);
 	background: transparent;
 	color: var(--text-dim);
@@ -3783,7 +4295,7 @@ body.is-resizing .dbv-tl__labels-resize {
 
 .db-import-row__detail {
 	padding: var(--space-2) var(--space-2) var(--space-3);
-	border-top: var(--border-width) solid var(--border-subtle);
+	border-top: var(--border-width) solid var(--border);
 }
 
 .db-import-row__fields {
@@ -3806,7 +4318,7 @@ body.is-resizing .dbv-tl__labels-resize {
 
 .db-import-row__fields dd input {
 	width: 100%;
-	border: var(--border-width) solid var(--border-subtle);
+	border: var(--border-width) solid var(--border);
 	border-radius: var(--radius-sm);
 	background: var(--bg);
 	color: var(--text);

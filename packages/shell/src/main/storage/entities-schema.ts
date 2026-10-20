@@ -338,4 +338,100 @@ export const ENTITIES_MIGRATIONS: SqliteMigration[] = [
 			`);
 		},
 	},
+	{
+		version: 11,
+		description: "entities.db v11 — agent_writes (Agent-15 run diff + undo)",
+		up: (db) => {
+			// Agent-15 — the pre-write journal behind "what did this run change"
+			// and "Undo this run". One row per agent-attributed write (create /
+			// property update / trash), stamped server-side with the run it
+			// belongs to. It holds VAULT CONTENT (the prior and written property
+			// values), which is why it lives here beside the rows it describes and
+			// not in the metadata-only `account.db` trace. `before_json` /
+			// `after_json` are NULL with `oversize = 1` when a value was too large
+			// to journal: the diff says so and undo refuses rather than half-
+			// reverting. LOCAL state — never syncs. Retention is bounded per
+			// principal and globally (`agent-writes-repo.ts`).
+			db.exec(`
+				CREATE TABLE agent_writes (
+					id           INTEGER PRIMARY KEY AUTOINCREMENT,
+					run_id       TEXT NOT NULL,
+					agent        TEXT NOT NULL,
+					entity_id    TEXT NOT NULL,
+					entity_type  TEXT NOT NULL,
+					kind         TEXT NOT NULL,
+					before_json  TEXT,
+					after_json   TEXT,
+					oversize     INTEGER NOT NULL DEFAULT 0,
+					ts           INTEGER NOT NULL,
+					reverted_at  INTEGER
+				);
+				CREATE INDEX idx_agent_writes_run ON agent_writes(run_id, id);
+				CREATE INDEX idx_agent_writes_agent ON agent_writes(agent, ts);
+				CREATE INDEX idx_agent_writes_ts ON agent_writes(ts);
+			`);
+		},
+	},
+	{
+		version: 12,
+		description: "entities.db v12 — entity_last_edits (Collab-C7 last edited by)",
+		up: (db) => {
+			// Collab-C7 — who last edited a SHARED object, and when. Written only on
+			// the sync path: an inbound update after its sender is authenticated
+			// and authorized as a writer, or a local edit to a tracked (shared)
+			// entity. `editor` is the std-base64 Ed25519 key (the roster's join
+			// key); the name is resolved through the roster at read time, never
+			// stored. One row per entity, so the table is bounded by the vault.
+			// LOCAL state — each device records what it observed; never syncs.
+			db.exec(`
+				CREATE TABLE entity_last_edits (
+					entity_id  TEXT PRIMARY KEY,
+					editor     TEXT NOT NULL,
+					edited_at  INTEGER NOT NULL
+				);
+			`);
+		},
+	},
+	{
+		version: 13,
+		description: "entities.db v13 — entity_versions + history_change_sets (10.16 version history)",
+		up: (db) => {
+			// 10.16 — checkpoint metadata. The body bytes live in the entity's
+			// append-only `.yhist` at (frame_offset, frame_length); `properties`
+			// is the property map at capture time, kept here so a diff never has
+			// to decode a body. `principals` is server-derived JSON: who wrote
+			// since the previous checkpoint, each with their last write time (the
+			// change-set revert's "edited since" rule reads it). `state_key` hashes
+			// the doc's content (properties, links, body), so "only if changed"
+			// ignores an idempotent re-write and still sees a pure deletion. Several rows may share one frame (a change-set
+			// checkpoint of an unchanged doc).
+			// LOCAL state (OQ-VH-1) — never syncs, never exported. Overlaps Agent-15's
+			// `agent_writes` journal by design: that holds per-write property diffs
+			// for run undo; this holds whole-object checkpoints (body included).
+			db.exec(`
+				CREATE TABLE entity_versions (
+					version_id     TEXT PRIMARY KEY,
+					entity_id      TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+					at             INTEGER NOT NULL,
+					cause          TEXT NOT NULL,
+					change_set_id  TEXT,
+					principals     TEXT NOT NULL,
+					frame_offset   INTEGER NOT NULL,
+					frame_length   INTEGER NOT NULL,
+					state_key      TEXT NOT NULL,
+					properties     TEXT NOT NULL
+				);
+				CREATE INDEX idx_entity_versions_entity ON entity_versions(entity_id, at);
+				CREATE INDEX idx_entity_versions_change_set ON entity_versions(change_set_id)
+					WHERE change_set_id IS NOT NULL;
+
+				CREATE TABLE history_change_sets (
+					change_set_id  TEXT PRIMARY KEY,
+					cause          TEXT NOT NULL,
+					principals     TEXT NOT NULL,
+					created_at     INTEGER NOT NULL
+				);
+			`);
+		},
+	},
 ];

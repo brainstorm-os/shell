@@ -15,11 +15,13 @@ import type {
 import type {
 	ChromeState,
 	ClockPrefs,
+	DisplayPrefs,
 	DndPrefs,
 	LocaleState,
 	NotificationRecord,
 	NotificationsState,
 	RegionalState,
+	StartupPage,
 } from "@brainstorm-os/protocol/shell-prefs";
 import {
 	type AutoUpdateState,
@@ -43,9 +45,19 @@ import {
 	type PinResolution,
 	type PropertyDef,
 } from "@brainstorm-os/sdk-types";
+import type { AgentRunChanges, AgentUndoResult } from "@brainstorm-os/sdk-types";
 import type { ThemeName } from "@brainstorm-os/tokens";
 import { contextBridge, ipcRenderer } from "electron";
+import type { BackupStatus, RestorePoint } from "../main/bundle/backup-service";
+import type { ImportReport } from "../main/bundle/bundle-format";
+import type {
+	CustomEndpointError,
+	CustomEndpointPreset,
+	EndpointUrlError,
+	OllamaSettingsError,
+} from "../shared/ai-endpoints";
 import { appIconUrl } from "../shared/app-icon-url";
+import type { BackupFrequency } from "../shared/backup-frequency";
 
 export type { AppearanceMode, AppearancePair, AppearanceSlot, AppearanceState };
 export type { ReleaseInfo, UpdateCheckResult, UpdatePrefs };
@@ -53,6 +65,7 @@ export { UpdateAvailability, UpdateChannel };
 export type {
 	ChromeState,
 	ClockPrefs,
+	DisplayPrefs,
 	DndPrefs,
 	LocaleState,
 	NotificationRecord,
@@ -474,6 +487,11 @@ export type DashboardSnapshot = {
 	regional: RegionalState;
 	/** Shell-interface settings: header-control visibility + clock options. */
 	chrome: ChromeState;
+	/** Settings → Appearance visibility preferences (12.18). Optional so a
+	 *  renderer newer than its main process degrades to the defaults. */
+	display?: DisplayPrefs;
+	/** 7.17 — what opens once after unlock. Optional for a stale main. */
+	startupPage?: StartupPage;
 	/** Notification preferences: OS-native toggle, DND, per-app mutes. */
 	notifications: NotificationsState;
 	/** Notification center history (newest last), capped. */
@@ -598,6 +616,26 @@ const covers = {
 
 /** IE-3 — Settings → Backup & Migration (privileged dashboard surface over the
  *  IE-1 bundle codec + IE-2 import engine). Apps never see this. */
+/** IE-14 — scheduled backups + restore points (`main/bundle/backup-service.ts`). */
+export type {
+	BackupStatus,
+	RestorePoint as BackupRestorePoint,
+} from "../main/bundle/backup-service";
+export type { ImportReport as BackupRestoreReport } from "../main/bundle/bundle-format";
+
+const backup = {
+	status: (): Promise<BackupStatus | null> => ipcRenderer.invoke("backup:status"),
+	updateSchedule: (patch: {
+		frequency?: BackupFrequency;
+		retention?: number;
+	}): Promise<BackupStatus | null> => ipcRenderer.invoke("backup:update-schedule", patch),
+	pickFolder: (): Promise<BackupStatus | null> => ipcRenderer.invoke("backup:pick-folder"),
+	runNow: (): Promise<BackupStatus | null> => ipcRenderer.invoke("backup:run-now"),
+	restorePoints: (): Promise<RestorePoint[]> => ipcRenderer.invoke("backup:restore-points"),
+	restore: (name: string): Promise<ImportReport> => ipcRenderer.invoke("backup:restore", name),
+	openFolder: (): Promise<void> => ipcRenderer.invoke("backup:open-folder"),
+};
+
 const importExport = {
 	pickSource: (): Promise<ImportSourcePreview | null> =>
 		ipcRenderer.invoke("import-export:pick-source"),
@@ -636,6 +674,14 @@ const importExport = {
 		subscribe<{ done: number; total: number }>("import-export:progress", handler),
 	exportVault: (): Promise<{ path: string } | null> =>
 		ipcRenderer.invoke("import-export:export-vault"),
+	exportMarkdown: (): Promise<{ path: string } | null> =>
+		ipcRenderer.invoke("import-export:export-markdown"),
+};
+
+type SpellcheckLanguagesSnapshot = {
+	active: string[];
+	available: string[];
+	chosen: string[] | null;
 };
 
 /** B11.17b — Settings → spellcheck custom-dictionary manager (privileged). */
@@ -643,8 +689,10 @@ const spellcheck = {
 	listWords: (): Promise<string[]> => ipcRenderer.invoke("spellcheck:list-words"),
 	removeWord: (word: string): Promise<string[]> =>
 		ipcRenderer.invoke("spellcheck:remove-word", word),
-	languages: (): Promise<{ active: string[]; available: string[] }> =>
-		ipcRenderer.invoke("spellcheck:languages"),
+	languages: (): Promise<SpellcheckLanguagesSnapshot> => ipcRenderer.invoke("spellcheck:languages"),
+	/** B11.31 — an ordered subset of `available`, or `null` to follow the OS. */
+	setLanguages: (languages: readonly string[] | null): Promise<SpellcheckLanguagesSnapshot> =>
+		ipcRenderer.invoke("spellcheck:set-languages", languages),
 };
 
 /** 11.9 — Settings → AI panel (privileged). Manages BYO cloud provider API
@@ -669,6 +717,24 @@ const aiSettings = {
 		ipcRenderer.invoke("ai-settings:set-default-provider", providerId),
 	setAppBudget: (appId: string, budget: AiAppBudgetView): Promise<AiSettingsView | null> =>
 		ipcRenderer.invoke("ai-settings:set-app-budget", appId, budget),
+	/** Agent-14 — add (no `id`) or edit a custom OpenAI-compatible endpoint.
+	 *  Its optional key goes through `setProviderKey(endpoint.id, …)`. */
+	upsertEndpoint: (input: AiCustomEndpointInputView): Promise<AiCustomEndpointResultView | null> =>
+		ipcRenderer.invoke("ai-settings:upsert-endpoint", input),
+	/** Remove a custom endpoint (its stored key is deleted with it). */
+	removeEndpoint: (id: string): Promise<AiSettingsView | null> =>
+		ipcRenderer.invoke("ai-settings:remove-endpoint", id),
+	/** Set the Ollama endpoint/model override (empty = env / built-in default). */
+	setOllama: (input: { endpoint: string; model: string }): Promise<AiOllamaResultView | null> =>
+		ipcRenderer.invoke("ai-settings:set-ollama", input),
+};
+
+/** Collab-C7 — Settings → Identity → the role new shares start at
+ *  (Viewer / Editor; re-validated main-side). */
+const sharingSettings = {
+	getDefaultRole: (): Promise<string> => ipcRenderer.invoke("sharing-settings:get-default-role"),
+	setDefaultRole: (role: string): Promise<string> =>
+		ipcRenderer.invoke("sharing-settings:set-default-role", role),
 };
 
 /** Agent-12d — Settings → AI → Agent activity (privileged; OQ-AO-2
@@ -684,6 +750,12 @@ const agentActivity = {
 	entityHistory: (entityId: string): Promise<AgentActivityEventsResultView> =>
 		ipcRenderer.invoke("agent-activity:entity-history", entityId),
 	agents: (): Promise<{ agents: readonly string[] }> => ipcRenderer.invoke("agent-activity:agents"),
+	/** Agent-15 — what one run changed (created / edited / trashed objects). */
+	changes: (runId: string): Promise<AgentRunChanges | null> =>
+		ipcRenderer.invoke("agent-activity:changes", runId),
+	/** Agent-15 — undo one run's writes (refuses on later edits). */
+	undo: (runId: string): Promise<AgentUndoResult> =>
+		ipcRenderer.invoke("agent-activity:undo", runId),
 };
 
 /** Mirrors the main-side `AgentActivityRunsQuery` (agent-activity-handlers).
@@ -737,10 +809,37 @@ export type AiAppBudgetView = {
 	maxCredits?: number;
 };
 
-/** Mirrors the main-side `AiSettings` shape (11.9/14.8). */
+/** Mirrors the main-side `CustomAiEndpoint` (Agent-14). */
+export type AiCustomEndpointView = {
+	id: string;
+	name: string;
+	baseUrl: string;
+	defaultModel: string;
+	preset: CustomEndpointPreset;
+};
+
+export type AiCustomEndpointInputView = {
+	id?: string;
+	name: string;
+	baseUrl: string;
+	defaultModel: string;
+	preset?: CustomEndpointPreset;
+};
+
+export type AiCustomEndpointResultView =
+	| { ok: true; settings: AiSettingsView; endpoint: AiCustomEndpointView }
+	| { ok: false; error: CustomEndpointError; urlError?: EndpointUrlError };
+
+export type AiOllamaResultView =
+	| { ok: true; settings: AiSettingsView }
+	| { ok: false; error: OllamaSettingsError; urlError?: EndpointUrlError };
+
+/** Mirrors the main-side `AiSettings` shape (11.9/14.8/Agent-14). */
 export type AiSettingsView = {
 	defaultProvider: string | null;
 	appBudgets: Record<string, AiAppBudgetView>;
+	customEndpoints: AiCustomEndpointView[];
+	ollama: { endpoint: string | null; model: string | null };
 };
 
 /** Mirrors the main-side `AiUsageView` (14.8): rolling-window per-app usage
@@ -1341,7 +1440,12 @@ export type SearchHit = {
 	snippet: string;
 	score: number;
 	updatedAt: number;
+	/** 9.22.7 — how many live objects link to this one. */
+	backlinkCount?: number;
 };
+
+/** 9.22.7 — a launcher query the user saved, listed on an empty query. */
+export type SavedSearch = { id: string; text: string; createdAt: number };
 
 export type SearchQuery = {
 	text: string;
@@ -1370,6 +1474,12 @@ const search = {
 	reindex: (): Promise<SearchIndexReport> => ipcRenderer.invoke("search:reindex"),
 	// 11.3 consent gate — opt into the ~130 MB semantic-model download.
 	enableSemantic: (): Promise<SearchIndexReport> => ipcRenderer.invoke("search:enable-semantic"),
+	// 9.22.7 — the launcher's empty-query memory.
+	recents: (): Promise<SearchHit[]> => ipcRenderer.invoke("search:recents"),
+	savedSearches: (): Promise<SavedSearch[]> => ipcRenderer.invoke("search:saved-list"),
+	saveSearch: (text: string): Promise<SavedSearch | null> =>
+		ipcRenderer.invoke("search:saved-save", text),
+	deleteSavedSearch: (id: string): Promise<boolean> => ipcRenderer.invoke("search:saved-delete", id),
 };
 
 /** Privileged intent-dispatch surface — for the launcher palette + future
@@ -1586,6 +1696,12 @@ const dashboard = {
 		ipcRenderer.invoke("dashboard:set-clock-prefs", partial),
 	/** Reset all interface (chrome) settings to defaults. */
 	resetChrome: (): Promise<void> => ipcRenderer.invoke("dashboard:reset-chrome"),
+	/** Set what opens once after unlock (7.17). */
+	setStartupPage: (page: StartupPage): Promise<void> =>
+		ipcRenderer.invoke("dashboard:set-startup-page", page),
+	/** Patch the Settings → Appearance visibility preferences (12.18). */
+	setDisplayPrefs: (partial: Partial<DisplayPrefs>): Promise<void> =>
+		ipcRenderer.invoke("dashboard:set-display-prefs", partial),
 	/** Toggle OS-native notifications. */
 	setNotificationsOsNative: (osNative: boolean): Promise<void> =>
 		ipcRenderer.invoke("dashboard:set-notifications-os-native", osNative),
@@ -2060,6 +2176,24 @@ function resolveAnalyticsDeviceId(): string {
 	}
 }
 
+/** 6.15 — remembered "Don't ask again" choices for the dashboard's own
+ *  confirm prompts, and the Settings reset that clears every app's. Kinds are
+ *  `ConfirmKind` values; main refuses to remember an irreversible one. */
+const confirmations = {
+	list: (): Promise<string[]> => ipcRenderer.invoke("confirmations:list"),
+	remember: (kind: string): Promise<boolean> => ipcRenderer.invoke("confirmations:remember", kind),
+	reset: (): Promise<number> => ipcRenderer.invoke("confirmations:reset"),
+};
+
+/** 7.16 — "Keep running in the background" (close to tray). App-global, not
+ *  per vault; `supported` is false on macOS, where the preference is moot. */
+export type BackgroundPrefsView = { supported: boolean; keepRunning: boolean };
+const background = {
+	getPrefs: (): Promise<BackgroundPrefsView> => ipcRenderer.invoke("background:get-prefs"),
+	setKeepRunning: (keepRunning: boolean): Promise<BackgroundPrefsView> =>
+		ipcRenderer.invoke("background:set-prefs", keepRunning),
+};
+
 const brainstorm = {
 	version: resolveAppVersion(),
 	platform: process.platform,
@@ -2086,9 +2220,11 @@ const brainstorm = {
 	icons,
 	covers,
 	importExport,
+	backup,
 	spellcheck,
 	aiSettings,
 	agentActivity,
+	sharingSettings,
 	billing,
 	mcpSettings,
 	filesHandles,
@@ -2101,6 +2237,8 @@ const brainstorm = {
 	feedback,
 	help,
 	shortcuts,
+	confirmations,
+	background,
 	shellActions: { on: onShellAction },
 	capabilityPrompt: { on: onCapabilityPrompt, respond: respondCapabilityPrompt },
 	toolApprovalPrompt: { on: onToolApprovalPrompt, respond: respondToolApprovalPrompt },

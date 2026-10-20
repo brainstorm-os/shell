@@ -28,12 +28,12 @@ import type { List, MemberInclude, PropertyDef } from "@brainstorm-os/sdk-types"
 import { ulid } from "ulid";
 import { AssetKind } from "../assets/asset-types";
 import { servedMimeForName } from "../files/upload-mime";
-import { EntitiesRepository } from "../storage/entities-repo";
 import type { VaultSession } from "../vault/session";
 import type { ApplyDocUpdate } from "../welcome/seed-deps";
 import { yieldToEventLoop } from "./import-engine";
 import { inferValueType } from "./import-map";
 import { parseTable } from "./import-parse";
+import { ImportEntitiesRepository } from "./import-repo";
 import { IMPORT_EXTERNAL_ID_PROP, ImportFormat } from "./import-types";
 import { bodyMarkdownFromProperties, plantImportMarkdownBody } from "./plant-import-body";
 
@@ -407,7 +407,7 @@ export async function importNotionPlan(
 	options: NotionImportOptions,
 	attachments: readonly NotionAttachment[] = [],
 ): Promise<NotionImportReport> {
-	const repo = new EntitiesRepository(await session.dataStores.open("entities"));
+	const repo = new ImportEntitiesRepository(await session.dataStores.open("entities"));
 	// Resolve every page + attachment dedupe key in one batched query up front —
 	// one map hit per row in the loops below instead of one full-table
 	// `json_extract` scan per entity. (Collection ids are batched separately in

@@ -24,24 +24,50 @@ import { LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import {
 	AGENT_PROVENANCE_PROPERTY_KEY,
+	type AgentRunChanges,
+	AgentUndoRefusal,
+	type AgentUndoResult,
+	AgentWriteKind,
 	type Entity,
 	type EntityDocLink,
 	EntityEventVerb,
 	type EntityMergeResult,
 	type EntityQuery,
+	LinkSkipReason,
+	type PropertyDef,
+	RESERVED_PROPERTY_KEYS,
+	type SkippedLink,
 	buildAgentProvenance,
 	parseProvenanceRequest,
+	stripDerivedAuthorship,
 	stripReservedProperties,
 } from "@brainstorm-os/sdk-types";
+import { isLockedProperties } from "@brainstorm-os/sdk/entity-lock";
 import type { ServiceHandler } from "../../ipc/broker";
+import {
+	type UndoOp,
+	UndoOpKind,
+	buildRunChanges,
+	planRunUndo,
+} from "../agents/run-undo/agent-run-undo";
 import { type AssetKind, AssetRefRole } from "../assets/asset-types";
-import type { EntitiesRepository, EntityRow } from "../storage/entities-repo";
+import { restorePatch } from "../history/property-diff";
+import type { AgentWriteBefore, EntitiesRepository, EntityRow } from "../storage/entities-repo";
 import { isSafeEntityId } from "../storage/entity-id";
 import { DekWrapFailurePolicy, createEntityWithDek } from "./create-with-dek";
 import { assetRefRoleForKind, extractAssetIds } from "./derive-asset-refs";
 import type { EntityChange } from "./entity-change-emitter";
 import type { EntityDekStore } from "./entity-dek-store";
 import type { EntityDocProjection } from "./entity-doc-codec";
+import {
+	type FarWrite,
+	type InversePairs,
+	type Multiplicity,
+	inversePairs,
+	multiplicityOf,
+	planInverseBackfill,
+	planInverseWrites,
+} from "./inverse-relations";
 import { rewriteEntityRefs } from "./merge-refs";
 import { isShellOwnedEntityType } from "./shell-owned-types";
 
@@ -49,6 +75,9 @@ import { isShellOwnedEntityType } from "./shell-owned-types";
  *  handful of rows; a pathological request must not pin the main process in
  *  the per-loser referrer scan. */
 const MERGE_MAX_LOSERS = 100;
+
+/** How often the agent write journal's retention caps are enforced. */
+const AGENT_JOURNAL_PRUNE_INTERVAL_MS = 60 * 60 * 1000;
 
 export type EntitiesServiceOptions = {
 	/** The entities repo for the active vault, or null when no vault is
@@ -80,10 +109,12 @@ export type EntitiesServiceOptions = {
 	 *  through this service so the per-type capability check (read to
 	 *  load, write to apply) is reused; no new privileged channel. */
 	ydoc?: (
-		method: "load" | "applyUpdate" | "close" | "setEntityState",
+		method: "load" | "applyUpdate" | "close" | "setEntityState" | "historyRestoreBody",
 		args: {
 			vaultPath: string;
 			entityId: string;
+			offset?: number;
+			length?: number;
 			updateB64?: string;
 			props?: Record<string, unknown>;
 			links?: EntityDocLink[];
@@ -174,6 +205,11 @@ export type EntitiesServiceOptions = {
 	 *  update bytes. SECURITY: fired ONLY after the per-type write gate passed
 	 *  and the write committed; a throw is contained and never fails the edit. */
 	onLocalDocUpdate?: (entityId: string, type: string, update: Uint8Array) => void;
+	/** 10.16 — the same commit as `onLocalDocUpdate`, carrying WHO wrote it:
+	 *  the broker-verified app, and whether it wrote as an agent (a provenance-
+	 *  carrying create/update/delete). Version history derives its principals
+	 *  from this — never from anything the client claims. Contained. */
+	onLocalWrite?: (entityId: string, type: string, writer: LocalWriter) => void;
 	/** 10.14 — the entity's backing Y.Doc just compacted (its on-disk tail
 	 *  crossed the threshold). The live-sync engine emits a full-state `Snapshot`
 	 *  frame so the durable node compacts its tail too. Contained: a throw never
@@ -184,7 +220,65 @@ export type EntitiesServiceOptions = {
 	 *  call an ungated `applyUpdate`; the engine invokes it for inbound frames
 	 *  on entities it already read-gated + tracks. */
 	bindApplyRemoteDoc?: (apply: ApplyRemoteDocFn) => void;
+	/** 9.12.25 — the vault property catalog. Its `inverseOf` pairs make a
+	 *  relation two-way: create/update/delete mirror the change onto every far
+	 *  end in the same service call. Absent / failing ⇒ relations stay
+	 *  one-way (the pre-9.12.25 behaviour), never a failed write. */
+	getPropertyDefs?: () => Promise<ReadonlyArray<PropertyDef> | null>;
+	/** 9.12.25 — hands out the system-side backfill closure ONCE at
+	 *  construction (kept off the broker, like `bindApplyRemoteDoc`); the
+	 *  properties service runs it when a def first declares `inverseOf`. */
+	bindInverseBackfill?: (backfill: InverseBackfillFn) => void;
+	/** Agent-15 — resolve the trace run an agent-attributed write belongs to
+	 *  (the principal's latest run in that conversation — where the approve
+	 *  gesture already attaches). Presence of this hook turns on the write
+	 *  journal; a write with no attributable run is not journaled. */
+	resolveAgentRun?: (app: string, conversationId: string) => Promise<string | null>;
+	/** Agent-15 — hands the run diff + undo operations out to the trace
+	 *  service and the privileged Settings surface, ONCE at construction. Off
+	 *  the broker for the same reason as `bindApplyRemoteDoc`: the callers
+	 *  authorize the run (own-run / privileged) before invoking. */
+	bindAgentRunOps?: (ops: AgentRunOps) => void;
+	/** Agent-15 — a run was undone (post-commit, contained). */
+	onAgentRunUndone?: (runId: string) => void;
+	/** 10.16 — hands the system-side version-restore closure to version
+	 *  history ONCE at construction (off the broker, like `bindApplyRemoteDoc`):
+	 *  the history service authorises the caller, this re-checks write + lock
+	 *  and writes through the normal update path. */
+	bindRestoreEntity?: (restore: RestoreEntityFn) => void;
 };
+
+/** Who committed a local write (10.16). */
+export type LocalWriter = { app: string; agent: boolean };
+
+const SHELL_WRITER: LocalWriter = { app: "io.brainstorm.shell", agent: false };
+
+/** Restore a checkpoint onto `entityId` as a forward edit: properties through
+ *  the update path (caps, lock, inverse relations, asset refs), the body
+ *  replaced in one Y transaction by the worker from the `.yhist` frame. */
+export type RestoreEntityFn = (input: {
+	app: string;
+	entityId: string;
+	properties: Record<string, unknown>;
+	frame: { offset: number; length: number };
+	agent: boolean;
+}) => Promise<void>;
+
+/** Who is asking for a run's diff / undo. `Privileged` is the shell's own
+ *  Settings surface acting for the user; an app principal is limited to the
+ *  types its ledger grants. */
+export type AgentRunCaller = { privileged: true } | { privileged: false; app: string };
+
+export type AgentRunOps = {
+	changes(runId: string, caller: AgentRunCaller): Promise<AgentRunChanges | null>;
+	undo(runId: string, caller: AgentRunCaller): Promise<AgentUndoResult>;
+};
+
+/** Make an existing one-sided relation two-sided across the vault, acting as
+ *  `app` (its `entities.write` grants gate every far end). Checks every write
+ *  first and refuses the whole backfill — `Denied` — if any far end is not
+ *  writable or is read-only-locked. Resolves the number of entities written. */
+export type InverseBackfillFn = (app: string, def: PropertyDef) => Promise<number>;
 
 /** Apply a decrypted remote Y.Doc delta to the live doc + persist + materialise
  *  + deliver to open windows. `updateB64` is the base64 plaintext Yjs update. */
@@ -198,6 +292,88 @@ enum EntityAccess {
 	Write = "write",
 }
 
+function canAccess(
+	ledger: CapabilityLedger,
+	app: string,
+	verb: EntityAccess,
+	type: string,
+): boolean {
+	// Agent-Teams-1 — shell-owned types are READ-ONLY to every app, however
+	// broad its grants. An `Agent/v1` record binds a ledger principal to a
+	// pubkey and a system-prompt persona: an app that could write one could
+	// hijack a granted agent's ceiling with its own persona, orphan a real
+	// agent's authority by mangling its identity, or trick a delete into
+	// destroying another agent's unrecoverable key. Only the privileged
+	// agent directory (which writes through the repo, not this service)
+	// may author them.
+	if (verb === EntityAccess.Write && isShellOwnedEntityType(type)) return false;
+	try {
+		return ledger.has(app, `entities.${verb}:${type}`);
+	} catch (error) {
+		if (error instanceof LedgerUnavailableError) {
+			throw named("Unavailable", "entities service: capability ledger unavailable");
+		}
+		throw error;
+	}
+}
+
+/** What a caller may do per entity type — the one shape the two-way relation
+ *  planner and its far-end checks take. */
+type EntityAuthority = { read: (type: string) => boolean; write: (type: string) => boolean };
+
+function authorityOf(ledger: CapabilityLedger, app: string): EntityAuthority {
+	return {
+		read: (type) => canAccess(ledger, app, EntityAccess.Read, type),
+		write: (type) => canAccess(ledger, app, EntityAccess.Write, type),
+	};
+}
+
+type InverseCatalog = {
+	pairs: InversePairs;
+	multi: Multiplicity;
+	/** A relation's declared target types (`[]` = any type). */
+	allowedTypes: (key: string) => readonly string[];
+};
+
+function catalogOf(defs: ReadonlyArray<PropertyDef>): InverseCatalog | null {
+	const pairs = inversePairs(defs);
+	if (pairs.size === 0) return null;
+	const allowed = new Map(defs.map((d) => [d.key, d.allowedTypes ?? []] as const));
+	return { pairs, multi: multiplicityOf(defs), allowedTypes: (key) => allowed.get(key) ?? [] };
+}
+
+/** Whether an object of `type` may hold every key of a far patch: it is a
+ *  target of each key's PARTNER, so it must be one of that partner's
+ *  `allowedTypes`. The far-write path is bounded by the catalog's declared
+ *  types, never only by who can edit the catalog. */
+function farTypeAllowed(
+	catalog: InverseCatalog,
+	type: string,
+	patch: Readonly<Record<string, unknown>>,
+): boolean {
+	for (const key of Object.keys(patch)) {
+		const partner = catalog.pairs.get(key);
+		if (partner === undefined) return false;
+		const allowed = catalog.allowedTypes(partner);
+		if (allowed.length > 0 && !allowed.includes(type)) return false;
+	}
+	return true;
+}
+
+/** Journals one far-end write of a two-way relation (Agent-15). */
+type FarWriteJournal = (
+	before: EntityRow,
+	patch: Record<string, unknown>,
+	after: EntityRow,
+) => Promise<void>;
+
+/** Upper bound on far ends one write may update through two-way relations. */
+export const MAX_FAR_WRITES_PER_CALL = 256;
+
+function withSkippedLinks(entity: Entity, skipped: readonly SkippedLink[]): Entity {
+	return skipped.length === 0 ? entity : { ...entity, skippedLinks: skipped };
+}
+
 function named(name: string, message: string): Error {
 	const err = new Error(message);
 	err.name = name;
@@ -207,6 +383,12 @@ function named(name: string, message: string): Error {
 function arg(envelope: { args: unknown[] }): Record<string, unknown> {
 	const a = envelope.args[0];
 	return a && typeof a === "object" ? (a as Record<string, unknown>) : {};
+}
+
+function reservedOf(patch: Record<string, unknown>): Record<string, unknown> {
+	const out: Record<string, unknown> = {};
+	for (const key of RESERVED_PROPERTY_KEYS) if (key in patch) out[key] = patch[key];
+	return out;
 }
 
 export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): ServiceHandler {
@@ -310,6 +492,25 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 	// the local `applyDoc` path; `null` on the remote-apply path (every open
 	// window is a peer of a remote edit). Shared by `applyDoc` and the
 	// off-broker `applyRemoteDoc` so the materialise+deliver logic lives once.
+	const deliverToOpenWindows = (
+		vaultPath: string,
+		id: string,
+		updateB64: string,
+		excludeApp: string | null,
+	): void => {
+		if (!options.deliverDocUpdate) return;
+		const sk = subKey(vaultPath, id);
+		const subs = docSubscribers.get(sk);
+		if (!subs) return;
+		const targets = [...subs.keys()].filter((a) => excludeApp === null || a !== excludeApp);
+		if (targets.length === 0) return;
+		// 9.3.2d — prune any target whose renderer is gone (closed without
+		// `closeDoc`) so its refcount can't leak forever.
+		const deadApps = options.deliverDocUpdate(id, updateB64, targets);
+		for (const dead of deadApps) subs.delete(dead);
+		if (subs.size === 0) docSubscribers.delete(sk);
+	};
+
 	const applyCanonicalDelta = async (
 		vaultPath: string,
 		id: string,
@@ -322,7 +523,12 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 		if (projection?.properties || projection?.links) {
 			const repo = await options.getRepo();
 			if (repo) {
-				if (projection.properties) repo.update(id, projection.properties, clock());
+				// The doc is app-writable (and peer-writable on the remote path):
+				// reserved keys in its projection are never authority, so the
+				// stored values survive the row's merge untouched.
+				if (projection.properties) {
+					repo.update(id, stripReservedProperties(projection.properties), clock());
+				}
 				if (projection.links) {
 					for (const link of projection.links) {
 						repo.putLink({
@@ -336,28 +542,26 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				}
 			}
 		}
-		if (options.deliverDocUpdate) {
-			const sk = subKey(vaultPath, id);
-			const subs = docSubscribers.get(sk);
-			if (subs) {
-				const targets = [...subs.keys()].filter((a) => excludeApp === null || a !== excludeApp);
-				if (targets.length > 0) {
-					// 9.3.2d — prune any target whose renderer is gone (closed
-					// without `closeDoc`) so its refcount can't leak forever.
-					const deadApps = options.deliverDocUpdate(id, updateB64, targets);
-					for (const dead of deadApps) subs.delete(dead);
-					if (subs.size === 0) docSubscribers.delete(sk);
-				}
-			}
-		}
+		deliverToOpenWindows(vaultPath, id, updateB64, excludeApp);
 		return applied;
 	};
 
 	// 10.12 — fire the live-sync emit hook for a committed local Y.Doc write.
 	// Contained: a listener throw can never surface as a failed edit (the
 	// write already committed). Skipped for an empty/idempotent diff.
-	const emitLocalDoc = (id: string, type: string, updateB64: string | null | undefined): void => {
-		if (!options.onLocalDocUpdate || !updateB64) return;
+	const emitLocalDoc = (
+		id: string,
+		type: string,
+		updateB64: string | null | undefined,
+		writer: LocalWriter = SHELL_WRITER,
+	): void => {
+		if (!updateB64) return;
+		try {
+			options.onLocalWrite?.(id, type, writer);
+		} catch (error) {
+			console.error("[entities] onLocalWrite hook failed:", error);
+		}
+		if (!options.onLocalDocUpdate) return;
 		try {
 			options.onLocalDocUpdate(id, type, new Uint8Array(Buffer.from(updateB64, "base64")));
 		} catch (error) {
@@ -378,6 +582,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 		repo: EntitiesRepository,
 		row: EntityRow,
 		patch: Record<string, unknown>,
+		writer: LocalWriter = SHELL_WRITER,
 	): Promise<EntityRow | null> => {
 		let propsForRow: Record<string, unknown> = patch;
 		const vaultPath = options.getVaultPath?.() ?? null;
@@ -386,14 +591,208 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				vaultPath,
 				entityId: row.id,
 				props: patch,
-				seedProps: row.properties,
+				seedProps: stripDerivedAuthorship(row.properties),
 			})) as { projection?: EntityDocProjection; updateB64?: string | null } | null;
-			if (res?.projection?.properties) propsForRow = res.projection.properties;
+			// The doc may still hold a reserved key an app planted through
+			// `applyDoc`; only this write's own (host-supplied) patch may set one.
+			if (res?.projection?.properties) {
+				propsForRow = { ...stripReservedProperties(res.projection.properties), ...reservedOf(patch) };
+			}
 			// 10.12 — emit the property write through live-sync if shared.
-			emitLocalDoc(row.id, row.type, res?.updateB64);
+			emitLocalDoc(row.id, row.type, res?.updateB64, writer);
 		}
 		return repo.update(row.id, propsForRow, clock());
 	};
+
+	// 9.12.25 — two-way relations. The pair map comes from the live catalog
+	// on every write (a def edit takes effect immediately); a catalog failure
+	// degrades to one-way relations rather than failing the write. The derived
+	// maps are memoised on the catalog array's identity.
+	let catalogMemo: { defs: ReadonlyArray<PropertyDef>; catalog: InverseCatalog | null } | null =
+		null;
+	const inverseCatalog = async (): Promise<InverseCatalog | null> => {
+		if (!options.getPropertyDefs) return null;
+		let defs: ReadonlyArray<PropertyDef>;
+		try {
+			defs = (await options.getPropertyDefs()) ?? [];
+		} catch (error) {
+			console.warn(`[entities] property catalog unavailable: ${(error as Error).message}`);
+			return null;
+		}
+		if (catalogMemo?.defs !== defs) catalogMemo = { defs, catalog: catalogOf(defs) };
+		return catalogMemo.catalog;
+	};
+
+	type StagedFarWrite = { row: EntityRow; patch: Record<string, unknown> };
+
+	// A far end the caller cannot READ is treated as absent: it is never
+	// written and never named, so a refusal is no existence/type oracle.
+	const readableProps =
+		(repo: EntitiesRepository, authority: EntityAuthority) =>
+		(id: string): Readonly<Record<string, unknown>> | null => {
+			const row = repo.get(id);
+			return row && authority.read(row.type) ? row.properties : null;
+		};
+
+	// Every far end is checked BEFORE anything is written, so a refusal never
+	// leaves the pair half-applied: the far type must be writable by the
+	// caller, and a read-only-locked far end refuses the whole operation.
+	const stageFarWrites = (
+		repo: EntitiesRepository,
+		authority: EntityAuthority,
+		catalog: InverseCatalog,
+		writes: ReadonlyArray<FarWrite>,
+		verb: string,
+	): StagedFarWrite[] => {
+		if (writes.length > MAX_FAR_WRITES_PER_CALL) {
+			throw named(
+				"Invalid",
+				`${verb}: a two-way relation may update at most ${MAX_FAR_WRITES_PER_CALL} linked objects per call`,
+			);
+		}
+		return writes.flatMap((w) => {
+			const row = repo.get(w.entityId);
+			if (!row || !authority.read(row.type)) return [];
+			if (!farTypeAllowed(catalog, row.type, w.patch)) {
+				throw named("Denied", `${verb}: a linked object is not a type this two-way relation links`);
+			}
+			if (!authority.write(row.type)) {
+				throw named("Denied", `${verb}: a linked object of a two-way relation is not writable`);
+			}
+			if (isLockedProperties(row.properties)) {
+				throw named("Denied", `${verb}: a linked object of a two-way relation is locked (read-only)`);
+			}
+			return [{ row, patch: w.patch }];
+		});
+	};
+
+	type FarPlan = {
+		authority: EntityAuthority;
+		entityId: string;
+		before: Readonly<Record<string, unknown>>;
+		after: Readonly<Record<string, unknown>>;
+		catalog: InverseCatalog;
+	};
+
+	const planFarWrites = async (
+		repo: EntitiesRepository,
+		authority: EntityAuthority,
+		entityId: string,
+		before: Readonly<Record<string, unknown>>,
+		after: Readonly<Record<string, unknown>>,
+		verb: string,
+	): Promise<FarPlan | null> => {
+		const catalog = await inverseCatalog();
+		if (!catalog) return null;
+		const writes = planInverseWrites({
+			entityId,
+			before,
+			after,
+			...catalog,
+			read: readableProps(repo, authority),
+		});
+		if (stageFarWrites(repo, authority, catalog, writes, verb).length === 0) return null;
+		return { authority, entityId, before, after, catalog };
+	};
+
+	// Far patches are whole-value rewrites of a relation (an array of refs),
+	// so two writes that both touch one far end must not interleave their
+	// read and write: every far-write phase runs on one chain, and is
+	// re-planned from the far ends' CURRENT values inside it.
+	let farChain: Promise<unknown> = Promise.resolve();
+	const onFarChain = <T>(fn: () => Promise<T>): Promise<T> => {
+		const next = farChain.then(fn, fn);
+		farChain = next.catch(() => undefined);
+		return next;
+	};
+
+	// Re-checked at apply time (the plan was checked before the primary write,
+	// and awaits sit between): a far end that can no longer take its back-link
+	// is skipped and REPORTED. A far end outside the catalog's types, or one
+	// the caller cannot read, is skipped silently — it was never part of the
+	// checked plan, and naming it would be an oracle.
+	const writeFarPatch = async (
+		repo: EntitiesRepository,
+		authority: EntityAuthority,
+		catalog: InverseCatalog,
+		farId: string,
+		rawPatch: Record<string, unknown>,
+		writer: LocalWriter,
+		journal: FarWriteJournal | undefined,
+	): Promise<SkippedLink | null> => {
+		const row = repo.get(farId);
+		if (!row || !authority.read(row.type) || !farTypeAllowed(catalog, row.type, rawPatch)) {
+			return null;
+		}
+		if (!authority.write(row.type)) return { entityId: farId, reason: LinkSkipReason.Denied };
+		if (isLockedProperties(row.properties)) {
+			return { entityId: farId, reason: LinkSkipReason.Locked };
+		}
+		const patch = stripReservedProperties(rawPatch);
+		if (Object.keys(patch).length === 0) return null;
+		const updated = await writePropsThroughDoc(repo, row, patch, writer);
+		if (!updated) return null;
+		emitChange(EntityEventVerb.Update, row.id, row.type);
+		await journal?.(row, patch, updated);
+		return null;
+	};
+
+	const applyFarWrites = (
+		repo: EntitiesRepository,
+		plan: FarPlan | null,
+		writer: LocalWriter = SHELL_WRITER,
+		journal?: FarWriteJournal,
+	): Promise<SkippedLink[]> => {
+		if (!plan) return Promise.resolve([]);
+		return onFarChain(async () => {
+			const writes = planInverseWrites({
+				entityId: plan.entityId,
+				before: plan.before,
+				after: plan.after,
+				...plan.catalog,
+				read: readableProps(repo, plan.authority),
+			}).slice(0, MAX_FAR_WRITES_PER_CALL);
+			const skipped: SkippedLink[] = [];
+			for (const w of writes) {
+				const skip = await writeFarPatch(
+					repo,
+					plan.authority,
+					plan.catalog,
+					w.entityId,
+					w.patch,
+					writer,
+					journal,
+				);
+				if (skip) skipped.push(skip);
+			}
+			return skipped;
+		});
+	};
+
+	if (options.bindInverseBackfill) {
+		options.bindInverseBackfill(async (app, def) => {
+			const repo = await options.getRepo();
+			const ledger = await options.getLedger();
+			if (!repo || !ledger) throw named("Unavailable", "entities service: no active vault session");
+			const inverse = def.inverseOf;
+			if (!inverse) return 0;
+			const known = (await options.getPropertyDefs?.()) ?? [];
+			const defs = [...known.filter((d) => d.key !== def.key), def];
+			const catalog = catalogOf(defs);
+			if (!catalog || catalog.pairs.get(def.key) !== inverse) return 0;
+			const authority = authorityOf(ledger, app);
+			const rows = repo.query({}).filter((r) => authority.read(r.type));
+			const writes = planInverseBackfill({ key: def.key, inverse, rows, multi: catalog.multi });
+			const staged = stageFarWrites(repo, authority, catalog, writes, "properties.setProperty");
+			const writer: LocalWriter = { app, agent: false };
+			await onFarChain(async () => {
+				for (const { row, patch } of staged) {
+					await writeFarPatch(repo, authority, catalog, row.id, patch, writer, undefined);
+				}
+			});
+			return staged.length;
+		});
+	}
 
 	// 10.12 — the system-only remote-apply path. NOT registered on the broker
 	// (an app must never be able to apply an ungated Y.Doc update): handed to
@@ -405,6 +804,253 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 			const vaultPath = options.getVaultPath?.() ?? null;
 			if (!vaultPath) return;
 			await applyCanonicalDelta(vaultPath, id, updateB64, null);
+		});
+	}
+
+	// 10.16 — the system-only version-restore path (see `bindRestoreEntity`).
+	// Re-checks the write gate + lock itself: the history service is not the
+	// write authority, this service is.
+	if (options.bindRestoreEntity) {
+		options.bindRestoreEntity(async ({ app, entityId, properties, frame, agent }) => {
+			const repo = await options.getRepo();
+			const ledger = await options.getLedger();
+			if (!repo || !ledger) throw named("Unavailable", "entities service: no active vault session");
+			const row = repo.get(entityId);
+			if (!row) throw named("Invalid", `history.restore: ${entityId} not found`);
+			if (!canAccess(ledger, app, EntityAccess.Write, row.type)) {
+				throw named("Denied", `history.restore: no entities.write for ${row.type}`);
+			}
+			if (isLockedProperties(row.properties)) {
+				throw named("Denied", `history.restore: ${entityId} is locked (read-only)`);
+			}
+			const writer: LocalWriter = { app, agent };
+			const patch = restorePatch(properties, row.properties);
+			if (Object.keys(patch).length > 0) {
+				const far = await planFarWrites(
+					repo,
+					authorityOf(ledger, app),
+					entityId,
+					row.properties,
+					{ ...row.properties, ...patch },
+					"history.restore",
+				);
+				const updated = await writePropsThroughDoc(repo, row, patch, writer);
+				if (!updated) throw named("Invalid", `history.restore: ${entityId} not found`);
+				emitChange(EntityEventVerb.Update, entityId, row.type);
+				await applyFarWrites(repo, far, writer);
+				await reconcileAssetRefs(repo, entityId, updated.properties);
+			}
+			const vaultPath = options.getVaultPath?.() ?? null;
+			if (!options.ydoc || !vaultPath) return;
+			const res = (await options.ydoc("historyRestoreBody", {
+				vaultPath,
+				entityId,
+				offset: frame.offset,
+				length: frame.length,
+			})) as { updateB64?: string | null; compacted?: boolean } | null;
+			if (!res?.updateB64) return;
+			deliverToOpenWindows(vaultPath, entityId, res.updateB64, null);
+			emitLocalDoc(entityId, row.type, res.updateB64, writer);
+			if (res.compacted && options.onDocCompacted) {
+				try {
+					options.onDocCompacted(entityId, row.type);
+				} catch (error) {
+					console.error("[entities] onDocCompacted hook failed:", error);
+				}
+			}
+		});
+	}
+
+	// Agent-15 — the agent write journal. Contained like every post-commit
+	// hook: the write already committed, so a journal failure is logged and
+	// never surfaces as a failed write. The run, the principal and the entity
+	// type are all resolved HERE (the broker-verified app; the repo's row) —
+	// the caller supplies only the conversation id it already supplies for
+	// provenance.
+	let lastJournalPruneMs = 0;
+	const journalAgentWrite = async (
+		repo: EntitiesRepository,
+		app: string,
+		provenance: unknown,
+		write: {
+			entityId: string;
+			entityType: string;
+			kind: AgentWriteKind;
+			before: AgentWriteBefore | null;
+			after: Record<string, unknown>;
+		},
+	): Promise<void> => {
+		if (!options.resolveAgentRun) return;
+		const request = parseProvenanceRequest(provenance);
+		if (!request) return;
+		try {
+			const runId = await options.resolveAgentRun(app, request.conversationId);
+			if (!runId) return;
+			const now = clock();
+			repo.agentWrites.insert({ runId, agent: app, ...write, ts: now });
+			if (now - lastJournalPruneMs >= AGENT_JOURNAL_PRUNE_INTERVAL_MS) {
+				lastJournalPruneMs = now;
+				repo.agentWrites.prune(now);
+			}
+		} catch (error) {
+			console.warn(`[entities] agent write journal failed: ${(error as Error).message}`);
+		}
+	};
+
+	// The prior values of exactly the keys a write touched (read from the row
+	// BEFORE it), and what they became — one journal entry per object written.
+	const journalAgentUpdate = (
+		repo: EntitiesRepository,
+		app: string,
+		provenance: unknown,
+		existing: EntityRow,
+		patch: Record<string, unknown>,
+		updated: EntityRow,
+	): Promise<void> => {
+		const before: AgentWriteBefore = { present: {}, absent: [] };
+		const after: Record<string, unknown> = {};
+		for (const key of Object.keys(patch)) {
+			if (key in existing.properties) before.present[key] = existing.properties[key];
+			else before.absent.push(key);
+			after[key] = updated.properties[key] ?? null;
+		}
+		return journalAgentWrite(repo, app, provenance, {
+			entityId: existing.id,
+			entityType: existing.type,
+			kind: AgentWriteKind.Updated,
+			before,
+			after,
+		});
+	};
+
+	// Agent-15 — an agent write's far-end updates are journaled into the same
+	// run, so undoing it puts the back-links back too.
+	const farJournalFor = (
+		repo: EntitiesRepository,
+		app: string,
+		provenance: unknown,
+	): FarWriteJournal | undefined =>
+		parseProvenanceRequest(provenance)
+			? (row, patch, updated) => journalAgentUpdate(repo, app, provenance, row, patch, updated)
+			: undefined;
+
+	if (options.bindAgentRunOps) {
+		const authorityFor = async (
+			caller: AgentRunCaller,
+			verb: EntityAccess,
+		): Promise<(type: string) => boolean> => {
+			if (caller.privileged) {
+				return (type) => verb === EntityAccess.Read || !isShellOwnedEntityType(type);
+			}
+			const ledger = await options.getLedger();
+			if (!ledger) throw named("Unavailable", "agent run: no active vault session");
+			return (type) => {
+				if (verb === EntityAccess.Write && isShellOwnedEntityType(type)) return false;
+				try {
+					return ledger.has(caller.app, `entities.${verb}:${type}`);
+				} catch {
+					return false;
+				}
+			};
+		};
+		const callerEntries = (repo: EntitiesRepository, runId: string, caller: AgentRunCaller) => {
+			const all = repo.agentWrites.listForRun(runId);
+			return caller.privileged ? all : all.filter((e) => e.agent === caller.app);
+		};
+		// One undo at a time: the plan is checked against live state and then
+		// applied, and two interleaved undos must not both pass the check.
+		let undoChain: Promise<unknown> = Promise.resolve();
+		const undo = async (runId: string, caller: AgentRunCaller): Promise<AgentUndoResult> => {
+			const repo = await options.getRepo();
+			if (!repo) throw named("Unavailable", "agent run: no active vault session");
+			const entries = callerEntries(repo, runId, caller);
+			if (entries.length === 0) {
+				return { ok: false, reason: AgentUndoRefusal.NotFound, entityId: null, field: null };
+			}
+			const canWrite = await authorityFor(caller, EntityAccess.Write);
+			const plannedAt = new Map<string, number>();
+			const plan = planRunUndo(
+				entries,
+				(id) => {
+					const row = repo.getIncludingDeleted(id);
+					if (row) plannedAt.set(id, row.updatedAt);
+					return row
+						? { properties: row.properties, updatedAt: row.updatedAt, deletedAt: row.deletedAt }
+						: null;
+				},
+				canWrite,
+			);
+			if (!plan.ok) return plan;
+			// The plan was checked against live state, but the writes below
+			// await: re-check each object right before writing it, so a grant
+			// revoked, a lock set or an edit landed in between is never
+			// overwritten. What was already reverted stays reverted.
+			const stale = (op: UndoOp): AgentUndoResult | null => {
+				const row = repo.getIncludingDeleted(op.entityId);
+				const refuse = (reason: AgentUndoRefusal) =>
+					({ ok: false, reason, entityId: op.entityId, field: null }) as const;
+				if (!canWrite(op.entityType)) return refuse(AgentUndoRefusal.Denied);
+				if (!row) return null;
+				if (isLockedProperties(row.properties)) return refuse(AgentUndoRefusal.Locked);
+				if (row.updatedAt !== plannedAt.get(op.entityId)) return refuse(AgentUndoRefusal.EditedSince);
+				return null;
+			};
+			for (const op of plan.ops) {
+				const refusal = stale(op);
+				if (refusal) return refusal;
+				switch (op.kind) {
+					case UndoOpKind.Trash:
+						if (repo.softDelete(op.entityId, clock())) {
+							emitChange(EntityEventVerb.Delete, op.entityId, op.entityType);
+							if (options.getAssetKind) {
+								try {
+									repo.assetRefs.deleteByEntity(op.entityId);
+								} catch (error) {
+									console.error("[entities] asset-ref delete-prune failed:", error);
+								}
+							}
+						}
+						break;
+					case UndoOpKind.Restore:
+						if (repo.restore(op.entityId, clock())) {
+							emitChange(EntityEventVerb.Update, op.entityId, op.entityType);
+						}
+						break;
+					case UndoOpKind.Patch: {
+						const row = repo.get(op.entityId);
+						if (!row) break;
+						const updated = await writePropsThroughDoc(repo, row, op.patch);
+						if (updated) {
+							emitChange(EntityEventVerb.Update, op.entityId, op.entityType);
+							await reconcileAssetRefs(repo, op.entityId, updated.properties);
+						}
+						break;
+					}
+				}
+				const written = repo.getIncludingDeleted(op.entityId);
+				if (written) plannedAt.set(op.entityId, written.updatedAt);
+			}
+			repo.agentWrites.markRunReverted(runId, clock());
+			try {
+				options.onAgentRunUndone?.(runId);
+			} catch {
+				// Contained: a trace failure never fails the undo.
+			}
+			return { ok: true, reverted: plan.ops.length };
+		};
+		options.bindAgentRunOps({
+			changes: async (runId, caller) => {
+				const repo = await options.getRepo();
+				if (!repo) return null;
+				const canRead = await authorityFor(caller, EntityAccess.Read);
+				const entries = callerEntries(repo, runId, caller).filter((e) => canRead(e.entityType));
+				return buildRunChanges(runId, entries);
+			},
+			undo: (runId, caller) => {
+				const next = undoChain.then(() => undo(runId, caller));
+				undoChain = next.catch(() => undefined);
+				return next;
+			},
 		});
 	}
 
@@ -424,25 +1070,8 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 			throw named("Unavailable", "entities service: no active vault session");
 		}
 
-		const can = (verb: EntityAccess, type: string): boolean => {
-			// Agent-Teams-1 — shell-owned types are READ-ONLY to every app, however
-			// broad its grants. An `Agent/v1` record binds a ledger principal to a
-			// pubkey and a system-prompt persona: an app that could write one could
-			// hijack a granted agent's ceiling with its own persona, orphan a real
-			// agent's authority by mangling its identity, or trick a delete into
-			// destroying another agent's unrecoverable key. Only the privileged
-			// agent directory (which writes through the repo, not this service)
-			// may author them.
-			if (verb === EntityAccess.Write && isShellOwnedEntityType(type)) return false;
-			try {
-				return ledger.has(app, `entities.${verb}:${type}`);
-			} catch (error) {
-				if (error instanceof LedgerUnavailableError) {
-					throw named("Unavailable", "entities service: capability ledger unavailable");
-				}
-				throw error;
-			}
-		};
+		const can = (verb: EntityAccess, type: string): boolean => canAccess(ledger, app, verb, type);
+		const authority = authorityOf(ledger, app);
 
 		const compose = (row: EntityRow): Entity => ({
 			id: row.id,
@@ -515,6 +1144,14 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 					throw named("Invalid", `entities.create: ${explicitId} already exists`);
 				}
 				const entityId = explicitId ?? options.newId();
+				const farOnCreate = await planFarWrites(
+					repo,
+					authority,
+					entityId,
+					{},
+					properties,
+					"entities.create",
+				);
 				// Stage 10.1 + 10.3a — the row is born with its sealed per-entity
 				// DEK and this device's member wrap, through the ONE shared seam
 				// the channel-approve path also uses (`create-with-dek.ts`). A
@@ -549,7 +1186,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 								props: properties,
 							})) as { updateB64?: string | null } | null;
 							// 10.12 — emit the initial property write if shared.
-							emitLocalDoc(entityId, type, seeded?.updateB64);
+							emitLocalDoc(entityId, type, seeded?.updateB64, { app, agent: provReq !== null });
 						} catch (error) {
 							console.warn(
 								`[entities] create: failed to seed Y.Doc for ${entityId}: ${(error as Error).message}`,
@@ -570,10 +1207,25 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 							// Contained: a trace failure never fails the create.
 						}
 					}
+					if (provReq) {
+						await journalAgentWrite(repo, app, a.provenance, {
+							entityId,
+							entityType: type,
+							kind: AgentWriteKind.Created,
+							before: null,
+							after: stripReservedProperties(row.properties),
+						});
+					}
 					// Asset-B4 — bind `asset_refs` to the `brainstorm://asset/`
 					// URLs the new row's properties carry (post-commit, contained).
 					await reconcileAssetRefs(repo, entityId, row.properties);
-					return compose(row);
+					const skippedLinks = await applyFarWrites(
+						repo,
+						farOnCreate,
+						{ app, agent: provReq !== null },
+						farJournalFor(repo, app, a.provenance),
+					);
+					return withSkippedLinks(compose(row), skippedLinks);
 				}
 			}
 
@@ -591,14 +1243,37 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				const patch = stripReservedProperties(
 					a.patch && typeof a.patch === "object" ? (a.patch as Record<string, unknown>) : {},
 				);
-				const updated = await writePropsThroughDoc(repo, existing, patch);
+				const farOnUpdate = await planFarWrites(
+					repo,
+					authority,
+					id,
+					existing.properties,
+					{ ...existing.properties, ...patch },
+					"entities.update",
+				);
+				const writer: LocalWriter = {
+					app,
+					agent: parseProvenanceRequest(a.provenance) !== null,
+				};
+				const updated = await writePropsThroughDoc(repo, existing, patch, writer);
 				if (!updated) throw named("Invalid", `entities.update: ${id} not found`);
 				emitChange(EntityEventVerb.Update, id, existing.type);
+				// Agent-15 — journal the primary write BEFORE the far ends, so a
+				// far-end failure can never leave it unrecorded.
+				if (a.provenance !== undefined && Object.keys(patch).length > 0) {
+					await journalAgentUpdate(repo, app, a.provenance, existing, patch, updated);
+				}
+				const skippedLinks = await applyFarWrites(
+					repo,
+					farOnUpdate,
+					writer,
+					farJournalFor(repo, app, a.provenance),
+				);
 				// Asset-B4 — reconcile against the row's FULL post-write property
 				// set (a patch merges into existing, so pruning off just the patch
 				// would drop refs for assets the patch never touched).
 				await reconcileAssetRefs(repo, id, updated.properties);
-				return compose(updated);
+				return withSkippedLinks(compose(updated), skippedLinks);
 			}
 
 			case "delete": {
@@ -608,8 +1283,32 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				if (!can(EntityAccess.Write, existing.type)) {
 					throw named("Denied", `entities.delete: no entities.write for ${existing.type}`);
 				}
+				const a = arg(envelope);
+				const farOnDelete = await planFarWrites(
+					repo,
+					authority,
+					id,
+					existing.properties,
+					{},
+					"entities.delete",
+				);
 				repo.softDelete(id, clock());
 				emitChange(EntityEventVerb.Delete, id, existing.type);
+				if (a.provenance !== undefined) {
+					await journalAgentWrite(repo, app, a.provenance, {
+						entityId: id,
+						entityType: existing.type,
+						kind: AgentWriteKind.Trashed,
+						before: null,
+						after: {},
+					});
+				}
+				await applyFarWrites(
+					repo,
+					farOnDelete,
+					{ app, agent: parseProvenanceRequest(a.provenance) !== null },
+					farJournalFor(repo, app, a.provenance),
+				);
 				// Asset-B4 — this is a SOFT delete (the row persists), so the
 				// `asset_refs.entity_id` ON DELETE CASCADE never fires; drop the
 				// owner's refs explicitly or they'd strand and keep the asset
@@ -642,7 +1341,9 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				const survivorId = String(a.survivorId ?? "");
 				const rawLoserIds = Array.isArray(a.loserIds) ? a.loserIds : [];
 				const patch =
-					a.patch && typeof a.patch === "object" ? (a.patch as Record<string, unknown>) : null;
+					a.patch && typeof a.patch === "object"
+						? stripReservedProperties(a.patch as Record<string, unknown>)
+						: null;
 				const survivor = repo.get(survivorId);
 				if (!survivor) throw named("Invalid", `entities.merge: survivor ${survivorId} not found`);
 				if (!can(EntityAccess.Write, survivor.type)) {
@@ -674,7 +1375,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				// lives) lands on the survivor through the standard Y.Doc-first
 				// write path.
 				if (patch && Object.keys(patch).length > 0) {
-					const updated = await writePropsThroughDoc(repo, survivor, patch);
+					const updated = await writePropsThroughDoc(repo, survivor, patch, { app, agent: false });
 					if (updated) {
 						emitChange(EntityEventVerb.Update, survivorId, survivor.type);
 						await reconcileAssetRefs(repo, survivorId, updated.properties);
@@ -683,6 +1384,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				const loserIdSet = new Set(losers.map((l) => l.id));
 				let refsRewritten = 0;
 				let linksRepointed = 0;
+				let lockedReferrers = 0;
 				if (losers.length > 0) {
 					// Referrer union across losers. The losers themselves are
 					// excluded (they're about to be binned); the survivor is NOT
@@ -704,7 +1406,16 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 						if (isShellOwnedEntityType(row.type)) continue;
 						const refPatch = rewriteEntityRefs(row.properties, loserIdSet, survivorId, row.id);
 						if (!refPatch) continue;
-						const updated = await writePropsThroughDoc(repo, row, refPatch);
+						// A read-only object keeps its refs (a locked List keeps its
+						// members): counted, never named — the caller may not read it.
+						if (isLockedProperties(row.properties)) {
+							lockedReferrers += 1;
+							continue;
+						}
+						const updated = await writePropsThroughDoc(repo, row, refPatch, {
+							app,
+							agent: false,
+						});
 						if (!updated) continue;
 						refsRewritten += 1;
 						emitChange(EntityEventVerb.Update, row.id, row.type);
@@ -733,6 +1444,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 					mergedIds: losers.map((l) => l.id),
 					linksRepointed,
 					refsRewritten,
+					lockedReferrers,
 				} satisfies EntityMergeResult;
 			}
 
@@ -811,7 +1523,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				const applied = await applyCanonicalDelta(vaultPath, id, updateB64, app);
 				// 10.12 — emit this local body edit through the always-on live-
 				// sync engine (no-op unless the entity is shared + tracked).
-				emitLocalDoc(id, row.type, updateB64);
+				emitLocalDoc(id, row.type, updateB64, { app, agent: false });
 				// 10.14 — if the worker compacted the doc's tail, let the engine
 				// emit a full-state Snapshot so the durable node compacts too.
 				if ((applied as { compacted?: boolean } | null)?.compacted && options.onDocCompacted) {

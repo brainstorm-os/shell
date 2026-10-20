@@ -1,17 +1,35 @@
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ANTHROPIC_PROVIDER_ID, OLLAMA_PROVIDER_ID } from "@brainstorm-os/sdk-types";
+import {
+	ANTHROPIC_PROVIDER_ID,
+	GLM_PROVIDER_ID,
+	MISTRAL_PROVIDER_ID,
+	OLLAMA_PROVIDER_ID,
+	SOLHEIM_PROVIDER_ID,
+} from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+	CustomEndpointError,
+	CustomEndpointPreset,
+	EndpointUrlError,
+	OPENROUTER_BASE_URL,
+	OllamaSettingsError,
+} from "../../shared/ai-endpoints";
 import { removeTestDir } from "../test-support/remove-test-dir";
 import {
 	MAX_APP_CREDIT_BUDGET,
 	MAX_APP_TOKEN_BUDGET,
+	MAX_CUSTOM_ENDPOINTS,
 	aiSettingsPath,
+	applyCustomEndpoint,
 	defaultAiSettings,
 	readAiSettings,
+	removeCustomEndpoint,
 	setAppBudget,
 	setDefaultProvider,
+	setOllamaSettings,
+	upsertCustomEndpoint,
 	validateAiSettings,
 	writeAiSettings,
 } from "./ai-settings-store";
@@ -23,6 +41,7 @@ describe("validateAiSettings", () => {
 			appBudgets: { "io.brainstorm.agent": { maxTokens: 5000 } },
 		});
 		expect(out).toEqual({
+			...defaultAiSettings(),
 			defaultProvider: ANTHROPIC_PROVIDER_ID,
 			appBudgets: { "io.brainstorm.agent": { maxTokens: 5000 } },
 		});
@@ -109,5 +128,131 @@ describe("readAiSettings / writeAiSettings + mutators", () => {
 		expect((await readAiSettings(dir)).appBudgets["io.brainstorm.browser"]).toEqual({
 			maxCredits: 12,
 		});
+	});
+});
+
+describe("Agent-14 — custom endpoints + Ollama override", () => {
+	let dir: string;
+	beforeEach(async () => {
+		dir = await mkdtemp(join(tmpdir(), "brainstorm-ai-endpoints-"));
+	});
+	afterEach(async () => {
+		await removeTestDir(dir);
+	});
+
+	const lan = { name: "Studio box", baseUrl: "http://192.168.1.20:1234/v1/", defaultModel: "qwen3" };
+
+	it("GLM, Mistral and Solheim are routable defaults", () => {
+		for (const id of [GLM_PROVIDER_ID, MISTRAL_PROVIDER_ID, SOLHEIM_PROVIDER_ID]) {
+			expect(validateAiSettings({ defaultProvider: id }).defaultProvider).toBe(id);
+		}
+	});
+
+	it("add → edit → remove round-trips through the file; the id is stable and routable", async () => {
+		const added = await upsertCustomEndpoint(dir, lan);
+		if (!added.ok) throw new Error("add failed");
+		const id = added.endpoint.id;
+		expect(id).toMatch(/^custom-[0-9a-f]{12}$/);
+		expect(added.endpoint).toEqual({
+			id,
+			name: "Studio box",
+			baseUrl: "http://192.168.1.20:1234/v1",
+			defaultModel: "qwen3",
+			preset: CustomEndpointPreset.Generic,
+		});
+		expect((await readAiSettings(dir)).customEndpoints).toEqual([added.endpoint]);
+
+		expect((await setDefaultProvider(dir, id)).defaultProvider).toBe(id);
+
+		const edited = await upsertCustomEndpoint(dir, { ...lan, id, defaultModel: "llama3.3" });
+		expect(edited.ok && edited.endpoint).toMatchObject({ id, defaultModel: "llama3.3" });
+		expect((await readAiSettings(dir)).customEndpoints).toHaveLength(1);
+
+		const removed = await removeCustomEndpoint(dir, id);
+		expect(removed?.customEndpoints).toEqual([]);
+		expect(removed?.defaultProvider).toBeNull();
+		expect(await removeCustomEndpoint(dir, id)).toBeNull();
+	});
+
+	it("keeps the OpenRouter preset on the record", async () => {
+		const added = await upsertCustomEndpoint(dir, {
+			name: "OpenRouter",
+			baseUrl: OPENROUTER_BASE_URL,
+			defaultModel: "anthropic/claude-sonnet-4.6",
+			preset: CustomEndpointPreset.OpenRouter,
+		});
+		expect(added.ok && added.endpoint.preset).toBe(CustomEndpointPreset.OpenRouter);
+	});
+
+	it("validates name, URL and model, and reports the URL reason", () => {
+		const base = defaultAiSettings();
+		expect(applyCustomEndpoint(base, { ...lan, name: " " })).toEqual({
+			ok: false,
+			error: CustomEndpointError.InvalidName,
+		});
+		expect(applyCustomEndpoint(base, { ...lan, name: "a\u0007b" })).toMatchObject({
+			error: CustomEndpointError.InvalidName,
+		});
+		expect(applyCustomEndpoint(base, { ...lan, baseUrl: "http://api.example.com/v1" })).toEqual({
+			ok: false,
+			error: CustomEndpointError.InvalidUrl,
+			urlError: EndpointUrlError.InsecurePublic,
+		});
+		expect(applyCustomEndpoint(base, { ...lan, defaultModel: "a\nb" })).toMatchObject({
+			error: CustomEndpointError.InvalidModel,
+		});
+		expect(applyCustomEndpoint(base, { ...lan, id: "custom-ffffffff" })).toMatchObject({
+			error: CustomEndpointError.NotFound,
+		});
+	});
+
+	it("caps the number of endpoints", () => {
+		let settings = defaultAiSettings();
+		let n = 0;
+		const mint = () => `custom-${(n++).toString(16).padStart(8, "0")}`;
+		for (let i = 0; i < MAX_CUSTOM_ENDPOINTS; i++) {
+			const r = applyCustomEndpoint(settings, lan, mint);
+			if (!r.ok) throw new Error("unexpected");
+			settings = r.settings;
+		}
+		expect(applyCustomEndpoint(settings, lan, mint)).toMatchObject({
+			error: CustomEndpointError.TooMany,
+		});
+	});
+
+	it("drops hand-edited endpoints that would fail validation, and a default pointing at one", () => {
+		const out = validateAiSettings({
+			defaultProvider: "custom-deadbeef",
+			customEndpoints: [
+				{ id: "custom-deadbeef", name: "x", baseUrl: "http://api.example.com", defaultModel: "m" },
+				{ id: "anthropic", name: "spoof", baseUrl: "https://example.com", defaultModel: "m" },
+				{ id: "custom-00000001", name: "ok", baseUrl: "https://example.com/v1", defaultModel: "m" },
+				{ id: "custom-00000001", name: "dup", baseUrl: "https://example.com/v1", defaultModel: "m" },
+			],
+		});
+		expect(out.customEndpoints.map((e) => e.id)).toEqual(["custom-00000001"]);
+		expect(out.defaultProvider).toBeNull();
+		expect(validateAiSettings({ defaultProvider: "custom-99999999" }).defaultProvider).toBeNull();
+	});
+
+	it("setOllamaSettings validates and an empty field clears back to the default", async () => {
+		const set = await setOllamaSettings(dir, { endpoint: "http://gpu-box:11434/", model: "qwen3" });
+		expect(set.ok && set.settings.ollama).toEqual({
+			endpoint: "http://gpu-box:11434",
+			model: "qwen3",
+		});
+		expect((await readAiSettings(dir)).ollama.model).toBe("qwen3");
+
+		expect(await setOllamaSettings(dir, { endpoint: "http://ollama.example.com" })).toEqual({
+			ok: false,
+			error: OllamaSettingsError.InvalidUrl,
+			urlError: EndpointUrlError.InsecurePublic,
+		});
+		expect(await setOllamaSettings(dir, { model: "bad\u0000" })).toMatchObject({
+			error: OllamaSettingsError.InvalidModel,
+		});
+
+		const cleared = await setOllamaSettings(dir, { endpoint: "", model: "" });
+		expect(cleared.ok && cleared.settings.ollama).toEqual({ endpoint: null, model: null });
 	});
 });

@@ -13,7 +13,9 @@ import { uniqueName } from "@brainstorm-os/sdk";
 import { type Icon, IconKind } from "@brainstorm-os/sdk-types";
 import type { List } from "../types/list";
 import type { ListSource } from "../types/list-source";
-import { type ColumnSpec, type ListView, ListViewKind } from "../types/list-view";
+import { ChartType, type ColumnSpec, type ListView, ListViewKind } from "../types/list-view";
+import { AggregationKind } from "./aggregations";
+import { isListLocked } from "./list-lock";
 
 let idCounter = 0;
 
@@ -96,10 +98,23 @@ export function createList(opts: {
 	return { list, view };
 }
 
+/* A locked List is read-only (9.16.14): rename / description / icon / delete
+ * return their input unchanged, so a caller that skips the write on identity
+ * (`next === list`) is gated without re-deriving the lock. The app layer owns
+ * the refusal message. */
+
 export function renameList(list: List, name: string): List {
 	const trimmed = name.trim();
-	if (!trimmed || trimmed === list.name) return list;
+	if (isListLocked(list) || !trimmed || trimmed === list.name) return list;
 	return { ...list, name: trimmed, updatedAt: nowMs() };
+}
+
+/** Set a list's description (9.12.27). Trimmed; an unchanged value returns
+ *  the same object so callers can skip the write. */
+export function setListDescription(list: List, description: string): List {
+	const trimmed = description.trim();
+	if (isListLocked(list) || trimmed === list.description) return list;
+	return { ...list, description: trimmed, updatedAt: nowMs() };
 }
 
 function sameIcon(a: Icon | null, b: Icon | null): boolean {
@@ -115,7 +130,7 @@ function sameIcon(a: Icon | null, b: Icon | null): boolean {
 
 /** Set (or clear, with `null`) the list's own universal icon. */
 export function setListIcon(list: List, icon: Icon | null): List {
-	if (sameIcon(list.icon, icon)) return list;
+	if (isListLocked(list) || sameIcon(list.icon, icon)) return list;
 	return { ...list, icon, updatedAt: nowMs() };
 }
 
@@ -151,12 +166,14 @@ export function duplicateList(
 	return { list, views: clonedViews };
 }
 
-/** Remove a list and all its views. Returns the filtered arrays. */
+/** Remove a list and all its views. Returns the filtered arrays; a locked
+ *  List returns them untouched. */
 export function deleteList(
 	lists: ReadonlyArray<List>,
 	views: ReadonlyArray<ListView>,
 	id: string,
 ): { lists: List[]; views: ListView[] } {
+	if (isListLocked(lists.find((l) => l.id === id))) return { lists: [...lists], views: [...views] };
 	return {
 		lists: lists.filter((l) => l.id !== id),
 		views: views.filter((v) => v.listId !== id),
@@ -171,6 +188,8 @@ export function createView(opts: {
 	name: string;
 	kind?: ListViewKind;
 	existingViewsForList: ReadonlyArray<ListView>;
+	/** Columns the new view starts with (see `seedColumnsForNewView`). */
+	columns?: ReadonlyArray<ColumnSpec>;
 }): ListView {
 	const kind = opts.kind ?? ListViewKind.Grid;
 	const name = uniqueName(opts.name, opts.existingViewsForList);
@@ -185,12 +204,25 @@ export function createView(opts: {
 		groupBy: null,
 		coverProperty: null,
 		cardSubtitleProperty: null,
-		columns: [],
+		columns: (opts.columns ?? []).map((c) => ({ ...c })),
 		defaultTypeUrl: null,
 		defaultTemplate: null,
 		pageSize: 50,
 		layoutOptions: defaultLayoutFor(kind),
 	};
+}
+
+/** The columns a new view starts with: the visible columns of the view the
+ *  user is looking at (else the list's first view). A view born with no
+ *  columns shows only the Name column as a grid and NO fields as a gallery
+ *  (F-511) — the user expects the new surface to show what the grid did. */
+export function seedColumnsForNewView(
+	siblings: ReadonlyArray<ListView>,
+	activeViewId: string | null,
+): ColumnSpec[] {
+	const source = siblings.find((v) => v.id === activeViewId) ?? siblings[0];
+	if (!source) return [];
+	return source.columns.filter((c) => c.visible !== false).map((c) => ({ ...c }));
 }
 
 /** Switch a view to another kind. Layout options are kind-specific, so
@@ -259,6 +291,12 @@ function defaultLayoutFor(kind: ListViewKind): ListView["layoutOptions"] {
 				colorBy: null,
 				labelProperty: null,
 			} as ListView["layoutOptions"];
+		case ListViewKind.Chart:
+			return {
+				chartType: ChartType.Bar,
+				aggregation: AggregationKind.CountAll,
+				valueProperty: null,
+			};
 	}
 }
 

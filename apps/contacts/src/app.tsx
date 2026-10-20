@@ -14,7 +14,9 @@
  */
 
 import { YDocProvider, useVaultEntities } from "@brainstorm-os/react-yjs";
-import type { VaultEntity } from "@brainstorm-os/sdk-types";
+import { ConfirmKind, type VaultEntity } from "@brainstorm-os/sdk-types";
+import { Checkbox } from "@brainstorm-os/sdk/checkbox";
+import { createConfirmMemory } from "@brainstorm-os/sdk/confirm-memory";
 import { lockTogglePatch } from "@brainstorm-os/sdk/entity-lock";
 import { entityTitleOr } from "@brainstorm-os/sdk/entity-title";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
@@ -30,10 +32,11 @@ import {
 	openAnchoredMenu,
 } from "@brainstorm-os/sdk/object-menu";
 import { readPanelOpen, writePanelOpen } from "@brainstorm-os/sdk/panel-state";
-import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { PanelSide, PanelToggleButton, useAutoHidePanel } from "@brainstorm-os/sdk/panel-toggle";
 import { Popover } from "@brainstorm-os/sdk/popover";
 import type { EntityTitleSource } from "@brainstorm-os/sdk/property-ui";
 import { useResizable } from "@brainstorm-os/sdk/resizable";
+import { useShortcut } from "@brainstorm-os/sdk/shortcut";
 import { publishTabIdentity } from "@brainstorm-os/sdk/tab-identity";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement } from "react";
@@ -73,6 +76,9 @@ import { PersonSidebar } from "./ui/person-list";
 import { exportContactsToVCard, importContactsFromVCard } from "./ui/vcard-actions";
 
 const SIDEBAR_OPEN_KEY = "contacts:sidebar-open";
+/** Show/hide the contact list — while auto-hide (7.15) governs a collapsed
+ *  list, the same chord reveals it as an overlay instead of pinning it. */
+const TOGGLE_SIDEBAR_CHORD = "CmdOrCtrl+\\";
 const PROPS_OPEN_KEY = "contacts:props-open";
 const GROUP_BY_KEY = "contacts:group-by";
 const SORT_BY_KEY = "contacts:sort-by";
@@ -227,6 +233,7 @@ export function ContactsApp(): ReactElement {
 	const [composeOpen, setComposeOpen] = useState(false);
 	const [duplicatesOpen, setDuplicatesOpen] = useState(false);
 	const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+	const [dontAskAgain, setDontAskAgain] = useState(false);
 	// Owned here (not in PersonDetail) so the object ⋯ menu's Add/Change-cover
 	// item can open the picker too — the Notes arrangement.
 	const [coverPickerOpen, setCoverPickerOpen] = useState(false);
@@ -497,6 +504,21 @@ export function ContactsApp(): ReactElement {
 		[writeCtx, nav],
 	);
 
+	// 6.15 — "Don't ask again" for move-to-Bin (a reversible kind: the Bin
+	// restores it). Reset from the shell's Settings → Interface.
+	const confirmMemory = useMemo(() => createConfirmMemory(settingsSvc), [settingsSvc]);
+	const requestDelete = useCallback(
+		async (id: string) => {
+			if (await confirmMemory.isSkipped(ConfirmKind.MoveToBin)) {
+				void deletePerson(id);
+				return;
+			}
+			setDontAskAgain(false);
+			setConfirmDeleteId(id);
+		},
+		[confirmMemory, deletePerson],
+	);
+
 	const companyNameOf = useCallback((id: string | null) => resolveName(nameIndex, id), [nameIndex]);
 
 	// F-158 — duplicate detection over the live person set (shared email →
@@ -686,12 +708,12 @@ export function ContactsApp(): ReactElement {
 			return contactObjectMenuContext({
 				person,
 				runtime: rt,
-				onRemove: () => setConfirmDeleteId(person.id),
+				onRemove: () => void requestDelete(person.id),
 				onToggleLock: () => void patchPerson(person.id, lockTogglePatch(person.locked)),
 				...(extras.length > 0 ? { extraItems: extras } : {}),
 			});
 		},
-		[rt, vcardItems, activePerson, patchPerson],
+		[rt, vcardItems, activePerson, patchPerson, requestDelete],
 	);
 
 	const moreRef = useRef<HTMLButtonElement>(null);
@@ -716,6 +738,13 @@ export function ContactsApp(): ReactElement {
 	const confirmDeletePerson = confirmDeleteId
 		? (persons.find((p) => p.id === confirmDeleteId) ?? null)
 		: null;
+
+	const sidebarAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !sidebarOpen });
+	useShortcut(TOGGLE_SIDEBAR_CHORD, (event) => {
+		event.preventDefault();
+		if (sidebarAutoHide.active) sidebarAutoHide.toggle();
+		else toggleSidebar();
+	});
 
 	const companyName = activePerson ? companyNameOf(activePerson.companyId) : null;
 
@@ -802,7 +831,8 @@ export function ContactsApp(): ReactElement {
 					query={query}
 					now={now}
 					demo={!usingVault}
-					open={sidebarOpen}
+					open={sidebarAutoHide.visible}
+					autoHide={sidebarAutoHide.panelProps}
 					activeId={location.id}
 					companyNameOf={companyNameOf}
 					grouping={grouping}
@@ -816,6 +846,7 @@ export function ContactsApp(): ReactElement {
 					onSetSorting={setSortingPref}
 					onReviewDuplicates={() => setDuplicatesOpen(true)}
 				/>
+				{sidebarAutoHide.edgeProps && <div {...sidebarAutoHide.edgeProps} />}
 				{sidebarOpen && (
 					<div className="contacts__resize" aria-label={t("sidebar.resize")} {...handleProps} />
 				)}
@@ -919,6 +950,7 @@ export function ContactsApp(): ReactElement {
 								className="bs-btn bs-btn--danger"
 								onClick={() => {
 									setConfirmDeleteId(null);
+									if (dontAskAgain) void confirmMemory.remember(ConfirmKind.MoveToBin);
 									void deletePerson(confirmDeletePerson.id);
 								}}
 							>
@@ -930,6 +962,15 @@ export function ContactsApp(): ReactElement {
 					<p className="contacts-confirm__body">
 						{t("delete.confirm.body", { name: confirmDeletePerson.name || t("row.noName") })}
 					</p>
+					{confirmMemory.canRemember(ConfirmKind.MoveToBin) && (
+						<Checkbox
+							className="contacts-confirm__remember"
+							label={t("delete.confirm.dontAskAgain")}
+							checked={dontAskAgain}
+							onChange={setDontAskAgain}
+							testId="contacts-delete-dont-ask"
+						/>
+					)}
 				</Popover>
 			)}
 		</div>

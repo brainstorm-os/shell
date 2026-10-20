@@ -20,10 +20,10 @@
 import { ulid } from "ulid";
 import { AssetKind } from "../assets/asset-types";
 import { servedMimeForName } from "../files/upload-mime";
-import { EntitiesRepository } from "../storage/entities-repo";
 import type { VaultSession } from "../vault/session";
 import type { ApplyDocUpdate } from "../welcome/seed-deps";
 import { parseFrontmatter } from "./import-parse";
+import { ImportEntitiesRepository } from "./import-repo";
 import { IMPORT_EXTERNAL_ID_PROP } from "./import-types";
 import { bodyMarkdownFromProperties, plantImportMarkdownBody } from "./plant-import-body";
 
@@ -249,7 +249,7 @@ export async function importObsidianVault(
 		files,
 		attachments.map((a) => a.path),
 	);
-	const repo = new EntitiesRepository(await session.dataStores.open("entities"));
+	const repo = new ImportEntitiesRepository(await session.dataStores.open("entities"));
 	const idByNote = new Map<string, string>(); // noteName → vault entity id
 	let created = 0;
 	let updated = 0;

@@ -165,6 +165,14 @@ const flatVariantStops = {
 	destructiveBottom: "var(--color-state-error)",
 } as const;
 
+// Emphasised caret + selection (12.18) — shared by every theme because both
+// derive from the theme's own accent tokens; `visibility.test.ts` holds the
+// selection wash under AA for primary text in each theme.
+const textEmphasis = {
+	caret: "var(--color-accent-on-surface)",
+	selection: "color-mix(in srgb, var(--color-accent-default) 40%, transparent)",
+} as const;
+
 // Pill-button control scale for the flat themes (Porcelain / Graphite).
 const pillControl = {
 	...control,
@@ -231,6 +239,30 @@ const z = {
 // per theme. Matched edges take the accent; unmatched edges fade to a tinted
 // grey. Edges and unmatched nodes are intentionally calmer than the eight
 // subject hues so subject identity reads first.
+const blockBackgroundLight = {
+	gray: "#e6e6e6",
+	brown: "#ecdfd5",
+	orange: "#fbe2cc",
+	yellow: "#fbf1c7",
+	green: "#d6ecdb",
+	blue: "#d4e7f7",
+	purple: "#e7ddf4",
+	pink: "#f7dcea",
+	red: "#fbdbd7",
+} as const;
+
+const blockBackgroundDark = {
+	gray: "#3a3a3a",
+	brown: "#4a382c",
+	orange: "#523620",
+	yellow: "#4d4424",
+	green: "#274034",
+	blue: "#22384d",
+	purple: "#3a2f4d",
+	pink: "#4d2c3e",
+	red: "#4d2926",
+} as const;
+
 const graphDark = {
 	subject: {
 		"1": "#a78bfa", // violet
@@ -577,6 +609,7 @@ export const defaultDark: Tokens = {
 			default: "rgba(0, 0, 0, 0.28)",
 			strong: "rgba(0, 0, 0, 0.45)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: palette.blue["400"],
 		},
@@ -596,6 +629,7 @@ export const defaultDark: Tokens = {
 		dimmer: "rgba(0, 0, 0, 0.3)",
 		textShadowOnGlass: "0 1px 2px rgba(0, 0, 0, 0.45)",
 		graph: graphDark,
+		blockBackground: blockBackgroundDark,
 	},
 	...sharedScalars,
 	shadow: {
@@ -677,6 +711,7 @@ export const defaultLight: Tokens = {
 			default: "rgba(17, 26, 46, 0.10)",
 			strong: "rgba(17, 26, 46, 0.18)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: palette.blue["500"],
 		},
@@ -699,6 +734,7 @@ export const defaultLight: Tokens = {
 		dimmer: "rgba(0, 0, 0, 0.18)",
 		textShadowOnGlass: "0 1px 1px rgba(255, 255, 255, 0.6)",
 		graph: graphLight,
+		blockBackground: blockBackgroundLight,
 	},
 	...sharedScalars,
 	shadow: {
@@ -777,6 +813,7 @@ export const midnight: Tokens = {
 			default: "rgba(0, 0, 0, 0.36)",
 			strong: "rgba(0, 0, 0, 0.55)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#38bdf8",
 		},
@@ -793,6 +830,7 @@ export const midnight: Tokens = {
 		dimmer: "rgba(0, 0, 0, 0.4)",
 		textShadowOnGlass: "0 1px 2px rgba(0, 0, 0, 0.55)",
 		graph: graphMidnight,
+		blockBackground: blockBackgroundDark,
 	},
 	...sharedScalars,
 	shadow: {
@@ -874,6 +912,7 @@ export const sepia: Tokens = {
 			default: "rgba(58, 46, 26, 0.14)",
 			strong: "rgba(58, 46, 26, 0.22)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#b04a18",
 		},
@@ -893,6 +932,7 @@ export const sepia: Tokens = {
 		dimmer: "rgba(58, 46, 26, 0.2)",
 		textShadowOnGlass: "0 1px 1px rgba(255, 248, 230, 0.6)",
 		graph: graphSepia,
+		blockBackground: blockBackgroundLight,
 	},
 	...sharedScalars,
 	// Sepia is the only built-in that overrides the typography family —
@@ -977,6 +1017,7 @@ export const highContrast: Tokens = {
 			default: "rgba(0, 0, 0, 0.9)",
 			strong: "rgba(0, 0, 0, 1)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#ffd400",
 		},
@@ -996,6 +1037,7 @@ export const highContrast: Tokens = {
 		dimmer: "rgba(0, 0, 0, 0.7)",
 		textShadowOnGlass: "0 0 0 transparent",
 		graph: graphHighContrast,
+		blockBackground: blockBackgroundDark,
 	},
 	...sharedScalars,
 	shadow: {
@@ -1076,6 +1118,7 @@ export const solar: Tokens = {
 			default: "rgba(31, 41, 55, 0.10)",
 			strong: "rgba(31, 41, 55, 0.18)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#ea580c",
 		},
@@ -1095,6 +1138,7 @@ export const solar: Tokens = {
 		dimmer: "rgba(31, 41, 55, 0.18)",
 		textShadowOnGlass: "0 1px 1px rgba(255, 255, 255, 0.6)",
 		graph: graphSolar,
+		blockBackground: blockBackgroundLight,
 	},
 	...sharedScalars,
 	shadow: {
@@ -1173,6 +1217,7 @@ export const forest: Tokens = {
 			default: "rgba(0, 0, 0, 0.32)",
 			strong: "rgba(0, 0, 0, 0.5)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#34d399",
 		},
@@ -1189,6 +1234,7 @@ export const forest: Tokens = {
 		dimmer: "rgba(0, 0, 0, 0.4)",
 		textShadowOnGlass: "0 1px 2px rgba(0, 0, 0, 0.55)",
 		graph: graphForest,
+		blockBackground: blockBackgroundDark,
 	},
 	...sharedScalars,
 	shadow: {
@@ -1269,6 +1315,7 @@ export const nord: Tokens = {
 			default: "rgba(0, 0, 0, 0.30)",
 			strong: "rgba(0, 0, 0, 0.45)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#88c0d0",
 		},
@@ -1285,6 +1332,7 @@ export const nord: Tokens = {
 		dimmer: "rgba(0, 0, 0, 0.36)",
 		textShadowOnGlass: "0 1px 2px rgba(0, 0, 0, 0.5)",
 		graph: graphNord,
+		blockBackground: blockBackgroundDark,
 	},
 	...sharedScalars,
 	shadow: {
@@ -1364,6 +1412,7 @@ export const aurora: Tokens = {
 			default: "rgba(0, 0, 0, 0.36)",
 			strong: "rgba(0, 0, 0, 0.55)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#d946ef",
 		},
@@ -1380,6 +1429,7 @@ export const aurora: Tokens = {
 		dimmer: "rgba(0, 0, 0, 0.42)",
 		textShadowOnGlass: "0 1px 2px rgba(0, 0, 0, 0.55)",
 		graph: graphAurora,
+		blockBackground: blockBackgroundDark,
 	},
 	...sharedScalars,
 	shadow: {
@@ -1458,6 +1508,7 @@ export const mint: Tokens = {
 			default: "rgba(20, 48, 40, 0.10)",
 			strong: "rgba(20, 48, 40, 0.18)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#0d9488",
 		},
@@ -1474,6 +1525,7 @@ export const mint: Tokens = {
 		dimmer: "rgba(20, 48, 40, 0.18)",
 		textShadowOnGlass: "0 1px 1px rgba(255, 255, 255, 0.6)",
 		graph: graphMint,
+		blockBackground: blockBackgroundLight,
 	},
 	...sharedScalars,
 	shadow: {
@@ -1552,6 +1604,7 @@ export const rose: Tokens = {
 			default: "rgba(58, 31, 41, 0.10)",
 			strong: "rgba(58, 31, 41, 0.18)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#e11d48",
 		},
@@ -1568,6 +1621,7 @@ export const rose: Tokens = {
 		dimmer: "rgba(58, 31, 41, 0.18)",
 		textShadowOnGlass: "0 1px 1px rgba(255, 255, 255, 0.6)",
 		graph: graphRose,
+		blockBackground: blockBackgroundLight,
 	},
 	...sharedScalars,
 	shadow: {
@@ -1646,6 +1700,7 @@ export const slate: Tokens = {
 			default: "rgba(30, 41, 59, 0.10)",
 			strong: "rgba(30, 41, 59, 0.18)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#4f46e5",
 		},
@@ -1662,6 +1717,7 @@ export const slate: Tokens = {
 		dimmer: "rgba(30, 41, 59, 0.18)",
 		textShadowOnGlass: "0 1px 1px rgba(255, 255, 255, 0.6)",
 		graph: graphSlate,
+		blockBackground: blockBackgroundLight,
 	},
 	...sharedScalars,
 	shadow: {
@@ -1743,6 +1799,7 @@ export const porcelain: Tokens = {
 			default: "rgba(23, 23, 23, 0.09)",
 			strong: "rgba(23, 23, 23, 0.16)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#4d80f0",
 		},
@@ -1762,6 +1819,7 @@ export const porcelain: Tokens = {
 		dimmer: "rgba(0, 0, 0, 0.16)",
 		textShadowOnGlass: "0 1px 1px rgba(255, 255, 255, 0.6)",
 		graph: graphPorcelain,
+		blockBackground: blockBackgroundLight,
 	},
 	...sharedScalars,
 	// Pill buttons — Porcelain's controls are fully rounded (the generic
@@ -1846,6 +1904,7 @@ export const graphite: Tokens = {
 			default: "rgba(0, 0, 0, 0.2)",
 			strong: "rgba(0, 0, 0, 0.38)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#377aff",
 		},
@@ -1865,6 +1924,7 @@ export const graphite: Tokens = {
 		dimmer: "rgba(0, 0, 0, 0.3)",
 		textShadowOnGlass: "0 1px 2px rgba(0, 0, 0, 0.45)",
 		graph: graphGraphite,
+		blockBackground: blockBackgroundDark,
 	},
 	...sharedScalars,
 	// Pill buttons — mirrors Porcelain (see the comment there).

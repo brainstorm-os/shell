@@ -32,6 +32,20 @@ describe("makeIntentsServiceHandler", () => {
 		);
 	});
 
+	it("dispatch passes the broker-verified sender renderer through to the bus", async () => {
+		const bus = { dispatch: vi.fn().mockResolvedValue({ handled: true }), suggest: vi.fn() };
+		const handler = makeIntentsServiceHandler({ getBus: async () => bus as unknown as IntentsBus });
+		const envelope = makeEnvelope("dispatch", [{ verb: "open", payload: { entityId: "ent_1" } }]);
+		await handler(envelope, 42);
+		expect(bus.dispatch).toHaveBeenLastCalledWith(expect.anything(), {
+			app: "io.example.notes",
+			webContentsId: 42,
+		});
+		// A non-renderer source (tests, synthesized calls) carries no id.
+		await handler(envelope, "test-source");
+		expect(bus.dispatch).toHaveBeenLastCalledWith(expect.anything(), { app: "io.example.notes" });
+	});
+
 	it("suggest forwards to the bus", async () => {
 		const bus = {
 			dispatch: vi.fn(),

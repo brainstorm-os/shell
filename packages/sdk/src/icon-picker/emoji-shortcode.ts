@@ -7,20 +7,36 @@
  * editor — so the lookup + ranking are unit-testable on their own.
  */
 
-import { ALL_EMOJIS, type EmojiData } from "./emoji-data";
-
-/** slug → emoji char, built once over the full set. */
-const BY_SLUG: ReadonlyMap<string, string> = new Map(ALL_EMOJIS.map((e) => [e.slug, e.char]));
+import { ALL_EMOJIS, type EmojiData, emojiKeywords } from "./emoji-data";
 
 /** Characters a `:slug:` shortcode may contain (Unicode emoji slugs are
  *  lowercase words joined by `_`). Exported so the editor transformer's
  *  trigger regExp and this module agree on the grammar. */
 export const EMOJI_SHORTCODE_BODY = "[a-z0-9_]+";
 
-/** Resolve a bare slug (no surrounding colons) to its emoji char, or `null`
- *  when no emoji has that slug. */
+const SHORTCODE_RE = new RegExp(`^${EMOJI_SHORTCODE_BODY}$`);
+
+/** slug → emoji char, built once over the full set. */
+const BY_SLUG: ReadonlyMap<string, string> = new Map(ALL_EMOJIS.map((e) => [e.slug, e.char]));
+
+/** Keyword aliases that fit the shortcode grammar (`:coffee:` → ☕). A real
+ *  slug always wins over an alias; the first emoji claiming an alias keeps
+ *  it. */
+const BY_ALIAS: ReadonlyMap<string, string> = (() => {
+	const map = new Map<string, string>();
+	for (const e of ALL_EMOJIS) {
+		for (const k of emojiKeywords(e)) {
+			if (SHORTCODE_RE.test(k) && !BY_SLUG.has(k) && !map.has(k)) map.set(k, e.char);
+		}
+	}
+	return map;
+})();
+
+/** Resolve a bare slug or alias (no surrounding colons) to its emoji char,
+ *  or `null` when nothing claims it. */
 export function resolveEmojiShortcode(slug: string): string | null {
-	return BY_SLUG.get(slug.toLowerCase()) ?? null;
+	const q = slug.toLowerCase();
+	return BY_SLUG.get(q) ?? BY_ALIAS.get(q) ?? null;
 }
 
 /**
@@ -36,8 +52,9 @@ export function emojiShortcodeCandidates(query: string, limit = 10): EmojiData[]
 	const prefix: EmojiData[] = [];
 	const contains: EmojiData[] = [];
 	for (const e of ALL_EMOJIS) {
-		if (e.slug.startsWith(q)) prefix.push(e);
-		else if (e.slug.includes(q)) contains.push(e);
+		const keys = [e.slug, ...emojiKeywords(e)];
+		if (keys.some((k) => k.startsWith(q))) prefix.push(e);
+		else if (keys.some((k) => k.includes(q))) contains.push(e);
 	}
 	prefix.sort((a, b) => a.slug.length - b.slug.length);
 	return [...prefix, ...contains].slice(0, limit);

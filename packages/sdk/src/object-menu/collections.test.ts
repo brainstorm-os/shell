@@ -68,6 +68,14 @@ describe("listCollectionsForObject", () => {
 		]);
 	});
 
+	it("carries each Collection's description for the picker's secondary line (9.12.27)", async () => {
+		const described = listEntity("c1", "Reading");
+		described.properties.description = "  Books to finish this year ";
+		const svc = fakeService([described, listEntity("c2", "Archive")]);
+		const options = await listCollectionsForObject(svc, "x");
+		expect(options.map((o) => o.description)).toEqual(["Books to finish this year", ""]);
+	});
+
 	it("drops foreign / malformed rows (codec returns null)", async () => {
 		const svc = fakeService([
 			listEntity("c1", "Reading"),
@@ -114,6 +122,15 @@ describe("toggleCollectionMembership", () => {
 		await toggleCollectionMembership(svc, "c1", "note-1", true, "notes");
 		const members = svc.store.get("c1")?.properties.members as { include: { by: string }[] };
 		expect(members.include[0]?.by).toBe("app:notes");
+	});
+
+	it("refuses to write a locked Collection", async () => {
+		const locked = listEntity("c1", "Reading");
+		locked.properties = { ...locked.properties, locked: true };
+		const svc = fakeService([locked]);
+		const updateSpy = vi.spyOn(svc, "update");
+		expect(await toggleCollectionMembership(svc, "c1", "note-1", true, "notes")).toBe(false);
+		expect(updateSpy).not.toHaveBeenCalled();
 	});
 
 	it("returns false for an unknown Collection id", async () => {

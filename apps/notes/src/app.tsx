@@ -11,9 +11,12 @@ import {
 	type CommentsFocusRequest,
 	CommentsProvider,
 	PlusIcon,
+	RichTextPropertyEditor,
 	type SelectionCommentAnchor,
+	TocIcon,
 	applySuggestionInEditor,
 	denormalizeBody,
+	serializedStateWithBlockStyles,
 	useCommentMentionHost,
 } from "@brainstorm-os/editor";
 import { useBlankRecoveryGap } from "@brainstorm-os/react-yjs";
@@ -27,6 +30,7 @@ import type {
 	PropertyValueByValueType,
 	ValueType,
 } from "@brainstorm-os/sdk-types";
+import { VersionCause, VersionPropertyChangeKind } from "@brainstorm-os/sdk-types";
 import { LiveRegion } from "@brainstorm-os/sdk/a11y";
 import { CoverPicker, type CoverPickerService } from "@brainstorm-os/sdk/cover-picker";
 import { EmptyState } from "@brainstorm-os/sdk/empty-state";
@@ -43,7 +47,7 @@ import {
 	ObjectMenuTrigger,
 } from "@brainstorm-os/sdk/object-menu";
 import { readPanelOpen, writePanelOpen } from "@brainstorm-os/sdk/panel-state";
-import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { PanelSide, PanelToggleButton, useAutoHidePanel } from "@brainstorm-os/sdk/panel-toggle";
 import { AddIconGlyph } from "@brainstorm-os/sdk/picker-host";
 import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
 import { PropertiesProvider, type ValuesMap } from "@brainstorm-os/sdk/property-ui";
@@ -53,11 +57,14 @@ import { useSelfDisplayName } from "@brainstorm-os/sdk/self-display-name";
 import { ShareDialog, type ShareDialogLabels } from "@brainstorm-os/sdk/share-dialog";
 import { publishTabIdentity } from "@brainstorm-os/sdk/tab-identity";
 import { TEMPLATE_ENTITY_TYPE, objectToTemplateProperties } from "@brainstorm-os/sdk/templates";
+import { type VersionHistoryLabels, VersionHistoryPanel } from "@brainstorm-os/sdk/version-history";
 import type { LexicalEditor, SerializedEditorState } from "lexical";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "./editor/editor";
 import type { InsertAtEndRequest } from "./editor/insert-at-end-plugin";
+import type { OutlineEntry } from "./editor/outline";
 import { queuePendingEntityLinks } from "./editor/pending-link";
+import type { TransclusionEditHost } from "./editor/transclusion-edit-host";
 import { useNotesT } from "./i18n-hooks";
 import { t } from "./i18n/t";
 import { ActionId } from "./keyboard/action-ids";
@@ -89,14 +96,39 @@ import {
 } from "./ui/note-export";
 import { NotesList } from "./ui/notes-list";
 import { noteObjectMenuContext } from "./ui/object-menu-context";
+import { OutlinePanel } from "./ui/outline-panel";
 import { NotesRightPanel, RightTab } from "./ui/right-panel-tabs";
 
 const NAV_PREF_KEY = "notes.navOpen";
 const PROPS_PREF_KEY = "notes.propsOpen";
+const OUTLINE_PREF_KEY = "notes.outlineOpen";
+
+const notesScrollContainer = (): HTMLElement | null =>
+	document.querySelector<HTMLElement>(".notes__main");
 
 /** Cheap order-insensitive equality for the autosave's body-ref diff, so a
  *  keystroke that doesn't change the set of cross-references doesn't re-persist
  *  `bodyRefs`. Compares `kind:entityId` keys. */
+/** The denormalised mirrors (`title`, `body` snippet, `bodyRefs`) a body edit
+ *  changes, or `null` when none moved. Shared by the open note's autosave and
+ *  an in-place transclusion edit of another note (B11.22). */
+function bodyDenormalizationPatch(
+	note: StoredNote,
+	body: SerializedEditorState,
+): Partial<StoredNote> | null {
+	const { title, snippet } = denormalizeBody(body);
+	const refs = extractNoteReferences(body);
+	const titleChanged = title !== note.title;
+	const snippetChanged = snippet !== note.body;
+	const refsChanged = !noteRefsEqual(refs, note.bodyRefs);
+	if (!titleChanged && !snippetChanged && !refsChanged) return null;
+	const patch: Partial<StoredNote> = {};
+	if (titleChanged) patch.title = title;
+	if (snippetChanged) patch.body = snippet;
+	if (refsChanged) patch.bodyRefs = refs;
+	return patch;
+}
+
 function noteRefsEqual(
 	a: readonly NoteReference[],
 	b: readonly NoteReference[] | undefined,
@@ -116,6 +148,44 @@ const COVERS_UNAVAILABLE: CoverPickerService = {
 	uploadBytes: () => Promise.reject(new Error("covers service unavailable")),
 	list: () => Promise.resolve([]),
 };
+
+function historyLabels(): VersionHistoryLabels {
+	return {
+		title: t("notes.history.title"),
+		empty: t("notes.history.empty"),
+		emptyHint: t("notes.history.emptyHint"),
+		loadFailed: t("notes.history.loadFailed"),
+		today: t("notes.history.today"),
+		tomorrow: t("notes.history.tomorrow"),
+		yesterday: t("notes.history.yesterday"),
+		you: t("notes.history.you"),
+		causes: {
+			[VersionCause.Idle]: t("notes.history.cause.idle"),
+			[VersionCause.BeforeBulk]: t("notes.history.cause.beforeBulk"),
+			[VersionCause.BeforeRestore]: t("notes.history.cause.beforeRestore"),
+			[VersionCause.AgentRun]: t("notes.history.cause.agentRun"),
+			[VersionCause.Import]: t("notes.history.cause.import"),
+			[VersionCause.Manual]: t("notes.history.cause.manual"),
+		},
+		listOnlyNotice: t("notes.history.listOnly"),
+		previewOnlyNotice: t("notes.history.previewOnly"),
+		back: t("notes.history.back"),
+		changesHeading: t("notes.history.changes"),
+		noChanges: t("notes.history.noChanges"),
+		bodyHeading: t("notes.history.body"),
+		emptyBody: t("notes.history.emptyBody"),
+		changeKinds: {
+			[VersionPropertyChangeKind.Added]: t("notes.history.change.added"),
+			[VersionPropertyChangeKind.Removed]: t("notes.history.change.removed"),
+			[VersionPropertyChangeKind.Changed]: t("notes.history.change.changed"),
+		},
+		restore: t("notes.history.restore"),
+		restoring: t("notes.history.restoring"),
+		restoreFailed: t("notes.history.restoreFailed"),
+		restored: t("notes.history.restored"),
+		previewFailed: t("notes.history.previewFailed"),
+	};
+}
 
 const SHARE_DIALOG_LABELS: ShareDialogLabels = {
 	title: t("notes.share.title"),
@@ -250,6 +320,8 @@ export function NotesApp() {
 	const [lastViewedLoaded, setLastViewedLoaded] = useState(false);
 	const [navOpen, setNavOpen] = useState(() => readPref(NAV_PREF_KEY, true));
 	const [propsOpen, setPropsOpen] = useState(() => readPanelOpen(PROPS_PREF_KEY, false));
+	const [outlineOpen, setOutlineOpen] = useState(() => readPanelOpen(OUTLINE_PREF_KEY, false));
+	const [outline, setOutline] = useState<OutlineEntry[]>([]);
 	const [rightTab, setRightTab] = useState<RightTab>(RightTab.Properties);
 
 	// Live comments adapter for the open note (B11.9). Bridges the vault
@@ -601,6 +673,25 @@ export function NotesApp() {
 		});
 	}, []);
 
+	const toggleOutline = useCallback(() => {
+		setOutlineOpen((open) => {
+			const next = !open;
+			writePanelOpen(OUTLINE_PREF_KEY, next);
+			return next;
+		});
+	}, []);
+
+	useShortcut(
+		ActionId.ToggleOutline,
+		useCallback(
+			(event: KeyboardEvent) => {
+				event.preventDefault();
+				toggleOutline();
+			},
+			[toggleOutline],
+		),
+	);
+
 	// Page-level lock (B11.11) — a SYNCED note property (`properties.locked`),
 	// not per-device chrome, so a lock set on one device/user is visible
 	// everywhere. Derived straight from the open note; the toggle persists
@@ -624,14 +715,18 @@ export function NotesApp() {
 		),
 	);
 
+	const navAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !navOpen });
+	const navAutoHideActive = navAutoHide.active;
+	const navAutoHideToggle = navAutoHide.toggle;
 	useShortcut(
 		ActionId.ToggleSidebar,
 		useCallback(
 			(event: KeyboardEvent) => {
 				event.preventDefault();
-				toggleNav();
+				if (navAutoHideActive) navAutoHideToggle();
+				else toggleNav();
 			},
-			[toggleNav],
+			[toggleNav, navAutoHideActive, navAutoHideToggle],
 		),
 	);
 
@@ -694,22 +789,28 @@ export function NotesApp() {
 			// AutosavePlugin gates this on real user interaction so the
 			// mount-settle echo doesn't re-fire (the [[project_notes_
 			// autosave_swallows_first_edit]] invariant).
-			const { title, snippet } = denormalizeBody(body);
-			// Extract body cross-refs from the live editor state and persist them
-			// so the shell can project note→note graph edges — the snippet has no
-			// rich nodes to walk (F-067).
-			const refs = extractNoteReferences(body);
-			const titleChanged = title !== note.title;
-			const snippetChanged = snippet !== note.body;
-			const refsChanged = !noteRefsEqual(refs, note.bodyRefs);
-			if (!titleChanged && !snippetChanged && !refsChanged) return;
-			const patch: Partial<StoredNote> = {};
-			if (titleChanged) patch.title = title;
-			if (snippetChanged) patch.body = snippet;
-			if (refsChanged) patch.bodyRefs = refs;
+			const patch = bodyDenormalizationPatch(note, body);
+			if (!patch) return;
 			update(note.id, patch);
 		},
 		[note, update],
+	);
+
+	// B11.22 — an in-place transclusion edit writes the SOURCE's Y.Doc directly;
+	// this keeps the source's denormalised mirrors in step, through the same
+	// lock-gated `update` funnel the open note uses.
+	const transclusionHost = useMemo<TransclusionEditHost>(
+		() => ({
+			canEdit: (id) => notes.has(id),
+			isLocked: (id) => notes.get(id)?.locked ?? false,
+			onSourceChange: (id, body) => {
+				const source = notes.get(id);
+				if (!source) return;
+				const patch = bodyDenormalizationPatch(source, body);
+				if (patch) update(id, patch);
+			},
+		}),
+		[notes, update],
 	);
 
 	// F-241 — insert applied (or failed) in the editor. The append is a
@@ -786,7 +887,10 @@ export function NotesApp() {
 		return {
 			files,
 			title: headerTitle,
-			getState: () => editorHandleRef.current?.getEditorState().toJSON() ?? null,
+			getState: () => {
+				const editor = editorHandleRef.current;
+				return editor ? serializedStateWithBlockStyles(editor) : null;
+			},
 			...(exportService ? { exportPdf: (html: string) => exportService.printToPdf({ html }) } : {}),
 			labels: {
 				filterName: (format) => filterByFormat[format],
@@ -903,7 +1007,12 @@ export function NotesApp() {
 	) : null;
 
 	const shell = (
-		<div className="notes" data-nav-open={navOpen} data-props-open={propsVisible}>
+		<div
+			className="notes"
+			data-nav-open={navOpen}
+			data-props-open={propsVisible}
+			data-outline-open={outlineOpen}
+		>
 			{/* DND-6 — screen-reader surface for drop / link-twin announcements. */}
 			<LiveRegion />
 			<header className="app-header notes__header">
@@ -976,6 +1085,18 @@ export function NotesApp() {
 						labels={{ show: t("notes.sidebar.show"), hide: t("notes.sidebar.hide") }}
 						controls="notes-nav"
 					/>
+					<button
+						type="button"
+						className="header-icon-btn"
+						onClick={toggleOutline}
+						aria-pressed={outlineOpen}
+						aria-controls="notes-outline"
+						aria-label={outlineOpen ? t("notes.outline.hide") : t("notes.outline.show")}
+						data-bs-tooltip={outlineOpen ? t("notes.outline.hide") : t("notes.outline.show")}
+						data-testid="notes-outline-toggle"
+					>
+						<TocIcon />
+					</button>
 					<PanelToggleButton
 						side={PanelSide.Right}
 						open={propsOpen}
@@ -1007,11 +1128,12 @@ export function NotesApp() {
 			</header>
 
 			<aside
+				{...navAutoHide.panelProps}
 				id="notes-nav"
 				className="notes__nav"
 				aria-label={t("notes.sidebar.region")}
-				aria-hidden={!navOpen}
-				inert={!navOpen ? true : undefined}
+				aria-hidden={!navAutoHide.visible}
+				inert={!navAutoHide.visible ? true : undefined}
 			>
 				<div className="notes__search">
 					<Searchbar
@@ -1040,6 +1162,7 @@ export function NotesApp() {
 					onLinkInto={onLinkInto}
 				/>
 			</aside>
+			{navAutoHide.edgeProps && <div {...navAutoHide.edgeProps} />}
 			<div
 				ref={navResizeRef}
 				className="notes__nav-resize"
@@ -1123,6 +1246,8 @@ export function NotesApp() {
 											insertRequest && insertRequest.noteId === note.id && !locked ? insertRequest : null
 										}
 										onInsertDone={onInsertDone}
+										transclusionHost={transclusionHost}
+										onOutlineChange={setOutline}
 									/>
 								)}
 							</div>
@@ -1174,11 +1299,38 @@ export function NotesApp() {
 								{...(pendingCommentAnchor ? { pendingAnchor: pendingCommentAnchor } : {})}
 								focusRequest={commentFocusRequest}
 								onApplySuggestion={onApplySuggestion}
+								{...(runtime?.services.history
+									? {
+											history: (
+												<VersionHistoryPanel
+													entityId={note.id}
+													service={runtime.services.history}
+													labels={historyLabels()}
+												/>
+											),
+										}
+									: {})}
 							/>
 						</CommentsProvider>
 					) : (
 						propertiesPanel
 					))}
+			</aside>
+
+			<aside
+				id="notes-outline"
+				className="notes__outline glass--strong"
+				aria-label={t("notes.outline.region")}
+				aria-hidden={!outlineOpen}
+				inert={!outlineOpen ? true : undefined}
+			>
+				<div className="notes__outline-header">{t("notes.outline.region")}</div>
+				<OutlinePanel
+					hasNote={note !== null}
+					entries={note ? outline : []}
+					editorRef={editorHandleRef}
+					scrollContainer={notesScrollContainer}
+				/>
 			</aside>
 
 			{pickerOpen && note && (
@@ -1226,6 +1378,7 @@ export function NotesApp() {
 	if (!runtime) return shell;
 	return (
 		<PropertiesProvider
+			richTextEditor={RichTextPropertyEditor}
 			runtime={runtime}
 			labels={notesPropertyUiLabels}
 			escapeMatcher={notesEscapeMatcher}

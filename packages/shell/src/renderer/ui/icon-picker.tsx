@@ -21,6 +21,7 @@ import {
 	useCompositeKeyboard,
 	useEscapeStackEntry,
 } from "@brainstorm-os/sdk/a11y";
+import { recentsOfKind, useRecentIcons } from "@brainstorm-os/sdk/icon-recents";
 import { type ChangeEvent, type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { IconEntry } from "../../preload";
 import { t } from "../i18n/t";
@@ -28,7 +29,13 @@ import { EMOJI_CATEGORIES, type EmojiEntry, emojiUrl, searchEmoji } from "./emoj
 import { EntityIcon } from "./entity-icon";
 import { Icon as Glyph, IconName } from "./icon";
 import "./icon-picker.css";
-import { PHOSPHOR_GLYPHS, PHOSPHOR_PACK_ID, type PackGlyph, searchPhosphor } from "./icon-packs";
+import {
+	PHOSPHOR_GLYPHS,
+	PHOSPHOR_PACK_ID,
+	type PackGlyph,
+	resolvePackGlyph,
+	searchPhosphor,
+} from "./icon-packs";
 
 export type IconPickerProps = {
 	value: Icon | null;
@@ -87,6 +94,21 @@ export function IconPicker({ value, onChange, onClose }: IconPickerProps) {
 	const [search, setSearch] = useState("");
 	const [skinTone, setSkinTone] = useState<SkinTone>(ST.None);
 	const [tintColor, setTintColor] = useState<string>(packTint(value) ?? "currentColor");
+	const { recents, record } = useRecentIcons();
+	const recentEmoji = useMemo(() => recentsOfKind(recents, IconKind.Emoji), [recents]);
+	const recentGlyphs = useMemo(
+		() =>
+			recentsOfKind(recents, IconKind.Pack).flatMap((v) => {
+				const glyph = resolvePackGlyph(v);
+				return glyph ? [glyph] : [];
+			}),
+		[recents],
+	);
+	const pick = (icon: Icon) => {
+		record(icon);
+		onChange(icon);
+		onClose();
+	};
 
 	// KBN-S-pickers: the tab row is a horizontal tablist (←/→ move + activate),
 	// so the role flows through the hook (drops the hand-written literals).
@@ -165,24 +187,22 @@ export function IconPicker({ value, onChange, onClose }: IconPickerProps) {
 						<EmojiTab
 							search={search}
 							skinTone={skinTone}
-							onPick={(char) => {
-								onChange({ kind: IconKind.Emoji, value: applySkinTone(char, skinTone) });
-								onClose();
-							}}
+							recent={recentEmoji}
+							onPick={(char) => pick({ kind: IconKind.Emoji, value: applySkinTone(char, skinTone) })}
 						/>
 					)}
 					{tab === PickerTab.Icon && (
 						<IconTab
 							search={search}
 							tint={tintColor}
-							onPick={(glyph) => {
-								onChange({
+							recent={recentGlyphs}
+							onPick={(glyph) =>
+								pick({
 									kind: IconKind.Pack,
 									value: `${PHOSPHOR_PACK_ID}/${glyph.name}`,
 									...(tintColor !== "currentColor" ? { color: tintColor } : {}),
-								});
-								onClose();
-							}}
+								})
+							}
 						/>
 					)}
 					{tab === PickerTab.Upload && (
@@ -215,13 +235,19 @@ export function IconPicker({ value, onChange, onClose }: IconPickerProps) {
 
 // ─── tabs ───────────────────────────────────────────────────────────────
 
+const EMOJI_BY_CHAR: ReadonlyMap<string, EmojiEntry> = new Map(
+	EMOJI_CATEGORIES.flatMap((cat) => cat.emojis.map((e) => [e.char, e] as const)),
+);
+
 function EmojiTab({
 	search,
 	skinTone,
+	recent,
 	onPick,
 }: {
 	search: string;
 	skinTone: SkinTone;
+	recent: readonly string[];
 	onPick: (char: string) => void;
 }) {
 	if (search.trim()) {
@@ -239,6 +265,21 @@ function EmojiTab({
 	}
 	return (
 		<div className="icon-picker__categories">
+			{recent.length > 0 && (
+				<section className="icon-picker__category" data-testid="icon-picker-recent">
+					<header className="icon-picker__category-label">{t("shell.iconPicker.recent")}</header>
+					<div className="icon-picker__grid">
+						{recent.map((char) => (
+							<EmojiButton
+								key={char}
+								emoji={EMOJI_BY_CHAR.get(char) ?? { char, keywords: char }}
+								skinTone={skinTone}
+								onPick={onPick}
+							/>
+						))}
+					</div>
+				</section>
+			)}
 			{EMOJI_CATEGORIES.map((cat) => (
 				<section key={cat.id} className="icon-picker__category">
 					<header className="icon-picker__category-label">{cat.label}</header>
@@ -278,34 +319,64 @@ function EmojiButton({
 function IconTab({
 	search,
 	tint,
+	recent,
 	onPick,
 }: {
 	search: string;
 	tint: string;
+	recent: readonly PackGlyph[];
 	onPick: (glyph: PackGlyph) => void;
 }) {
 	const glyphs = useMemo(() => (search.trim() ? searchPhosphor(search) : PHOSPHOR_GLYPHS), [search]);
-	return (
+	const grid = (
 		<div className="icon-picker__grid">
-			{glyphs.map((g) => {
-				const Glyph = g.comp;
-				return (
-					<button
-						key={g.name}
-						type="button"
-						className="icon-picker__cell"
-						aria-label={g.name}
-						onClick={() => onPick(g)}
-						style={{ color: tint }}
-					>
-						<Glyph size={20} weight="regular" />
-					</button>
-				);
-			})}
+			{glyphs.map((g) => (
+				<GlyphButton key={g.name} glyph={g} tint={tint} onPick={onPick} />
+			))}
 			{glyphs.length === 0 && (
 				<div className="icon-picker__empty">{t("shell.iconPicker.noMatch")}</div>
 			)}
 		</div>
+	);
+	if (search.trim() || recent.length === 0) return grid;
+	return (
+		<div className="icon-picker__categories">
+			<section className="icon-picker__category" data-testid="icon-picker-recent">
+				<header className="icon-picker__category-label">{t("shell.iconPicker.recent")}</header>
+				<div className="icon-picker__grid">
+					{recent.map((g) => (
+						<GlyphButton key={g.name} glyph={g} tint={tint} onPick={onPick} />
+					))}
+				</div>
+			</section>
+			<section className="icon-picker__category">
+				<header className="icon-picker__category-label">{t("shell.iconPicker.allIcons")}</header>
+				{grid}
+			</section>
+		</div>
+	);
+}
+
+function GlyphButton({
+	glyph,
+	tint,
+	onPick,
+}: {
+	glyph: PackGlyph;
+	tint: string;
+	onPick: (glyph: PackGlyph) => void;
+}) {
+	const Glyph = glyph.comp;
+	return (
+		<button
+			type="button"
+			className="icon-picker__cell"
+			aria-label={glyph.name}
+			onClick={() => onPick(glyph)}
+			style={{ color: tint }}
+		>
+			<Glyph size={20} weight="regular" />
+		</button>
 	);
 }
 

@@ -7,6 +7,7 @@ import {
 	type AgentRunSummary,
 	AgentRunSurface,
 	type AgentTraceEventRecord,
+	AgentUndoRefusal,
 } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ENVELOPE_PROTOCOL_VERSION, type Envelope } from "../../../ipc/envelope";
@@ -174,5 +175,39 @@ describe("agent-trace service (app-facing demarcation + own-runs reads)", () => 
 		await expect(handler(envelope("selfDestruct", {}))).rejects.toMatchObject({
 			name: "Invalid",
 		});
+	});
+
+	it("Agent-15: listChanges / undoRun reach the ops only for the caller's OWN run, as that app", async () => {
+		const calls: Array<{ op: string; runId: string; caller: unknown }> = [];
+		const withOps = makeAgentTraceServiceHandler({
+			recorder,
+			getRepo: async () => repo,
+			getRunOps: () => ({
+				changes: async (runId, caller) => {
+					calls.push({ op: "changes", runId, caller });
+					return { runId, changes: [], moreChanges: 0, revertedAt: null };
+				},
+				undo: async (runId, caller) => {
+					calls.push({ op: "undo", runId, caller });
+					return { ok: true, reverted: 0 };
+				},
+			}),
+		});
+		const mine = (await withOps(envelope("beginTurn", { conversationId: "c" }))) as { runId: string };
+		const theirs = (await withOps(envelope("beginTurn", { conversationId: "c" }, OTHER))) as {
+			runId: string;
+		};
+		expect(await withOps(envelope("listChanges", { runId: theirs.runId }))).toBeNull();
+		expect(await withOps(envelope("undoRun", { runId: theirs.runId }))).toMatchObject({
+			ok: false,
+			reason: AgentUndoRefusal.NotFound,
+		});
+		expect(calls).toEqual([]);
+		await withOps(envelope("listChanges", { runId: mine.runId }));
+		await withOps(envelope("undoRun", { runId: mine.runId }));
+		expect(calls).toEqual([
+			{ op: "changes", runId: mine.runId, caller: { privileged: false, app: APP } },
+			{ op: "undo", runId: mine.runId, caller: { privileged: false, app: APP } },
+		]);
 	});
 });

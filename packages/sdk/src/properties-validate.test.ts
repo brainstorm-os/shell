@@ -46,6 +46,13 @@ describe("validatePropertyDef — base shape", () => {
 		expect(result.ok).toBe(false);
 	});
 
+	it("rejects a prototype key as the key or the partner", () => {
+		for (const key of ["__proto__", "constructor", "prototype"]) {
+			expect(validatePropertyDef(makeDef(ValueType.Text, { key })).ok).toBe(false);
+			expect(validatePropertyDef(makeDef(ValueType.EntityRef, { inverseOf: key })).ok).toBe(false);
+		}
+	});
+
 	it("rejects an unknown valueType", () => {
 		// biome-ignore lint/suspicious/noExplicitAny: tests an invalid runtime value
 		const result = validatePropertyDef({ ...BASE, valueType: "bogus" as any });
@@ -167,6 +174,14 @@ describe("validatePropertyDef — entityRef modifiers", () => {
 		expect(
 			validatePropertyDef(makeDef(ValueType.EntityRef, { allowedTypes: ["io.example/Person/v1"] })).ok,
 		).toBe(true);
+	});
+
+	it("accepts inverseOf on entityRef only (9.12.25)", () => {
+		expect(validatePropertyDef(makeDef(ValueType.EntityRef, { inverseOf: "prop_books" })).ok).toBe(
+			true,
+		);
+		expect(validatePropertyDef(makeDef(ValueType.Text, { inverseOf: "prop_books" })).ok).toBe(false);
+		expect(validatePropertyDef(makeDef(ValueType.EntityRef, { inverseOf: "" })).ok).toBe(false);
 	});
 
 	it("rejects allowedTypes on text", () => {
@@ -399,5 +414,18 @@ describe("Dictionary validators", () => {
 			sortIndex: Number.NaN,
 		});
 		expect(result.ok).toBe(false);
+	});
+});
+
+describe("validatePropertyDef — number unit (9.12.33)", () => {
+	const base = { key: "w", name: "Weight", icon: null, valueType: ValueType.Number } as const;
+	it("accepts a short unit on a plain number only", () => {
+		expect(validatePropertyDef({ ...base, unit: "kg" }).ok).toBe(true);
+		expect(validatePropertyDef({ ...base, unit: "" }).ok).toBe(false);
+		expect(validatePropertyDef({ ...base, unit: "x".repeat(17) }).ok).toBe(false);
+		expect(validatePropertyDef({ ...base, format: PropertyFormat.Currency, unit: "kg" }).ok).toBe(
+			false,
+		);
+		expect(validatePropertyDef({ ...base, valueType: ValueType.Text, unit: "kg" }).ok).toBe(false);
 	});
 });

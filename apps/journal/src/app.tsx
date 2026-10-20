@@ -27,6 +27,7 @@ import { type CommentsFocusRequest, RightPanelTab } from "@brainstorm-os/editor"
 import { useVaultEntities, useYDocDamaged } from "@brainstorm-os/react-yjs";
 import { navModeFromEvent, openEntity } from "@brainstorm-os/sdk";
 import type { CommentAnchor, Icon } from "@brainstorm-os/sdk-types";
+import { type LinkedEntity, findBacklinks, findOutgoingLinks } from "@brainstorm-os/sdk/backlinks";
 import { MiniCalendar, openCalendarPopover } from "@brainstorm-os/sdk/calendar";
 import type { MonthGridReactCell } from "@brainstorm-os/sdk/calendar";
 import { Checkbox } from "@brainstorm-os/sdk/checkbox";
@@ -50,7 +51,7 @@ import {
 	openAnchoredMenu,
 } from "@brainstorm-os/sdk/object-menu";
 import { readPanelOpen, writePanelOpen } from "@brainstorm-os/sdk/panel-state";
-import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { PanelSide, PanelToggleButton, useAutoHidePanel } from "@brainstorm-os/sdk/panel-toggle";
 import { IconPickerButton } from "@brainstorm-os/sdk/picker-host";
 import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
 import { applyPersistedPanelWidth, attachResizable } from "@brainstorm-os/sdk/resizable";
@@ -68,13 +69,13 @@ import {
 } from "react";
 import { buildJournalDemo } from "./demo/dataset";
 import { useJournalT } from "./i18n-hooks";
-import {
-	type Backlink,
-	type OutgoingLink,
-	findBacklinks,
-	findOutgoingLinks,
-} from "./logic/backlinks";
 import { shiftByDays } from "./logic/calendar-grid";
+import {
+	type CaptureWriter,
+	type FileableCollection,
+	fileableCollections,
+} from "./logic/capture-filing";
+import { captureIntoDay } from "./logic/capture-into-day";
 import {
 	HABIT_LABEL_KEY,
 	type HabitId,
@@ -85,6 +86,7 @@ import {
 	toggleHabit,
 } from "./logic/check-in";
 import { JournalDayBodyMode, journalDayBodyMode } from "./logic/day-body-mode";
+import { dateMsForEntryId, ensureDayEntry } from "./logic/day-entry";
 import { buildJournalDenormalizer } from "./logic/denormalize-entry";
 import { groupEntriesByMonth, monthLabelFromKey } from "./logic/entry-overview";
 import { type EntryWriteContext, writeEntryPatch } from "./logic/entry-writes";
@@ -99,7 +101,6 @@ import { journalPlural, t } from "./logic/journal-i18n";
 import {
 	dateKeyForJournal,
 	journalEntryIdForKey,
-	journalEntryIdToDateMs,
 	journalNoteTitle,
 	parseJournalDateKey,
 } from "./logic/journal-keys";
@@ -122,9 +123,11 @@ import {
 import { parseReminderTime, shouldFireWriteReminder } from "./logic/write-reminder";
 import {
 	JOURNAL_ENTRY_TYPE,
+	NOTE_ENTITY_TYPE,
 	type VaultSnapshot,
 	getJournalRuntime,
 	notesFromSnapshot,
+	vaultEntityToNoteLike,
 } from "./runtime";
 import { pushEntityIndex, wireEditorIndex } from "./store/editor-index";
 import { getYDocResolverApi } from "./store/ydoc-resolver";
@@ -136,10 +139,11 @@ import {
 	type JournalMenuResolver,
 	bindDelegatedObjectMenu,
 } from "./ui/delegated-object-menu";
-import { applyJournalSuggestion, insertEntityMention } from "./ui/editor-bridge";
+import { appendJournalLine, applyJournalSuggestion, insertEntityMention } from "./ui/editor-bridge";
 import type { JournalCommentHooks, JournalDenormalizeFn } from "./ui/entry-editor-mount";
 import { attachOverviewKeyboard } from "./ui/overview-keyboard";
 import { JournalPropertiesIsland, type JournalPropertiesOptions } from "./ui/properties-panel";
+import { QuickCapture, type QuickCaptureResult } from "./ui/quick-capture";
 import { EntityIcon } from "./ui/react/entity-icon";
 import { EntryEditorIsland } from "./ui/react/entry-editor-island";
 import { openJournalSearch } from "./ui/search-overlay";
@@ -404,9 +408,14 @@ export function JournalApp(): ReactElement {
 		[recordNav],
 	);
 
+	// Loaded entries behind a ref: the boot-time `open` lands on a seeded
+	// entry (its own id, not `journal-<key>`) only via the list, and the
+	// handler is bound once.
+	const mergedEntriesRef = useRef<readonly JournalEntry[]>(mergedEntries);
+	mergedEntriesRef.current = mergedEntries;
 	const focusJournalEntry = useCallback(
 		(entityId: string): boolean => {
-			const ms = journalEntryIdToDateMs(entityId);
+			const ms = dateMsForEntryId(entityId, mergedEntriesRef.current);
 			if (ms !== null) {
 				focusTo(new Date(ms));
 				return true;
@@ -461,7 +470,10 @@ export function JournalApp(): ReactElement {
 	);
 
 	/** Ensure a journal entry exists for `date`. Returns its id (or null when
-	 *  there's no entities service / the create rejected non-idempotently). */
+	 *  there's no entities service / the create rejected non-idempotently).
+	 *  The day resolves to ONE entry: the one the list shows, else the one the
+	 *  vault already holds (the live snapshot can still be the empty initial
+	 *  one when the editor autofocuses on open), else a fresh `journal-<key>`. */
 	const ensureEntry = useCallback(
 		async (date: Date, init?: { icon?: Icon | null }): Promise<string | null> => {
 			const dateKey = dateKeyForJournal(date);
@@ -469,8 +481,10 @@ export function JournalApp(): ReactElement {
 			if (existing) return existing.noteId;
 
 			const bs = getJournalRuntime();
-			const create = bs?.services?.entities?.create;
-			if (!create) return null;
+			const entities = bs?.services?.entities;
+			const create = entities?.create;
+			const list = bs?.services?.vaultEntities?.list;
+			if (!create || !list) return null;
 
 			const stableId = journalEntryIdForKey(dateKey);
 			const pending = inflightCreateRef.current.get(stableId);
@@ -480,33 +494,37 @@ export function JournalApp(): ReactElement {
 			if (init?.icon !== undefined) properties.icon = init.icon;
 
 			const job = (async (): Promise<string | null> => {
-				try {
-					await create.call(bs?.services?.entities, JOURNAL_ENTRY_TYPE, properties, stableId);
-				} catch (error) {
-					const msg = error instanceof Error ? error.message : String(error);
-					if (!/already exists/i.test(msg)) {
-						console.warn("[journal] entities.create failed:", error);
-						return null;
-					}
-				}
-				const ts = Date.now();
-				const synthetic: JournalEntry = {
-					noteId: stableId,
-					icon: init?.icon ?? null,
-					dateEpochMs: parseJournalDateKey(dateKey) ?? date.getTime(),
+				const resolved = await ensureDayEntry({
 					dateKey,
-					rawTitle: dateKey,
-					preview: "",
-					wordCount: 0,
-					seedBody: null,
-					values: {},
-					mood: null,
-					habits: [],
-					createdAt: ts,
-					updatedAt: ts,
-				};
-				setOptimistic((prev) => new Map(prev).set(dateKey, synthetic));
-				return stableId;
+					existing: null,
+					stableId,
+					listRows: async () =>
+						(await list.call(bs?.services?.vaultEntities, { types: [JOURNAL_ENTRY_TYPE] })).entities,
+					create: async (id) => {
+						await create.call(entities, JOURNAL_ENTRY_TYPE, properties, id);
+					},
+				});
+				if (!resolved) return null;
+				const ts = Date.now();
+				const synthetic: JournalEntry | undefined = resolved.row
+					? projectJournalEntries([vaultEntityToNoteLike(resolved.row)])[0]
+					: {
+							noteId: resolved.noteId,
+							icon: init?.icon ?? null,
+							dateEpochMs: parseJournalDateKey(dateKey) ?? date.getTime(),
+							dateKey,
+							rawTitle: dateKey,
+							preview: "",
+							wordCount: 0,
+							seedBody: null,
+							values: {},
+							mood: null,
+							habits: [],
+							createdAt: ts,
+							updatedAt: ts,
+						};
+				if (synthetic) setOptimistic((prev) => new Map(prev).set(dateKey, synthetic));
+				return resolved.noteId;
 			})();
 			inflightCreateRef.current.set(stableId, job);
 			try {
@@ -1026,6 +1044,7 @@ export function JournalApp(): ReactElement {
 			return next;
 		});
 	}, []);
+	const navAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !navOpen });
 	const toggleProps = useCallback(() => {
 		setPropsOpen((open) => {
 			const next = !open;
@@ -1168,10 +1187,11 @@ export function JournalApp(): ReactElement {
 				data-props-open={String(propsOpen)}
 			>
 				<aside
+					{...navAutoHide.panelProps}
 					className="journal__nav"
 					id="journal-nav"
-					aria-hidden={!navOpen}
-					inert={!navOpen ? true : undefined}
+					aria-hidden={!navAutoHide.visible}
+					inert={!navAutoHide.visible ? true : undefined}
 				>
 					<div className="journal__nav-inner">
 						<StreakBadge entries={mergedEntries} todayKey={todayKey} />
@@ -1198,6 +1218,7 @@ export function JournalApp(): ReactElement {
 						/>
 					</div>
 				</aside>
+				{navAutoHide.edgeProps && <div {...navAutoHide.edgeProps} />}
 				<div
 					className="journal__nav-resize"
 					ref={navResizeRef}
@@ -1219,6 +1240,7 @@ export function JournalApp(): ReactElement {
 								journalDenormalize={journalDenormalize}
 								commentHooks={commentHooks}
 								onPlaceholderCreate={ensureEntry}
+								captureEnabled={isToday}
 								resolveTemplates={resolveTemplates}
 								onTemplate={startEntryFromTemplate}
 								onMood={setEntryMood}
@@ -1652,24 +1674,28 @@ function LinkRow({
 	);
 }
 
-function BacklinksPanel({
-	backlinks,
+/** "Linked from" (backlinks) / "Links to" (outgoing) — one panel, two
+ *  headings; both walks resolve to the same `LinkedEntity` row. */
+function LinksPanel({
+	heading,
+	links,
 	onOpen,
 }: {
-	backlinks: readonly Backlink[];
-	onOpen: (link: Backlink, event: React.MouseEvent) => void;
+	heading: string;
+	links: readonly LinkedEntity[];
+	onOpen: (link: LinkedEntity, event: React.MouseEvent) => void;
 }): ReactElement {
 	return (
 		<aside className="journal__backlinks">
-			<h2 className="journal__backlinks-heading">{t("linkedFrom", { count: backlinks.length })}</h2>
+			<h2 className="journal__backlinks-heading">{heading}</h2>
 			<ul className="journal__backlinks-list">
-				{backlinks.map((link) => (
+				{links.map((link) => (
 					<LinkRow
-						key={`${link.sourceNoteId}:${link.linkType}`}
+						key={`${link.entityId}:${link.linkType}`}
 						title={link.title}
 						meta={link.linkType === LINK_TYPE_NOTE_LINK ? t("link") : t("mention")}
-						noteId={link.sourceNoteId}
-						type={link.sourceType}
+						noteId={link.entityId}
+						type={link.entityType}
 						onOpen={(event) => onOpen(link, event)}
 					/>
 				))}
@@ -1678,30 +1704,23 @@ function BacklinksPanel({
 	);
 }
 
-function OutgoingPanel({
-	links,
-	onOpen,
-}: {
-	links: readonly OutgoingLink[];
-	onOpen: (link: OutgoingLink, event: React.MouseEvent) => void;
-}): ReactElement {
-	return (
-		<aside className="journal__backlinks">
-			<h2 className="journal__backlinks-heading">{t("linksTo", { count: links.length })}</h2>
-			<ul className="journal__backlinks-list">
-				{links.map((link) => (
-					<LinkRow
-						key={`${link.destNoteId}:${link.linkType}`}
-						title={link.title}
-						meta={link.linkType === LINK_TYPE_NOTE_LINK ? t("link") : t("mention")}
-						noteId={link.destNoteId}
-						type={link.destType}
-						onOpen={(event) => onOpen(link, event)}
-					/>
-				))}
-			</ul>
-		</aside>
-	);
+/** Only rich-text bodies count as journal backlink sources — a Task or a
+ *  Database row pointing at an entry is not a "mention". */
+const JOURNAL_BACKLINK_SOURCES: ReadonlySet<string> = new Set([
+	NOTE_ENTITY_TYPE,
+	JOURNAL_ENTRY_TYPE,
+]);
+
+function journalBacklinks(snapshot: VaultSnapshot, id: string): LinkedEntity[] {
+	return findBacklinks(snapshot, id, { types: JOURNAL_BACKLINK_SOURCES });
+}
+
+function openLinked(link: LinkedEntity, event: React.MouseEvent): void {
+	void openEntity(getJournalRuntime(), {
+		entityId: link.entityId,
+		entityType: link.entityType,
+		mode: navModeFromEvent(event.nativeEvent),
+	});
 }
 
 // ── Periodic rollup body. ──
@@ -1718,7 +1737,7 @@ function PeriodicBody({
 	const pending = pendingSeedRef.current?.get(periodic.id);
 	if (pending !== undefined) pendingSeedRef.current?.delete(periodic.id);
 	const outgoing = snapshot ? findOutgoingLinks(snapshot, periodic.id) : [];
-	const backlinks = snapshot ? findBacklinks(snapshot, periodic.id) : [];
+	const backlinks = snapshot ? journalBacklinks(snapshot, periodic.id) : [];
 	return (
 		<div className="journal__entry-body">
 			<div className="journal__entry-editor-host">
@@ -1729,31 +1748,45 @@ function PeriodicBody({
 				)}
 			</div>
 			{outgoing.length > 0 ? (
-				<OutgoingPanel
+				<LinksPanel
+					heading={t("linksTo", { count: outgoing.length })}
 					links={outgoing}
-					onOpen={(link, event) =>
-						void openEntity(getJournalRuntime(), {
-							entityId: link.destNoteId,
-							entityType: link.destType,
-							mode: navModeFromEvent(event.nativeEvent),
-						})
-					}
+					onOpen={openLinked}
 				/>
 			) : null}
 			{backlinks.length > 0 ? (
-				<BacklinksPanel
-					backlinks={backlinks}
-					onOpen={(link, event) =>
-						void openEntity(getJournalRuntime(), {
-							entityId: link.sourceNoteId,
-							entityType: link.sourceType,
-							mode: navModeFromEvent(event.nativeEvent),
-						})
-					}
+				<LinksPanel
+					heading={t("linkedFrom", { count: backlinks.length })}
+					links={backlinks}
+					onOpen={openLinked}
 				/>
 			) : null}
 		</div>
 	);
+}
+
+// ── Quick capture (9.16.14). ──
+const JOURNAL_APP_ID = "io.brainstorm.journal";
+
+/** The vault writer a filed capture creates its object through. */
+function captureWriter(): CaptureWriter | null {
+	const entities = getJournalRuntime()?.services?.entities;
+	const create = entities?.create;
+	const get = entities?.get;
+	const update = entities?.update;
+	if (!create) return null;
+	return {
+		create: (type, properties) => create.call(entities, type, properties),
+		membership:
+			get && update
+				? {
+						get: (id) => get.call(entities, id),
+						update: (id, patch) => update.call(entities, id, patch),
+					}
+				: null,
+		appId: JOURNAL_APP_ID,
+		now: Date.now(),
+	};
 }
 
 // ── Day entry body. ──
@@ -1766,6 +1799,7 @@ function EntryBody({
 	journalDenormalize,
 	commentHooks,
 	onPlaceholderCreate,
+	captureEnabled,
 	resolveTemplates,
 	onTemplate,
 	onMood,
@@ -1780,6 +1814,8 @@ function EntryBody({
 	journalDenormalize: JournalDenormalizeFn;
 	commentHooks: JournalCommentHooks;
 	onPlaceholderCreate: (date: Date) => Promise<string | null>;
+	/** Today only (9.16.14) — the capture stream appends to the current day. */
+	captureEnabled: boolean;
 	resolveTemplates: () => JournalTemplate[];
 	onTemplate: (date: Date, template: JournalTemplate) => void;
 	onMood: (entry: JournalEntry, mood: MoodId | null) => void;
@@ -1842,9 +1878,14 @@ function EntryBody({
 		(snapshot?.entities.some((e) => e.id === entry.noteId && e.properties.locked === true) ?? false);
 	const editable = mutable && !entryLocked;
 	const onBodyDenormalize = entry ? journalDenormalize : lazyDenormalize;
+	const runtime = getJournalRuntime();
+	const captureCollections = fileableCollections(
+		snapshot?.entities ?? [],
+		runtime?.capabilities ?? [],
+	);
 
 	const outgoing = entry && snapshot ? findOutgoingLinks(snapshot, entry.noteId) : [];
-	const backlinks = entry && snapshot ? findBacklinks(snapshot, entry.noteId) : [];
+	const backlinks = entry && snapshot ? journalBacklinks(snapshot, entry.noteId) : [];
 
 	return (
 		<div className="journal__entry-body">
@@ -1878,6 +1919,21 @@ function EntryBody({
 			    then (before the first keystroke), not on mere navigation — keeps
 			    browsing from minting empty days while ensuring the row exists in
 			    time for content-bearing persists. Lazy create on first edit backstops. */}
+			{captureEnabled && editable && resolver ? (
+				<QuickCapture
+					collectionCount={captureCollections.length}
+					onCapture={(raw): Promise<QuickCaptureResult> =>
+						captureIntoDay({
+							raw,
+							collections: captureCollections,
+							writer: captureWriter(),
+							ensureEntry: () => onPlaceholderCreate(focus),
+							append: appendJournalLine,
+							denormalize: journalDenormalize,
+						})
+					}
+				/>
+			) : null}
 			<div
 				className="journal__entry-editor-host"
 				{...(entry ? {} : { onFocus: () => void onPlaceholderCreate(focus) })}
@@ -1913,27 +1969,17 @@ function EntryBody({
 					</div>
 					<CheckIn entry={entry} onMood={onMood} onHabit={onHabit} />
 					{outgoing.length > 0 ? (
-						<OutgoingPanel
+						<LinksPanel
+							heading={t("linksTo", { count: outgoing.length })}
 							links={outgoing}
-							onOpen={(link, event) =>
-								void openEntity(getJournalRuntime(), {
-									entityId: link.destNoteId,
-									entityType: link.destType,
-									mode: navModeFromEvent(event.nativeEvent),
-								})
-							}
+							onOpen={openLinked}
 						/>
 					) : null}
 					{backlinks.length > 0 ? (
-						<BacklinksPanel
-							backlinks={backlinks}
-							onOpen={(link, event) =>
-								void openEntity(getJournalRuntime(), {
-									entityId: link.sourceNoteId,
-									entityType: link.sourceType,
-									mode: navModeFromEvent(event.nativeEvent),
-								})
-							}
+						<LinksPanel
+							heading={t("linkedFrom", { count: backlinks.length })}
+							links={backlinks}
+							onOpen={openLinked}
 						/>
 					) : null}
 				</>

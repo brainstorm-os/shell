@@ -14,6 +14,16 @@ import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ShareDialog, type ShareDialogLabels } from "./share-dialog";
 
+vi.mock("../select-menu", () => ({
+	SelectMenu: (props: { options: { value: string }[]; onChange: (v: string) => void }) => (
+		<button
+			type="button"
+			data-testid="role-pick"
+			onClick={() => props.onChange(props.options[0]?.value ?? "")}
+		/>
+	),
+}));
+
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const LABELS: ShareDialogLabels = {
@@ -143,7 +153,7 @@ describe("ShareDialog", () => {
 		expect(host.textContent).toContain("Marcus");
 	});
 
-	it("Owner adds by pasted code → sharing.share with the chosen role, then reloads", async () => {
+	it("Owner adds by pasted code → sharing.share at the safe default role (Viewer), then reloads", async () => {
 		await mount(true);
 		const input = codeInput();
 		if (!input) throw new Error("expected code input for a manager");
@@ -154,7 +164,7 @@ describe("ShareDialog", () => {
 			entityId: "ent_1",
 			type: "brainstorm/Note/v1",
 			invite: "PASTED-CODE",
-			role: RosterRole.Editor,
+			role: RosterRole.Viewer,
 		});
 		// Reloaded after the share (initial mount + post-share).
 		expect(roster.members.mock.calls.length).toBeGreaterThanOrEqual(2);
@@ -173,7 +183,7 @@ describe("ShareDialog", () => {
 			entityId: "ent_1",
 			type: "brainstorm/Note/v1",
 			invite: "PASTED-CODE",
-			role: RosterRole.Editor,
+			role: RosterRole.Viewer,
 		});
 	});
 
@@ -213,7 +223,7 @@ describe("ShareDialog", () => {
 			entityId: "chan_1",
 			type: "io.brainstorm.chat/Channel/v1",
 			invite: "PASTED-CODE",
-			role: RosterRole.Editor,
+			role: RosterRole.Viewer,
 		});
 		expect(sharing.share).not.toHaveBeenCalled();
 	});
@@ -232,7 +242,7 @@ describe("ShareDialog", () => {
 			entityId: "ent_1",
 			type: "brainstorm/Note/v1",
 			contact: "carol-pub",
-			role: RosterRole.Editor,
+			role: RosterRole.Viewer,
 		});
 	});
 
@@ -267,5 +277,103 @@ describe("ShareDialog", () => {
 		expect(rows().length).toBe(2);
 		expect(codeInput()).toBeNull();
 		expect(host.querySelector(".bs-share__revoke")).toBeNull();
+	});
+
+	describe("Collab-C7", () => {
+		it("starts at the configured default role", async () => {
+			Object.assign(sharing, { defaultRole: vi.fn(async () => RosterRole.Editor) });
+			await mount(true);
+			const input = codeInput();
+			if (!input) throw new Error("expected code input");
+			await act(async () => typeInto(input, "PASTED-CODE"));
+			await act(async () => addBtn()?.click());
+			await flush();
+			expect(sharing.share).toHaveBeenCalledWith(expect.objectContaining({ role: RosterRole.Editor }));
+		});
+
+		it("a late default-role reply never overwrites a role the user already picked", async () => {
+			let resolveDefault: (r: RosterRole) => void = () => undefined;
+			Object.assign(sharing, {
+				defaultRole: vi.fn(
+					() =>
+						new Promise<RosterRole>((r) => {
+							resolveDefault = r;
+						}),
+				),
+			});
+			await mount(true);
+			await act(async () =>
+				host.querySelector<HTMLButtonElement>('[data-testid="role-pick"]')?.click(),
+			);
+			await act(async () => resolveDefault(RosterRole.Viewer));
+			await flush();
+			const input = codeInput();
+			if (!input) throw new Error("expected code input");
+			await act(async () => typeInto(input, "PASTED-CODE"));
+			await act(async () => addBtn()?.click());
+			await flush();
+			expect(sharing.share).toHaveBeenCalledWith(expect.objectContaining({ role: RosterRole.Editor }));
+		});
+
+		it("an invite link pre-fills the code and says who it is from, but never adds by itself", async () => {
+			const pendingInvite = vi.fn(async () => ({
+				invite: "LINKED-TOKEN-0123456789",
+				label: "Mara",
+				fingerprint: "ed25519:abcd",
+				receivedAt: 1,
+			}));
+			Object.assign(sharing, { pendingInvite });
+			await mount(true);
+			expect(codeInput()?.value).toBe("LINKED-TOKEN-0123456789");
+			expect(host.querySelector('[data-testid="share-from-link"]')?.textContent).toContain(
+				"Mara (ed25519:abcd)",
+			);
+			expect(sharing.share).not.toHaveBeenCalled();
+			await act(async () => addBtn()?.click());
+			await flush();
+			expect(sharing.share).toHaveBeenCalledWith(
+				expect.objectContaining({ invite: "LINKED-TOKEN-0123456789", role: RosterRole.Viewer }),
+			);
+		});
+
+		it("a non-manager never asks for the pending invite", async () => {
+			const pendingInvite = vi.fn(async () => null);
+			Object.assign(sharing, { pendingInvite });
+			await mount(false);
+			expect(pendingInvite).not.toHaveBeenCalled();
+		});
+
+		it("a pasted link is reduced to its code", async () => {
+			await mount(true);
+			const input = codeInput();
+			if (!input) throw new Error("expected code input");
+			await act(async () => typeInto(input, "  brainstorm://invite/PASTED-TOKEN-0123456789 "));
+			expect(codeInput()?.value).toBe("PASTED-TOKEN-0123456789");
+		});
+
+		it("copies the invite as a link", async () => {
+			const writeText = vi.fn(async () => undefined);
+			Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+			await mount(true);
+			const getCode = [...host.querySelectorAll("button")].find(
+				(b) => b.textContent === "Get my invite code",
+			);
+			await act(async () => getCode?.click());
+			await flush();
+			const copyLink = [...host.querySelectorAll("button")].find((b) => b.textContent === "Copy link");
+			await act(async () => copyLink?.click());
+			await flush();
+			expect(writeText).toHaveBeenCalledWith("brainstorm://invite/INVITE-TOKEN-XYZ");
+		});
+
+		it("shows who last edited, resolved through the roster", async () => {
+			Object.assign(sharing, {
+				lastEdit: vi.fn(async () => ({ editor: "guest1", editedAt: Date.UTC(2026, 9, 1) })),
+			});
+			await mount(true);
+			expect(host.querySelector('[data-testid="share-last-edit"]')?.textContent).toContain(
+				"Last edited by Marcus",
+			);
+		});
 	});
 });

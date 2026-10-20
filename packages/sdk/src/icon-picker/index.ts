@@ -42,3 +42,12 @@ export {
 	subscribePhosphorReact,
 	tryGetPhosphorComponent,
 } from "./phosphor-data";
+export {
+	RECENT_ICONS_CAP,
+	type RecentIcon,
+	loadRecentIcons,
+	pushRecentIcon,
+	recentsOfKind,
+	recordRecentIcon,
+	useRecentIcons,
+} from "./recent-icons";

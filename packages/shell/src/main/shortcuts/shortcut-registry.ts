@@ -23,6 +23,7 @@
 
 import type { ShortcutRegistration } from "../apps/manifest";
 import { normalizeChord } from "./chord";
+import { SplitShortcut } from "./split-shortcut";
 
 export { normalizeChord };
 
@@ -57,6 +58,11 @@ export type ShortcutAction = {
 	 *  actions like `shell/appearance.toggle` that have no surface — those
 	 *  should NOT yank focus away from the currently active app window. */
 	surfacesOnDashboard?: boolean;
+	/** Shell layer only — the action acts on the window whose renderer had
+	 *  focus (split view) and is handled in the main process; it never reaches
+	 *  the dashboard. When there's nothing to act on (the window isn't split)
+	 *  the chord falls through to the app. */
+	routesToWindow?: boolean;
 };
 
 /** Wire shape for runtime-registered dynamic shortcuts. Identical to the
@@ -127,6 +133,38 @@ export const DEFAULT_SHELL_SHORTCUTS: readonly Omit<ShortcutAction, "layer">[] =
 		surfacesOnDashboard: false,
 	},
 	{ id: "shell/vault-switcher", defaultChord: "CmdOrCtrl+Shift+V", label: "Switch Vault" },
+	// Split view (6.14). Letter keys only: they match on the layout-invariant
+	// `code`, where macOS Option would otherwise rewrite punctuation/arrows.
+	{
+		id: SplitShortcut.Open,
+		defaultChord: "CmdOrCtrl+Alt+D",
+		label: "Open to the Side",
+		routesToWindow: true,
+	},
+	{
+		id: SplitShortcut.FocusOther,
+		defaultChord: "CmdOrCtrl+Alt+O",
+		label: "Focus Other Pane",
+		routesToWindow: true,
+	},
+	{
+		id: SplitShortcut.Swap,
+		defaultChord: "CmdOrCtrl+Alt+Shift+D",
+		label: "Swap Panes",
+		routesToWindow: true,
+	},
+	{
+		id: SplitShortcut.DividerLeft,
+		defaultChord: "CmdOrCtrl+Alt+Shift+H",
+		label: "Move Split Divider Left",
+		routesToWindow: true,
+	},
+	{
+		id: SplitShortcut.DividerRight,
+		defaultChord: "CmdOrCtrl+Alt+Shift+L",
+		label: "Move Split Divider Right",
+		routesToWindow: true,
+	},
 ] as const;
 
 export class ShortcutRegistry {

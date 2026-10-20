@@ -22,10 +22,12 @@ import {
 	useDropTarget,
 } from "@brainstorm-os/sdk/object-dnd";
 import { ObjectMenuTrigger } from "@brainstorm-os/sdk/object-menu";
+import { useOsFileDrop } from "@brainstorm-os/sdk/os-file-drop";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { t } from "../i18n";
 import { dragItemsForEntry } from "../logic/drag-items";
+import { hasActiveFilters } from "../logic/filters";
 import {
 	DEFAULT_LIST_COLUMNS,
 	LIST_COLUMN_WIDTH,
@@ -39,9 +41,9 @@ import type { FilesStore } from "../store/use-files-store";
 import { type Entity, FILE_TYPE, FOLDER_TYPE, readName } from "../types/entity";
 import type { BrainstormRuntime } from "../types/runtime";
 import { TileSize, ViewMode, isListMode } from "../view-mode";
-import { formatBytes, formatTimeAgo, readEntityIcon, typeLabel } from "./entity-view";
-import { EntityIcon } from "./entity-visuals";
+import { formatBytes, formatTimeAgo, typeLabel } from "./entity-view";
 import { filesObjectMenuContext } from "./object-menu-context";
+import { RowGlyph } from "./row-glyph";
 
 const DND_MIME = "application/x-brainstorm-entity";
 
@@ -126,12 +128,6 @@ type GridGeometry = {
 
 function isGridMode(mode: ViewMode): boolean {
 	return mode === ViewMode.Grid || mode === ViewMode.Gallery || mode === ViewMode.IconList;
-}
-
-/** Tile modes that render the media slot (thumbnail / glyph band). The
- *  icon-list lanes are compact rows — they keep the plain entity icon. */
-function isTileMediaMode(mode: ViewMode): boolean {
-	return mode === ViewMode.Grid || mode === ViewMode.Gallery;
 }
 
 function rowHeightFor(mode: ViewMode, tileSize: TileSize): number {
@@ -222,56 +218,18 @@ export function ContentList({
 	const mode = store.viewMode;
 	const isGrid = isGridMode(mode);
 
-	// One icon track for the whole list, not one per row. A row renders a glyph
-	// when it is a folder or the entity carries its own icon; `EntityIcon`
-	// renders an EMPTY span otherwise, per the project-wide
-	// no-default-type-icon-fallback rule. Because `grid-template-columns` is
-	// per-row, an `auto` first track then collapsed to 0 on exactly those rows
-	// and reserved space on the others — so name, kind and modified each landed
-	// at two different x positions in one list.
-	//
-	// The rule is preserved: when NOTHING in this folder has an icon the track
-	// is still 0 and every name slides left into the slot. It is only when the
-	// folder is mixed that the iconless rows keep the gutter, which is the
-	// alignment the list view exists for.
 	const iconTrack = useMemo(
-		() =>
-			listIconTrack(
-				rows.some((entity) => entity.type === FOLDER_TYPE || readEntityIcon(entity)),
-				iconSizeFor(mode, store.tileSize),
-			),
-		[rows, mode, store.tileSize],
+		() => listIconTrack(iconSizeFor(mode, store.tileSize)),
+		[mode, store.tileSize],
 	);
 
-	// 9.8.15 — Finder/OS drag-in upload. The content area is the drop
-	// target for EXTERNAL files (`dataTransfer` carries the "Files" type);
-	// internal entity drags ride DND_MIME on the rows and never enter this
-	// path. Depth-counted so dragging across child rows doesn't flicker
-	// the affordance off.
-	const [osDragDepth, setOsDragDepth] = useState(0);
-	const isOsFileDrag = (e: React.DragEvent) =>
-		e.dataTransfer.types.includes("Files") && !e.dataTransfer.types.includes(DND_MIME);
-	const onOsDragEnter = (e: React.DragEvent) => {
-		if (!isOsFileDrag(e)) return;
-		e.preventDefault();
-		setOsDragDepth((d) => d + 1);
-	};
-	const onOsDragOver = (e: React.DragEvent) => {
-		if (!isOsFileDrag(e)) return;
-		e.preventDefault();
-		e.dataTransfer.dropEffect = "copy";
-	};
-	const onOsDragLeave = (e: React.DragEvent) => {
-		if (!isOsFileDrag(e)) return;
-		setOsDragDepth((d) => Math.max(0, d - 1));
-	};
-	const onOsDrop = (e: React.DragEvent) => {
-		if (!isOsFileDrag(e)) return;
-		e.preventDefault();
-		setOsDragDepth(0);
-		const files = Array.from(e.dataTransfer.files);
-		if (files.length > 0) void store.uploadDroppedFiles(files);
-	};
+	// 9.8.15 — Finder/OS drag-in upload, through the shared
+	// `@brainstorm-os/sdk/os-file-drop` zone (9.8.17): EXTERNAL files only —
+	// internal row drags ride DND_MIME and are ignored here.
+	const osDrop = useOsFileDrop({
+		onFiles: (files) => void store.uploadDroppedFiles(files),
+		ignoreTypes: [DND_MIME],
+	});
 
 	// Group-by section headers (9.8.11) — injected as their own virtual rows
 	// in List mode. Grid/Gallery render group-ORDERED tiles without header
@@ -398,42 +356,75 @@ export function ContentList({
 	);
 
 	if (rows.length === 0) {
-		const searching = store.searchQuery.trim() !== "";
+		const filtered = hasActiveFilters(store.filters);
+		const searching = !store.duplicatesActive && store.searchQuery.trim() !== "";
+		const empty = store.duplicatesActive
+			? {
+					icon: IconName.Copy,
+					title: t("brainstorm.files.duplicates.emptyTitle"),
+					hint: filtered
+						? t("brainstorm.files.filter.emptyBody")
+						: t("brainstorm.files.duplicates.emptyBody"),
+				}
+			: searching
+				? {
+						icon: IconName.Search,
+						title: t("brainstorm.files.empty.searchTitle"),
+						hint: t("brainstorm.files.empty.searchBody", { query: store.searchQuery }),
+					}
+				: filtered
+					? {
+							icon: IconName.Search,
+							title: t("brainstorm.files.filter.emptyTitle"),
+							hint: t("brainstorm.files.filter.emptyBody"),
+						}
+					: null;
 		return (
 			<div
 				className="content-empty"
 				data-testid="content-empty"
-				data-os-drop={osDragDepth > 0 ? "true" : "false"}
-				onDragEnter={onOsDragEnter}
-				onDragOver={onOsDragOver}
-				onDragLeave={onOsDragLeave}
-				onDrop={onOsDrop}
+				data-os-drop={osDrop.isOver ? "true" : "false"}
+				{...osDrop.dropProps}
 			>
-				<EmptyState
-					icon={searching ? IconName.Search : IconName.Folder}
-					title={searching ? t("brainstorm.files.empty.searchTitle") : t("brainstorm.files.empty.title")}
-					hint={
-						searching
-							? t("brainstorm.files.empty.searchBody", { query: store.searchQuery })
-							: t("brainstorm.files.empty.body")
-					}
-					{...(searching
-						? {}
-						: {
-								action: (
-									<button
-										type="button"
-										className="bs-btn"
-										data-bs-primary=""
-										data-testid="content-empty-new-folder"
-										onClick={store.newFolder}
-									>
-										<Icon name={IconName.Plus} size={15} />
-										{t("brainstorm.files.empty.newFolder")}
-									</button>
-								),
-							})}
-				/>
+				{empty ? (
+					<EmptyState
+						icon={empty.icon}
+						title={empty.title}
+						hint={empty.hint}
+						{...(filtered
+							? {
+									action: (
+										<button
+											type="button"
+											className="bs-btn"
+											data-testid="content-empty-clear-filters"
+											onClick={store.clearFilters}
+										>
+											{t("brainstorm.files.filter.clear")}
+										</button>
+									),
+								}
+							: {})}
+					/>
+				) : (
+					<EmptyState
+						icon={IconName.Folder}
+						title={t("brainstorm.files.empty.title")}
+						hint={t("brainstorm.files.empty.body")}
+						action={
+							<button
+								type="button"
+								className="bs-btn"
+								data-bs-primary=""
+								data-testid="content-empty-new-folder"
+								onClick={store.newFolder}
+							>
+								<Icon name={IconName.Plus} size={15} />
+								{t("brainstorm.files.empty.newFolder")}
+							</button>
+						}
+					/>
+				)}
 			</div>
 		);
 	}
@@ -448,13 +439,10 @@ export function ContentList({
 			id="content-list"
 			data-testid="content-list"
 			data-view-mode={store.viewMode}
-			data-os-drop={osDragDepth > 0 ? "true" : "false"}
+			data-os-drop={osDrop.isOver ? "true" : "false"}
 			ref={setListRef}
 			aria-label={t("brainstorm.files.contentList.label")}
-			onDragEnter={onOsDragEnter}
-			onDragOver={onOsDragOver}
-			onDragLeave={onOsDragLeave}
-			onDrop={onOsDrop}
+			{...osDrop.dropProps}
 		>
 			<div
 				style={{
@@ -544,15 +532,9 @@ type ContentRowProps = {
 	 *  (the destination picker drops from it); null falls back to the content
 	 *  region. */
 	onMoveTo: (entity: Entity, anchor: HTMLElement | null) => void;
-	/** The icon track for list mode, decided ONCE for the whole list.
-	 *
-	 *  `grid-template-columns` is per-ROW — every row is its own grid — so an
-	 *  `auto` first track sizes independently per row. `EntityIcon` renders an
-	 *  empty span when an entity has no icon (the no-default-fallback rule), so
-	 *  those rows collapsed the track to 0 while icon-bearing rows reserved it:
-	 *  two column geometries in one list, with name, kind and modified all
-	 *  landing at different x. Deciding it once and giving every row the same
-	 *  value is what makes the columns line up. */
+	/** The list-mode icon track. `grid-template-columns` is per ROW, so it
+	 *  is decided once from the mode's icon size and handed to every row —
+	 *  one column geometry for the whole list. */
 	iconTrack: string;
 	/** DND-6 — keyboard twin of the DND-5 drag-out grip. Absent when the
 	 *  runtime has no save surface (older shells). */
@@ -574,91 +556,6 @@ function columnText(column: ListColumn, entity: Entity): string {
 	if (column === ListColumn.Modified) return formatTimeAgo(entity.updatedAt);
 	const size = entity.properties.size;
 	return typeof size === "number" ? formatBytes(size) : "";
-}
-
-/** Trailing extension of `name`, uppercased for the tile chip ("JPG",
- *  "PDF"). Hidden-file prefixes and extension-less names yield null (the
- *  band keeps its plain surface). Capped so "markdown" doesn't blow the
- *  chip out. */
-function extensionChip(name: string): string | null {
-	const dot = name.lastIndexOf(".");
-	if (dot <= 0 || dot === name.length - 1) return null;
-	const ext = name.slice(dot + 1);
-	if (ext.length > 5) return null;
-	return ext.toUpperCase();
-}
-
-/**
- * The tile-mode media slot (grid / gallery): image files render their
- * stored blob (`brainstorm://asset/<assetId>`, decided by the shell's
- * preview-safe `assetMime`); anything with its OWN icon renders it; other
- * files fall back to an extension chip so a tile is never an anonymous
- * blank rectangle. Folders render the folder glyph (the sanctioned
- * type-indicator exception to [[feedback_no_default_type_icon_fallback]] —
- * a container genuinely needs an indicator) on a neutral surface rather
- * than an empty tinted "cover" band.
- *
- * A non-File/Folder object (the universal browser) with no own icon shows
- * its default opener app's squircle (`brainstorm://app-icon/<appId>`) —
- * the same sanctioned type-identity badge the dashboard pins use, so a
- * Task/Note/Bookmark tile reads as *what it is* rather than going blank.
- */
-function TileMedia({
-	entity,
-	iconSize,
-	openerAppId,
-}: {
-	entity: Entity;
-	iconSize: number;
-	openerAppId: string | null;
-}) {
-	const icon = readEntityIcon(entity);
-	const isFolder = entity.type === FOLDER_TYPE;
-	const isFile = entity.type === FILE_TYPE;
-	const assetId = entity.properties.assetId;
-	const assetMime = entity.properties.assetMime;
-	const hasImage =
-		typeof assetId === "string" &&
-		assetId !== "" &&
-		typeof assetMime === "string" &&
-		assetMime.startsWith("image/");
-	const chip = isFile && !hasImage && !icon ? extensionChip(readName(entity)) : null;
-	const appIcon = !isFolder && !isFile && !icon && !hasImage ? openerAppId : null;
-	return (
-		<span
-			className="content-row__glyph"
-			data-kind={isFolder ? "folder" : "file"}
-			// Pipe the tile-size preset's icon metric to the stylesheet so the
-			// glyph / squircle / thumbnail scale with the tile instead of the
-			// CSS pinning one fixed pixel size across Small/Medium/Large.
-			style={{ "--glyph-size": `${iconSize}px` } as React.CSSProperties}
-			aria-hidden="true"
-		>
-			{hasImage ? (
-				<img
-					className="content-row__thumb"
-					src={`brainstorm://asset/${assetId}`}
-					alt=""
-					loading="lazy"
-					draggable={false}
-				/>
-			) : icon ? (
-				<EntityIcon icon={icon} size={iconSize} />
-			) : isFolder ? (
-				<Icon name={IconName.Folder} size={iconSize} />
-			) : appIcon ? (
-				<img
-					className="content-row__app-icon"
-					src={`brainstorm://app-icon/${appIcon}`}
-					alt=""
-					loading="lazy"
-					draggable={false}
-				/>
-			) : chip ? (
-				<span className="content-row__ext">{chip}</span>
-			) : null}
-		</span>
-	);
 }
 
 function ContentRow({
@@ -885,23 +782,12 @@ function ContentRow({
 						<Icon name={IconName.OpenExternal} size={13} />
 					</button>
 				) : null}
-				{isTileMediaMode(store.viewMode) ? (
-					<TileMedia
-						entity={entity}
-						iconSize={iconSizeFor(store.viewMode, store.tileSize)}
-						openerAppId={store.openerForType(entity.type)?.appId ?? null}
-					/>
-				) : isFolder && !readEntityIcon(entity) ? (
-					<span className="content-row__glyph" data-glyph="folder" aria-hidden="true">
-						<Icon name={IconName.Folder} size={iconSizeFor(store.viewMode, store.tileSize)} />
-					</span>
-				) : (
-					<EntityIcon
-						icon={readEntityIcon(entity)}
-						size={iconSizeFor(store.viewMode, store.tileSize)}
-						className="content-row__glyph"
-					/>
-				)}
+				<RowGlyph
+					entity={entity}
+					mode={store.viewMode}
+					iconSize={iconSizeFor(store.viewMode, store.tileSize)}
+					openerAppId={store.openerForType(entity.type)?.appId ?? null}
+				/>
 				<span className="content-row__name">
 					{renaming ? (
 						<RenameInput store={store} entity={entity} onCollision={onCollision} />

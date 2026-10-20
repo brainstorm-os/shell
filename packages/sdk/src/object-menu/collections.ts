@@ -16,7 +16,8 @@
 
 import type { Entity, EntityQuery, Icon, MemberOverrideSource } from "@brainstorm-os/sdk-types";
 import { AddOutcome, RemoveOutcome, addToList, removeFromList } from "../collections";
-import { LIST_ENTITY_TYPE, entityToList } from "../list-entity-codec";
+import { isLockedProperties } from "../entity-lock";
+import { LIST_ENTITY_TYPE, type ListEntityRow, entityToList } from "../list-entity-codec";
 
 /** The slice of the entities service the collection surface needs — narrowed
  *  so a host/test can inject a stub. Each method is a per-type-gated call on
@@ -25,6 +26,14 @@ export type CollectionsEntitiesService = {
 	query(query: EntityQuery): Promise<Entity[]>;
 	get(id: string): Promise<Entity | null>;
 	update(id: string, patch: Record<string, unknown>): Promise<Entity>;
+};
+
+/** The two calls a membership toggle makes — re-read the List, write its
+ *  overrides. Narrower than `CollectionsEntitiesService` so a host that only
+ *  files into a known Collection (Journal's quick capture) needs no query. */
+export type CollectionMembershipService = {
+	get(id: string): Promise<ListEntityRow | null>;
+	update(id: string, patch: Record<string, unknown>): Promise<unknown>;
 };
 
 /** The capability an app must hold to write Collection membership — the same
@@ -37,6 +46,9 @@ export type CollectionOption = {
 	id: string;
 	name: string;
 	icon: Icon | null;
+	/** The Collection's description ("" when it has none) — the picker shows
+	 *  it as the row's secondary line (9.12.27). */
+	description: string;
 	/** Manual member — the entity is in `members.include`. */
 	isMember: boolean;
 };
@@ -57,6 +69,7 @@ export async function listCollectionsForObject(
 			id: list.id,
 			name: list.name,
 			icon: list.icon,
+			description: list.description.trim(),
 			isMember: list.members.include.some((m) => m.entityId === entityId),
 		});
 	}
@@ -66,16 +79,17 @@ export async function listCollectionsForObject(
 /** Toggle this entity's MANUAL membership of a Collection. `add` is the
  *  intent (true = ensure member). Writes only when membership actually
  *  changed (so a no-op never broadcasts). Returns the resulting membership
- *  state; `false` if the Collection can't be loaded. */
+ *  state; `false` if the Collection can't be loaded or is locked (read-only). */
 export async function toggleCollectionMembership(
-	svc: CollectionsEntitiesService,
+	svc: CollectionMembershipService,
 	listId: string,
 	entityId: string,
 	add: boolean,
 	appId: string,
 ): Promise<boolean> {
 	const row = await svc.get(listId);
-	const list = row ? entityToList(row) : null;
+	if (!row || isLockedProperties(row.properties)) return false;
+	const list = entityToList(row);
 	if (!list) return false;
 	const ctx = { matchesSource: false, by: `app:${appId}` as MemberOverrideSource };
 	const result = add

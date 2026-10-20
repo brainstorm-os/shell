@@ -129,6 +129,31 @@
 	width: 100%;
 }
 
+.backup-migration__subtitle {
+	margin: 0;
+	font-size: var(--text-size-sm);
+	font-weight: var(--text-weight-semibold);
+	color: var(--color-text-primary);
+}
+
+.backup-migration__points {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.backup-migration__point {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-2);
+	font-size: var(--text-size-sm);
+	color: var(--color-text-secondary);
+}
+
 .backup-migration__progress {
 	display: flex;
 	gap: var(--space-2);

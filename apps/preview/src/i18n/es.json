@@ -76,5 +76,14 @@
   "inspector.properties": "Propiedades",
   "inspector.noProperties": "Aún no hay propiedades",
   "inspector.addProperty": "Añadir propiedad",
-  "inspector.removeProperty": "Eliminar {name}"
+  "inspector.removeProperty": "Eliminar {name}",
+  "inspector.caption": "Pie de foto",
+  "inspector.linkedFrom.one": "Enlazado desde {count} objeto",
+  "inspector.linkedFrom.other": "Enlazado desde {count} objetos",
+  "inspector.noBacklinks": "Aún no hay nada enlazado aquí",
+  "inspector.openInNewTab": "Abrir «{name}» en una pestaña nueva",
+  "inspector.moveToBin": "Mover a la papelera",
+  "inspector.lockedHint": "Desbloquea este archivo para cambiarlo",
+  "inspector.deleted": "Se movió «{name}» a la papelera",
+  "inspector.deleteFailed": "No se pudo mover «{name}» a la papelera"
 }

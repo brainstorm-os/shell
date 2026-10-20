@@ -24,6 +24,7 @@ import { t, tCount } from "../i18n/t";
 import type { CompiledSection, CompiledSurface } from "../logic/compile-surface";
 import { dateKey } from "../logic/date-buckets";
 import { TASK_SORTS, TaskSort } from "../logic/task-sort";
+import { isClosed } from "../logic/task-status";
 import type { Project } from "../types/project";
 import { TaskSurface, UPCOMING_GROUPINGS, UpcomingGrouping } from "../types/surface";
 import type { Task } from "../types/task";
@@ -473,7 +474,7 @@ function renderTaskList(tasks: readonly Task[], opts: TaskListOpts): HTMLElement
 		// Drag-and-drop is opt-in per surface — only open tasks in
 		// Inbox/Project participate. Done tasks stay anchored at the
 		// bottom by completion time so they can't be hand-shuffled.
-		if (opts.dndEnabled && task.completedAt === null) {
+		if (opts.dndEnabled && !isClosed(task)) {
 			row.draggable = true;
 			row.setAttribute("aria-grabbed", "false");
 		}

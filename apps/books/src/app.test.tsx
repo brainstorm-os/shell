@@ -264,3 +264,35 @@ describe("BooksApp — the read-only lock", () => {
 		expect(update).toHaveBeenCalledWith("b1", { locked: false });
 	});
 });
+
+describe("BooksApp — auto-hide library (7.15)", () => {
+	afterEach(() => {
+		document.documentElement.removeAttribute("data-bs-autohide-sidebars");
+	});
+
+	const library = (el: HTMLElement) => el.querySelector("#books-library") as HTMLElement;
+	const collapse = async (el: HTMLElement) => {
+		const toggle = el.querySelector<HTMLButtonElement>('[aria-controls="books-library"]');
+		await act(async () => toggle?.click());
+	};
+
+	it("without the preference, collapsing hides the library out of the tab order", async () => {
+		installShell([]);
+		const el = await renderApp();
+		await collapse(el);
+		expect(library(el).hasAttribute("inert")).toBe(true);
+		expect(library(el).hasAttribute("data-bs-autohide")).toBe(false);
+		expect(el.querySelector(".bs-autohide-edge")).toBeNull();
+	});
+
+	it("with the preference on, a collapsed library becomes a hidden overlay with an edge hot-zone", async () => {
+		document.documentElement.setAttribute("data-bs-autohide-sidebars", "on");
+		installShell([]);
+		const el = await renderApp();
+		expect(library(el).hasAttribute("data-bs-autohide")).toBe(false);
+		await collapse(el);
+		expect(library(el).getAttribute("data-bs-autohide")).toBe("hidden");
+		expect(library(el).hasAttribute("inert")).toBe(true);
+		expect(el.querySelector(".bs-autohide-edge")).not.toBeNull();
+	});
+});

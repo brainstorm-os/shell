@@ -36,6 +36,7 @@ import {
 	requestSaveBytes,
 	suggestedFilename,
 } from "@brainstorm-os/sdk/export-file";
+import { formatBytes } from "@brainstorm-os/sdk/format-bytes";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { MenuAlign, openSearchPicker } from "@brainstorm-os/sdk/menus";
 import { NavButtons } from "@brainstorm-os/sdk/nav-history";
@@ -44,7 +45,7 @@ import {
 	ObjectMenuTrigger,
 	openAnchoredMenu,
 } from "@brainstorm-os/sdk/object-menu";
-import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { PanelSide, PanelToggleButton, useAutoHidePanel } from "@brainstorm-os/sdk/panel-toggle";
 import { Searchbar } from "@brainstorm-os/sdk/searchbar";
 import { SelectMenu, type SelectMenuOption } from "@brainstorm-os/sdk/select-menu";
 import { useShortcut } from "@brainstorm-os/sdk/shortcut";
@@ -54,6 +55,7 @@ import { useFilesT } from "./i18n-hooks";
 import { orderedSelection } from "./logic/bulk";
 import { bulkRenamePlanAvoiding } from "./logic/bulk-rename";
 import { destinationFolders } from "./logic/destination-folders";
+import { hasActiveFilters } from "./logic/filters";
 import { buildPreviewSiblings } from "./logic/preview-siblings";
 import { ScopeFlipAction, SearchScope, flipScope } from "./logic/search";
 import type { SmartFolder } from "./logic/smart-folders";
@@ -73,6 +75,7 @@ import {
 	SmartFolderNamePopover,
 	SortMenuPopover,
 } from "./ui/dialogs";
+import { FilterBar, FilterToggleButton } from "./ui/filter-bar";
 import { Inspector } from "./ui/inspector";
 import { filesObjectMenuContext } from "./ui/object-menu-context";
 import { SidebarSection, SidebarTree } from "./ui/sidebar-tree";
@@ -162,6 +165,8 @@ export function FilesApp() {
 	// is mounted and can anchor off the live rect.
 	const [sortTrigger, setSortTrigger] = useState<HTMLButtonElement | null>(null);
 	const [storageOpen, setStorageOpen] = useState(false);
+	const [filterOpen, setFilterOpen] = useState(false);
+	const filterBarShown = filterOpen || hasActiveFilters(store.filters);
 	// Smart-folder name popover: `{ mode: "save" }` seeds from the active
 	// query; `{ mode: "rename", folder }` seeds from the saved name.
 	const [smartNamePrompt, setSmartNamePrompt] = useState<
@@ -468,7 +473,11 @@ export function FilesApp() {
 	// ─── Keyboard (shared SDK useShortcut, chords from the registry) ──────
 	const chord = (id: ActionId) => chordFor(id) ?? "";
 	useShortcut(chord(ActionId.Search), () => searchInputRef.current?.focus());
-	useShortcut(chord(ActionId.ToggleSidebar), store.toggleNav);
+	const sidebarAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !store.navOpen });
+	useShortcut(chord(ActionId.ToggleSidebar), () => {
+		if (sidebarAutoHide.active) sidebarAutoHide.toggle();
+		else store.toggleNav();
+	});
 	useShortcut(chord(ActionId.ToggleInspector), store.toggleInspector);
 	useShortcut(chord(ActionId.NewFolder), store.newFolder);
 	useShortcut(chord(ActionId.NewMenu), openNewMenu);
@@ -612,11 +621,12 @@ export function FilesApp() {
 
 			<main className="window" id="window">
 				<aside
+					{...sidebarAutoHide.panelProps}
 					className="sidebar"
 					data-testid="sidebar"
 					aria-label={t("brainstorm.files.sidebar.label")}
-					aria-hidden={!store.navOpen}
-					inert={!store.navOpen ? true : undefined}
+					aria-hidden={!sidebarAutoHide.visible}
+					inert={!sidebarAutoHide.visible ? true : undefined}
 				>
 					<SidebarSection titleKey="brainstorm.files.sidebar.folders">
 						<SidebarTree store={store} onCycle={onCycle} />
@@ -634,12 +644,12 @@ export function FilesApp() {
 							/>
 						</SidebarSection>
 					) : null}
-					{/* Storage location — a Finder-style place that opens the
-					    cross-store media inventory. A real sidebar location, not a
-					    toolbar button bolted on. */}
-					{runtime?.services?.files?.listStorageInventory ? (
-						<SidebarSection titleKey="brainstorm.files.sidebar.storage">
-							<ul className="sidebar__list">
+					{/* Storage places — Finder-style locations, not toolbar buttons
+					    bolted on: the cross-store media inventory (when the shell
+					    exposes it) and the vault-wide Duplicates view (9.8.16). */}
+					<SidebarSection titleKey="brainstorm.files.sidebar.storage">
+						<ul className="sidebar__list">
+							{runtime?.services?.files?.listStorageInventory ? (
 								<li>
 									<button
 										type="button"
@@ -654,10 +664,25 @@ export function FilesApp() {
 										<span className="sidebar__name">{t("brainstorm.files.storage.allMedia")}</span>
 									</button>
 								</li>
-							</ul>
-						</SidebarSection>
-					) : null}
+							) : null}
+							<li>
+								<button
+									type="button"
+									className="sidebar__tree-row"
+									data-testid="sidebar-duplicates"
+									aria-current={store.duplicatesActive ? "page" : undefined}
+									style={{ paddingLeft: "12px" }}
+									onClick={store.showDuplicates}
+								>
+									<span className="sidebar__chevron sidebar__chevron--hidden" aria-hidden="true" />
+									<Icon name={IconName.Copy} size={16} className="sidebar__glyph" />
+									<span className="sidebar__name">{t("brainstorm.files.duplicates.title")}</span>
+								</button>
+							</li>
+						</ul>
+					</SidebarSection>
 				</aside>
+				{sidebarAutoHide.edgeProps && <div {...sidebarAutoHide.edgeProps} />}
 
 				<section
 					ref={contentRef}
@@ -719,6 +744,14 @@ export function FilesApp() {
 							) : null}
 						</div>
 						<div className="toolbar__group toolbar__group--end">
+							<FilterToggleButton
+								open={filterBarShown}
+								filters={store.filters}
+								onToggle={() => {
+									if (filterBarShown && hasActiveFilters(store.filters)) store.clearFilters();
+									setFilterOpen(!filterBarShown);
+								}}
+							/>
 							<button
 								type="button"
 								ref={setSortTrigger}
@@ -748,6 +781,29 @@ export function FilesApp() {
 							/>
 						</div>
 					</div>
+
+					{filterBarShown ? (
+						<FilterBar
+							filters={store.filters}
+							extensions={store.availableExtensions}
+							onChange={store.setFilter}
+							onClear={store.clearFilters}
+						/>
+					) : null}
+					{store.duplicateGroups && store.duplicateGroups.length > 0 ? (
+						<p className="files-locationbar" data-testid="duplicates-summary" role="status">
+							{plural(
+								store.duplicateGroups.length,
+								"brainstorm.files.duplicates.summary.one",
+								"brainstorm.files.duplicates.summary.other",
+								{
+									size: formatBytes(
+										store.duplicateGroups.reduce((sum, group) => sum + group.reclaimableBytes, 0),
+									),
+								},
+							)}
+						</p>
+					) : null}
 
 					<ContentList
 						store={store}

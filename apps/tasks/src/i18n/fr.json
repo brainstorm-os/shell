@@ -99,7 +99,6 @@
   "tasks.header.sidebar.hide": "Masquer la barre latérale",
   "tasks.header.iconPicker.open": "Changer l'icône du projet",
   "tasks.header.renameProject": "Renommer le projet",
-  "tasks.row.toggle.aria": "Basculer l'état terminé",
   "tasks.row.icon.aria": "Changer l'icône",
   "tasks.row.due.sr": "Échéance le {date}",
   "tasks.row.scheduled.sr": "Planifiée le {date}",
@@ -280,5 +279,12 @@
   "tasks.export.cancel": "Annuler",
   "tasks.export.markdown": "Markdown",
   "tasks.export.csv": "CSV",
-  "tasks.export.json": "JSON"
+  "tasks.export.json": "JSON",
+  "tasks.menu.markDone": "Marquer comme terminée",
+  "tasks.menu.markWontDo": "Marquer comme abandonnée",
+  "tasks.menu.reopen": "Rouvrir",
+  "tasks.row.toggle.open": "Marquer « {name} » comme terminée",
+  "tasks.row.toggle.done": "« {name} » est terminée — marquer comme abandonnée",
+  "tasks.row.toggle.wontDo": "« {name} » est abandonnée — rouvrir",
+  "tasks.quickLook.value.wontDo": "Abandonnée"
 }

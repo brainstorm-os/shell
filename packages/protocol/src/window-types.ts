@@ -33,6 +33,9 @@ export enum NavigationMode {
 	Replace = "replace",
 	NewTab = "new-tab",
 	NewWindow = "new-window",
+	/** Split view (6.14, doc 37's `new-panel`): open beside the source pane in
+	 *  the same window. */
+	NewPanel = "new-panel",
 }
 
 export type WindowBounds = { x: number; y: number; width: number; height: number };

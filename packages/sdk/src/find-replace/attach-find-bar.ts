@@ -7,16 +7,13 @@
 
 import { DEFAULT_FIND_LABELS, type FindLabels } from "../i18n/common-labels";
 import { type FindController, FindStatus } from "./find-controller";
+import { findCounterText } from "./find-counter";
 
 export type AttachFindBarOptions = {
 	mode?: "find" | "find-replace";
 	labels?: Partial<FindLabels>;
 	className?: string;
 };
-
-function fill(template: string, vars: Record<string, string | number>): string {
-	return template.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? `{${k}}`));
-}
 
 const OPTION_KEYS = [
 	["caseSensitive", "Aa"],
@@ -145,12 +142,11 @@ export function attachFindBar(
 		// sync above) so typing replaces it while bare Enter reuses it
 		// (the standard editor/browser find behavior — F-214).
 		if (opened) term.select();
-		count.textContent =
-			s.status === FindStatus.NoMatches
-				? labels.noResults
-				: s.status === FindStatus.Matches
-					? fill(labels.matchCount, { current: s.activeIndex + 1, total: s.matchCount })
-					: "";
+		count.textContent = findCounterText(s, labels);
+		const invalid = s.status === FindStatus.InvalidPattern;
+		if (invalid) term.setAttribute("aria-invalid", "true");
+		else term.removeAttribute("aria-invalid");
+		count.toggleAttribute("data-invalid", invalid);
 		const hasMatches = s.matchCount > 0;
 		prev.disabled = !hasMatches;
 		next.disabled = !hasMatches;

@@ -9,6 +9,8 @@
  *   - Backspace at the very start of the summary, when the body is
  *     empty, unwraps the toggle back to a plain paragraph so an empty
  *     toggle is never undeletable.
+ *   - Outliner keys on a summary line (B11.30): Tab / Shift+Tab nest and
+ *     un-nest toggles, Enter starts a sibling (see `toggle-outliner.ts`).
  *
  * Collapsed state is **per-device chrome** (B11.5): it lives in a
  * `ToggleCollapseStore` keyed by the node's persisted `__bsId`, never on
@@ -27,7 +29,10 @@ import {
 	$isRangeSelection,
 	COMMAND_PRIORITY_EDITOR,
 	COMMAND_PRIORITY_LOW,
+	COMMAND_PRIORITY_NORMAL,
 	KEY_BACKSPACE_COMMAND,
+	KEY_ENTER_COMMAND,
+	KEY_TAB_COMMAND,
 	createCommand,
 } from "lexical";
 import { useEffect, useMemo } from "react";
@@ -39,6 +44,7 @@ import {
 	type ToggleNode,
 } from "../nodes/toggle-node";
 import { ToggleCollapseStore } from "./toggle-collapse-store";
+import { $enterOnSummary, $indentToggle, $outdentToggle, $summaryToggle } from "./toggle-outliner";
 
 export const INSERT_TOGGLE_COMMAND = createCommand<ToggleVariant>("INSERT_TOGGLE_COMMAND");
 
@@ -136,6 +142,37 @@ export function TogglePlugin({ docId }: TogglePluginProps = {}) {
 					return true;
 				},
 				COMMAND_PRIORITY_EDITOR,
+			),
+			editor.registerCommand(
+				KEY_TAB_COMMAND,
+				(event) => {
+					const toggle = $summaryToggle();
+					if (!toggle) return false;
+					// Nothing to nest under / out of → not ours: Tab falls through to
+					// TabIndentationPlugin instead of being swallowed.
+					if (event.shiftKey) {
+						if (!$outdentToggle(toggle)) return false;
+						event.preventDefault();
+						return true;
+					}
+					const parent = $indentToggle(toggle);
+					if (!parent) return false;
+					event.preventDefault();
+					store.setCollapsed(parent.getBlockId(), false);
+					return true;
+				},
+				COMMAND_PRIORITY_NORMAL,
+			),
+			editor.registerCommand(
+				KEY_ENTER_COMMAND,
+				(event) => {
+					if (event?.shiftKey) return false;
+					const toggle = $summaryToggle();
+					if (!toggle || !$enterOnSummary(toggle)) return false;
+					event?.preventDefault();
+					return true;
+				},
+				COMMAND_PRIORITY_NORMAL,
 			),
 			editor.registerCommand(
 				KEY_BACKSPACE_COMMAND,

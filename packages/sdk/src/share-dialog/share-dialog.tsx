@@ -18,8 +18,15 @@ import type {
 	SharedContact,
 	SharingService,
 } from "@brainstorm-os/sdk-types";
-import { RosterRole } from "@brainstorm-os/sdk-types";
-import { type ReactElement, useCallback, useEffect, useState } from "react";
+import {
+	DEFAULT_SHARE_ROLE,
+	RosterRole,
+	inviteLinkFor,
+	inviteTokenFromInput,
+	parseShareDefaultRole,
+} from "@brainstorm-os/sdk-types";
+import { type ReactElement, useCallback, useEffect, useRef, useState } from "react";
+import { type LastEditView, resolveLastEdit } from "../entity-authorship";
 import { Icon, IconName } from "../icon";
 import { Popover } from "../popover";
 import { SelectMenu } from "../select-menu";
@@ -48,6 +55,23 @@ export type ShareDialogLabels = {
 	revokeFailed: string;
 	loadFailed: string;
 	done: string;
+	/** Collab-C7 — optional (English defaults below) so existing hosts keep
+	 *  compiling; a localized host passes its own. `{from}` / `{name}` /
+	 *  `{time}` are substituted here. */
+	copyLink?: string;
+	linkCopied?: string;
+	fromLink?: string;
+	lastEdited?: string;
+};
+
+type C7LabelKey = "copyLink" | "linkCopied" | "fromLink" | "lastEdited";
+
+const DEFAULT_C7_LABELS: Readonly<Record<C7LabelKey, string>> = {
+	copyLink: "Copy link",
+	linkCopied: "Link copied",
+	fromLink:
+		"Filled in from an invite link from {from}. Check it is who you expect, choose a role, then press Add.",
+	lastEdited: "Last edited by {name} · {time}",
 };
 
 /** The services this dialog drives — narrowed so a consumer can pass the live
@@ -57,7 +81,15 @@ export type ShareDialogProps = {
 	entityType: string;
 	sharing: Pick<
 		SharingService,
-		"createInvite" | "share" | "shareCollection" | "saveContact" | "listContacts" | "revoke"
+		| "createInvite"
+		| "share"
+		| "shareCollection"
+		| "saveContact"
+		| "listContacts"
+		| "revoke"
+		| "pendingInvite"
+		| "defaultRole"
+		| "lastEdit"
 	>;
 	roster: Pick<RosterService, "members">;
 	/** True when the local user is the entity Owner — gates add / revoke. */
@@ -95,22 +127,62 @@ function memberKeyLine(m: RosterMember): string | null {
 	return m.displayName ? m.fingerprint : null;
 }
 
+/** The optional labels a host actually supplied (an `undefined` must not
+ *  shadow the English default). */
+function definedLabels(labels: ShareDialogLabels): Partial<Record<C7LabelKey, string>> {
+	const out: Partial<Record<C7LabelKey, string>> = {};
+	for (const key of Object.keys(DEFAULT_C7_LABELS) as C7LabelKey[]) {
+		const value = labels[key];
+		if (typeof value === "string") out[key] = value;
+	}
+	return out;
+}
+
+function formatEditTime(ms: number): string {
+	return new Date(ms).toLocaleString(undefined, {
+		month: "short",
+		day: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+	});
+}
+
 export function ShareDialog(props: ShareDialogProps): ReactElement {
 	const { entityId, entityType, sharing, roster, canManage, labels, onClose } = props;
 	const [members, setMembers] = useState<RosterMember[]>([]);
 	const [contacts, setContacts] = useState<SharedContact[]>([]);
 	const [code, setCode] = useState("");
-	const [role, setRole] = useState<RosterRole>(EDITOR);
+	// Collab-C7 — a new share starts at the user's configured default, which is
+	// Viewer unless they widened it (read-only until deliberately changed).
+	const [role, setRole] = useState<RosterRole>(DEFAULT_SHARE_ROLE);
+	// The default-role reply is async; a late one must never overwrite a role
+	// the user already picked.
+	const rolePicked = useRef(false);
+	const pickRole = useCallback((next: RosterRole) => {
+		rolePicked.current = true;
+		setRole(next);
+	}, []);
 	const [myCode, setMyCode] = useState<string | null>(null);
 	const [copied, setCopied] = useState(false);
+	const [linkCopied, setLinkCopied] = useState(false);
+	const [fromLink, setFromLink] = useState<string | null>(null);
+	const [lastEdit, setLastEdit] = useState<LastEditView | null>(null);
+	const text = { ...DEFAULT_C7_LABELS, ...definedLabels(labels) };
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
 	const reload = useCallback(async () => {
+		let roll: RosterMember[] = [];
 		try {
-			setMembers(await roster.members(entityId));
+			roll = await roster.members(entityId);
+			setMembers(roll);
 		} catch {
 			setError(labels.loadFailed);
+		}
+		try {
+			setLastEdit(await resolveLastEdit(sharing, null, entityId, labels.you, roll));
+		} catch {
+			setLastEdit(null);
 		}
 		// Contacts are a convenience (share-by-name); a failure here must not block
 		// the member list or the paste-a-code path.
@@ -119,11 +191,37 @@ export function ShareDialog(props: ShareDialogProps): ReactElement {
 		} catch {
 			setContacts([]);
 		}
-	}, [roster, sharing, entityId, labels.loadFailed]);
+	}, [roster, sharing, entityId, labels.loadFailed, labels.you]);
 
 	useEffect(() => {
 		void reload();
 	}, [reload]);
+
+	// Collab-C7 — the configured default role, and an invite a deep link
+	// delivered. The link only PRE-FILLS the code: the owner still reads who it
+	// is from, picks the role and presses Add.
+	useEffect(() => {
+		let live = true;
+		void sharing
+			.defaultRole?.()
+			.then((r) => {
+				if (live && !rolePicked.current) setRole(parseShareDefaultRole(r));
+			})
+			.catch(() => undefined);
+		if (canManage) {
+			void sharing
+				.pendingInvite?.()
+				.then((pending) => {
+					if (!live || !pending) return;
+					setCode(pending.invite);
+					setFromLink(pending.label ? `${pending.label} (${pending.fingerprint})` : pending.fingerprint);
+				})
+				.catch(() => undefined);
+		}
+		return () => {
+			live = false;
+		};
+	}, [sharing, canManage]);
 
 	const roleLabel = useCallback(
 		(r: RosterRole): string =>
@@ -147,6 +245,7 @@ export function ShareDialog(props: ShareDialogProps): ReactElement {
 				/* non-fatal */
 			}
 			setCode("");
+			setFromLink(null);
 			await reload();
 		} catch {
 			setError(labels.shareFailed);
@@ -218,6 +317,14 @@ export function ShareDialog(props: ShareDialogProps): ReactElement {
 		);
 	}, [myCode]);
 
+	const onCopyLink = useCallback(() => {
+		if (!myCode) return;
+		void navigator.clipboard?.writeText(inviteLinkFor(myCode)).then(
+			() => setLinkCopied(true),
+			() => undefined,
+		);
+	}, [myCode]);
+
 	// Known teammates not already on this entity — the click-to-add picks.
 	const knownPicks = contacts.filter((c) => !members.some((m) => m.pubkey === c.pubkey));
 
@@ -253,6 +360,13 @@ export function ShareDialog(props: ShareDialogProps): ReactElement {
 							</li>
 						))}
 					</ul>
+					{lastEdit ? (
+						<p className="bs-share__hint" data-testid="share-last-edit">
+							{text.lastEdited
+								.replace("{name}", lastEdit.name)
+								.replace("{time}", formatEditTime(lastEdit.at))}
+						</p>
+					) : null}
 				</section>
 
 				{canManage && knownPicks.length > 0 ? (
@@ -285,7 +399,10 @@ export function ShareDialog(props: ShareDialogProps): ReactElement {
 								placeholder={labels.codePlaceholder}
 								aria-label={labels.codePlaceholder}
 								disabled={busy}
-								onChange={(e) => setCode(e.target.value)}
+								onChange={(e) => {
+									setCode(inviteTokenFromInput(e.target.value));
+									setFromLink(null);
+								}}
 								onKeyDown={(e) => {
 									// Enter submits the single-field add, matching every other
 									// commit-on-Enter input in the product.
@@ -301,7 +418,7 @@ export function ShareDialog(props: ShareDialogProps): ReactElement {
 									{ value: VIEWER, label: labels.canView },
 								]}
 								value={role}
-								onChange={setRole}
+								onChange={pickRole}
 								ariaLabel={labels.addHeading}
 							/>
 							<button
@@ -314,6 +431,11 @@ export function ShareDialog(props: ShareDialogProps): ReactElement {
 								{labels.add}
 							</button>
 						</div>
+						{fromLink ? (
+							<p className="bs-share__hint" role="status" data-testid="share-from-link">
+								{text.fromLink.replace("{from}", fromLink)}
+							</p>
+						) : null}
 					</section>
 				) : null}
 
@@ -329,6 +451,9 @@ export function ShareDialog(props: ShareDialogProps): ReactElement {
 							/>
 							<button type="button" className="bs-btn bs-btn--neutral" onClick={onCopy}>
 								{copied ? labels.copied : labels.copy}
+							</button>
+							<button type="button" className="bs-btn bs-btn--neutral" onClick={onCopyLink}>
+								{linkCopied ? text.linkCopied : text.copyLink}
 							</button>
 						</div>
 					) : (

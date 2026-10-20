@@ -18,12 +18,16 @@
  */
 
 import {
+	CREATED_BY_AGENT_PROPERTY_KEY,
 	type Comparand,
 	type EntityQuery,
 	LinkDirection,
 	type LinkPredicate,
 	type PropertyPredicate,
 	isPropertyRef,
+	predicateReferencesHost,
+	projectAgentAuthorship,
+	stripDerivedAuthorship,
 } from "@brainstorm-os/sdk-types";
 import type { SqliteDatabase, SqliteStatement } from "@brainstorm-os/sqlite";
 import { EdgeMatch, type GraphPattern } from "../../entities/pattern";
@@ -33,7 +37,9 @@ import {
 	MULTI_HOP_CTE_ROW_LIMIT,
 	compilePattern,
 } from "../../entities/pattern-compiler";
+import { AgentWritesRepository } from "./agent-writes-repo";
 import { AssetRefsRepository } from "./asset-refs-repo";
+import { LastEditsRepository } from "./last-edits-repo";
 
 export type EntityRow = {
 	id: string;
@@ -157,9 +163,16 @@ class InvalidPropertyKeyError extends Error {
 	}
 }
 
+/** Agent-16 — derived keys that are not stored: a predicate on one compiles to
+ *  the stored path it is projected from, so a server-side filter on "created by
+ *  agent" matches exactly what a reader sees. */
+const DERIVED_KEY_PATHS: Readonly<Record<string, string>> = {
+	[CREATED_BY_AGENT_PROPERTY_KEY]: "$.agentProvenance.agent",
+};
+
 function jsonPath(key: string): string {
 	if (!PROPERTY_KEY_RE.test(key)) throw new InvalidPropertyKeyError(key);
-	return `$.${key}`;
+	return DERIVED_KEY_PATHS[key] ?? `$.${key}`;
 }
 
 /** Upper bound on the per-handle prepared-statement LRU. Fixed-SQL repos use a
@@ -176,6 +189,8 @@ export class EntitiesRepository {
 	// adds up to GB of native memory before any JS-side reference is dropped.
 	private readonly statements = new Map<string, SqliteStatement>();
 	private assetRefsRepo: AssetRefsRepository | null = null;
+	private agentWritesRepo: AgentWritesRepository | null = null;
+	private lastEditsRepo: LastEditsRepository | null = null;
 
 	constructor(private readonly db: SqliteDatabase) {}
 
@@ -186,6 +201,19 @@ export class EntitiesRepository {
 	get assetRefs(): AssetRefsRepository {
 		if (!this.assetRefsRepo) this.assetRefsRepo = new AssetRefsRepository(this.db);
 		return this.assetRefsRepo;
+	}
+
+	/** Agent-15 — the agent write journal over this same handle, for the
+	 *  entities service's run-diff capture + undo. */
+	get agentWrites(): AgentWritesRepository {
+		if (!this.agentWritesRepo) this.agentWritesRepo = new AgentWritesRepository(this.db);
+		return this.agentWritesRepo;
+	}
+
+	/** Collab-C7 — the last-editor table over this same handle. */
+	get lastEdits(): LastEditsRepository {
+		if (!this.lastEditsRepo) this.lastEditsRepo = new LastEditsRepository(this.db);
+		return this.lastEditsRepo;
 	}
 
 	/** Run `fn` inside a single SQLite transaction against `entities.db`.
@@ -227,13 +255,14 @@ export class EntitiesRepository {
 		// path (shell-internal singletons that don't yet have a DEK row).
 		const dekId = input.dekId === "" ? null : input.dekId;
 		const updatedAt = input.updatedAt ?? input.now;
+		const stored = stripDerivedAuthorship(input.properties);
 		this.stmt(
 			"INSERT INTO entities (id, type, space_id, properties, created_by, created_at, updated_at, dek_id, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)",
 		).run(
 			input.id,
 			input.type,
 			input.spaceId ?? null,
-			JSON.stringify(input.properties),
+			JSON.stringify(stored),
 			input.createdBy,
 			input.now,
 			updatedAt,
@@ -244,11 +273,20 @@ export class EntitiesRepository {
 			id: input.id,
 			type: input.type,
 			spaceId: input.spaceId ?? null,
-			properties: input.properties,
+			properties: projectAgentAuthorship(stored),
 			createdBy: input.createdBy,
 			createdAt: input.now,
 			updatedAt,
 		};
+	}
+
+	/** The entity whether live or in the Bin, with its deletion time (null when
+	 *  live). Null only when the row does not exist at all (purged / never). */
+	getIncludingDeleted(id: string): (EntityRow & { deletedAt: number | null }) | null {
+		const row = this.stmt(
+			"SELECT id, type, space_id, properties, created_by, created_at, updated_at, deleted_at FROM entities WHERE id = ?",
+		).get(id) as (DbEntityRow & { deleted_at: number | null }) | undefined;
+		return row ? { ...rowToEntity(row), deletedAt: row.deleted_at } : null;
 	}
 
 	/** Live (non-deleted) entity, or null. */
@@ -265,12 +303,12 @@ export class EntitiesRepository {
 	update(id: string, patch: Record<string, unknown>, now: number): EntityRow | null {
 		const current = this.get(id);
 		if (!current) return null;
-		const properties = { ...current.properties, ...patch };
+		const stored = stripDerivedAuthorship({ ...current.properties, ...patch });
 		this.stmt(
 			"UPDATE entities SET properties = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
-		).run(JSON.stringify(properties), now, id);
+		).run(JSON.stringify(stored), now, id);
 		this.recordChange(id, "update", this.nextVersion(id), now);
-		return { ...current, properties, updatedAt: now };
+		return { ...current, properties: projectAgentAuthorship(stored), updatedAt: now };
 	}
 
 	/**
@@ -496,6 +534,9 @@ export class EntitiesRepository {
 		this.stmt("DELETE FROM entity_deks WHERE entity_id = ?").run(id);
 		// ROT-3a-ii — the deferred-rotation mark (same pragma-independent posture).
 		this.stmt("DELETE FROM pending_rotations WHERE entity_id = ?").run(id);
+		this.stmt("DELETE FROM entity_last_edits WHERE entity_id = ?").run(id);
+		// Agent-15 — the journal holds the purged object's property values.
+		this.stmt("DELETE FROM agent_writes WHERE entity_id = ?").run(id);
 		return true;
 	}
 
@@ -655,6 +696,34 @@ export class EntitiesRepository {
 			for (let i = 0; i < chunkSize; i += 1) padding[i] = i < chunk.length ? chunk[i] : null;
 			const rows = this.stmt(sql).all(...padding) as DbLinkRow[];
 			for (const row of rows) out.push(rowToLink(row));
+		}
+		return out;
+	}
+
+	/**
+	 * Backlink count per entity: the number of distinct live entities with a
+	 * live link pointing at it (self-links excluded). One grouped query per
+	 * chunk, so the launcher's result list never runs N+1. Ids with no
+	 * backlinks are absent from the map (read as 0).
+	 */
+	countBacklinks(entityIds: readonly string[]): Map<string, number> {
+		const out = new Map<string, number>();
+		if (entityIds.length === 0) return out;
+		const chunkSize = 64;
+		const placeholders = new Array(chunkSize).fill("?").join(",");
+		const sql = `SELECT l.dest_entity_id AS id, COUNT(DISTINCT l.source_entity_id) AS n
+		             FROM links AS l
+		             JOIN entities AS s ON s.id = l.source_entity_id AND s.deleted_at IS NULL
+		             WHERE l.dest_entity_id IN (${placeholders})
+		               AND l.deleted_at IS NULL
+		               AND l.source_entity_id != l.dest_entity_id
+		             GROUP BY l.dest_entity_id`;
+		const padding = new Array<unknown>(chunkSize);
+		for (let start = 0; start < entityIds.length; start += chunkSize) {
+			const chunk = entityIds.slice(start, start + chunkSize);
+			for (let i = 0; i < chunkSize; i += 1) padding[i] = i < chunk.length ? chunk[i] : null;
+			const rows = this.stmt(sql).all(...padding) as Array<{ id: string; n: number }>;
+			for (const row of rows) out.set(row.id, Number(row.n));
 		}
 		return out;
 	}
@@ -852,7 +921,7 @@ function rowToEntity(row: DbEntityRow): EntityRow {
 	try {
 		const parsed = JSON.parse(row.properties) as unknown;
 		if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-			properties = parsed as Record<string, unknown>;
+			properties = projectAgentAuthorship(parsed as Record<string, unknown>);
 		}
 	} catch {
 		// Corrupt row — treat as empty rather than failing the whole query.
@@ -954,16 +1023,26 @@ function decodePatternRows(
 
 type Compiled = { sql: string; params: unknown[] };
 
+const MATCH_NOTHING: Compiled = { sql: "0 = 1", params: [] };
+
+/** A query has no host entity, so a `$host`-relative predicate (9.12.24) is
+ *  rejected WHOLE — compiling it per leaf would let `$or`/`$not` around a
+ *  dead leaf widen into rows the author never asked for. */
 function compilePredicate(pred: PropertyPredicate): Compiled {
+	if (predicateReferencesHost(pred)) return MATCH_NOTHING;
+	return compilePredicateNode(pred);
+}
+
+function compilePredicateNode(pred: PropertyPredicate): Compiled {
 	if ("$and" in pred) {
-		const parts = pred.$and.map(compilePredicate);
+		const parts = pred.$and.map(compilePredicateNode);
 		return {
 			sql: `(${parts.map((p) => p.sql).join(" AND ")})`,
 			params: parts.flatMap((p) => p.params),
 		};
 	}
 	if ("$or" in pred) {
-		const parts = pred.$or.map(compilePredicate);
+		const parts = pred.$or.map(compilePredicateNode);
 		return {
 			sql: `(${parts.map((p) => p.sql).join(" OR ")})`,
 			params: parts.flatMap((p) => p.params),
@@ -980,8 +1059,10 @@ function compilePredicate(pred: PropertyPredicate): Compiled {
 				if ("$now" in rhs) {
 					clauses.push(`${left} = ?`);
 					params.push(Date.now());
-				} else {
+				} else if ("$prop" in rhs) {
 					clauses.push(`${left} = json_extract(e.properties, '${jsonPath(rhs.$prop)}')`);
+				} else {
+					return MATCH_NOTHING;
 				}
 			} else {
 				clauses.push(`${left} = ?`);
@@ -991,6 +1072,10 @@ function compilePredicate(pred: PropertyPredicate): Compiled {
 		return { sql: `(${clauses.join(" AND ")})`, params };
 	}
 	if ("$contains" in pred) {
+		// A computed `$contains` RHS is an in-memory-evaluator feature; SQL
+		// has no row-relative LIKE here, so it matches nothing rather than
+		// LIKE-ing the stringified ref object.
+		if (Object.values(pred.$contains).some(isPropertyRef)) return MATCH_NOTHING;
 		return conjunction(
 			pred.$contains,
 			(path) => `lower(json_extract(e.properties, '${path}')) LIKE ?`,
@@ -1031,8 +1116,10 @@ function compileComparison(obj: Record<string, Comparand>, op: ">" | "<"): Compi
 			if ("$now" in rhs) {
 				right = "?";
 				params.push(Date.now());
-			} else {
+			} else if ("$prop" in rhs) {
 				right = `CAST(${jsonAtOrSelf(rhs.$prop)} AS REAL)`;
+			} else {
+				return MATCH_NOTHING;
 			}
 		} else {
 			right = "?";

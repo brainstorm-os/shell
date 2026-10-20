@@ -42,6 +42,11 @@ export function t(key: ChatMessageId, params?: TParams): string {
 /** Non-React tests and standalone previews use the English manifest. */
 export const englishT = createT(CHAT_I18N);
 
-export function plural(count: number, one: ChatMessageId, other: ChatMessageId): string {
-	return sdkPlural(activeT, count, one, other);
+export function plural(
+	count: number,
+	one: ChatMessageId,
+	other: ChatMessageId,
+	params?: TParams,
+): string {
+	return sdkPlural(activeT, count, one, other, params);
 }

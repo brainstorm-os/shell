@@ -18,7 +18,9 @@
 
 import { useVaultEntities } from "@brainstorm-os/react-yjs";
 import { NavigationMode, navModeFromEvent, openEntity } from "@brainstorm-os/sdk";
-import type { VaultEntitiesService } from "@brainstorm-os/sdk-types";
+import { ConfirmKind, type VaultEntitiesService } from "@brainstorm-os/sdk-types";
+import { createCheckbox } from "@brainstorm-os/sdk/checkbox";
+import { createConfirmMemory } from "@brainstorm-os/sdk/confirm-memory";
 import { EmptyState, EmptyStateTone } from "@brainstorm-os/sdk/empty-state";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { recallLastViewed, rememberLastViewed } from "@brainstorm-os/sdk/last-viewed";
@@ -30,7 +32,7 @@ import {
 	openObjectMenu,
 } from "@brainstorm-os/sdk/object-menu";
 import { readPanelOpen, writePanelOpen } from "@brainstorm-os/sdk/panel-state";
-import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { PanelSide, PanelToggleButton, useAutoHidePanel } from "@brainstorm-os/sdk/panel-toggle";
 import { PopoverSize, createPopoverElement } from "@brainstorm-os/sdk/popover";
 import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
 import { applyPersistedPanelWidth, attachResizable } from "@brainstorm-os/sdk/resizable";
@@ -316,6 +318,13 @@ export function CodeEditorApp(): ReactElement {
 
 	const [navOpen, setNavOpen] = useState(() => readPanelPref(NAV_OPEN_KEY, true));
 	const [refsOpen, setRefsOpen] = useState(() => readPanelOpen(REFS_OPEN_KEY, true));
+	const filesAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !navOpen });
+	const filesAutoHideActive = filesAutoHide.active;
+	const toggleFilesAutoHide = filesAutoHide.toggle;
+	const toggleFiles = useCallback((): void => {
+		if (filesAutoHideActive) toggleFilesAutoHide();
+		else setNavOpen((v) => !v);
+	}, [filesAutoHideActive, toggleFilesAutoHide]);
 
 	// ── Folder tree view state (9.7.12) ───────────────────────────────────────
 	const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(
@@ -878,33 +887,56 @@ export function CodeEditorApp(): ReactElement {
 			const del = getCodeEditorRuntime()?.services?.entities?.delete;
 			if (!del) return;
 			const name = fileName(row.path);
+			// 6.15 — "Don't ask again" for move-to-Bin (reversible: the Bin restores).
+			const memory = createConfirmMemory(getCodeEditorRuntime()?.services?.settings);
 
-			const actions = document.createElement("div");
-			actions.className = "editor__rename-actions";
-			const cancelBtn = document.createElement("button");
-			cancelBtn.type = "button";
-			cancelBtn.className = "bs-btn bs-btn--ghost";
-			cancelBtn.textContent = t("deleteCancel");
-			const confirmBtn = document.createElement("button");
-			confirmBtn.type = "button";
-			confirmBtn.className = "bs-btn bs-btn--danger";
-			confirmBtn.textContent = t("deleteConfirm");
-			actions.append(cancelBtn, confirmBtn);
+			void memory.isSkipped(ConfirmKind.MoveToBin).then((skipped) => {
+				if (skipped) {
+					void deleteFile(row);
+					return;
+				}
+				const actions = document.createElement("div");
+				actions.className = "editor__rename-actions";
+				const cancelBtn = document.createElement("button");
+				cancelBtn.type = "button";
+				cancelBtn.className = "bs-btn bs-btn--ghost";
+				cancelBtn.textContent = t("deleteCancel");
+				const confirmBtn = document.createElement("button");
+				confirmBtn.type = "button";
+				confirmBtn.className = "bs-btn bs-btn--danger";
+				confirmBtn.textContent = t("deleteConfirm");
+				actions.append(cancelBtn, confirmBtn);
 
-			const handle = createPopoverElement({
-				title: t("deleteTitle", { name }),
-				body: t("deleteBody", { name }),
-				footer: actions,
-				size: PopoverSize.Small,
-				testId: "code-delete",
-				onClose: () => handle.close(),
+				const remember = memory.canRemember(ConfirmKind.MoveToBin)
+					? createCheckbox({ label: t("deleteDontAskAgain") })
+					: null;
+				let body: HTMLElement | string = t("deleteBody", { name });
+				if (remember) {
+					const wrap = document.createElement("div");
+					const text = document.createElement("p");
+					text.className = "editor__delete-body";
+					text.textContent = t("deleteBody", { name });
+					remember.element.classList.add("editor__delete-remember");
+					wrap.append(text, remember.element);
+					body = wrap;
+				}
+
+				const handle = createPopoverElement({
+					title: t("deleteTitle", { name }),
+					body,
+					footer: actions,
+					size: PopoverSize.Small,
+					testId: "code-delete",
+					onClose: () => handle.close(),
+				});
+				cancelBtn.addEventListener("click", () => handle.close());
+				confirmBtn.addEventListener("click", () => {
+					handle.close();
+					if (remember?.input.checked) void memory.remember(ConfirmKind.MoveToBin);
+					void deleteFile(row);
+				});
+				confirmBtn.focus();
 			});
-			cancelBtn.addEventListener("click", () => handle.close());
-			confirmBtn.addEventListener("click", () => {
-				handle.close();
-				void deleteFile(row);
-			});
-			confirmBtn.focus();
 		},
 		[deleteFile],
 	);
@@ -1067,7 +1099,7 @@ export function CodeEditorApp(): ReactElement {
 				id: "code-editor.toggle-files",
 				label: t("command.toggleFiles"),
 				keywords: ["sidebar", "panel", "explorer"],
-				run: () => setNavOpen((v) => !v),
+				run: toggleFiles,
 			},
 			{
 				id: "code-editor.toggle-references",
@@ -1077,7 +1109,7 @@ export function CodeEditorApp(): ReactElement {
 			},
 		);
 		return commands;
-	}, [canCreateFile, showQuickOpen, persistSelected, createNewFile, focusReferences]);
+	}, [canCreateFile, showQuickOpen, persistSelected, createNewFile, focusReferences, toggleFiles]);
 
 	const showCommandPalette = useCallback((): void => {
 		if (commandPaletteRef.current) return;
@@ -1183,11 +1215,19 @@ export function CodeEditorApp(): ReactElement {
 			attachShortcut(window, CODE_EDITOR_CHORDS[CodeEditorAction.FormatDocument], () => {
 				void paneRef.current?.formatBuffer();
 			}),
+			attachShortcut(window, CODE_EDITOR_CHORDS[CodeEditorAction.ToggleFiles], toggleFiles),
 		];
 		return () => {
 			for (const dispose of disposers) dispose();
 		};
-	}, [persistSelected, moveSelection, focusReferences, showQuickOpen, showCommandPalette]);
+	}, [
+		persistSelected,
+		moveSelection,
+		focusReferences,
+		showQuickOpen,
+		showCommandPalette,
+		toggleFiles,
+	]);
 
 	const selectedContent = selectedRow ? contentOf(selectedRow, edits) : "";
 	// `edits` changes on every keystroke, so deriving the inspector straight off
@@ -1358,7 +1398,10 @@ export function CodeEditorApp(): ReactElement {
 							onMoveFiles={moveFiles}
 							onMoveFolder={moveFolder}
 							menuContext={fileMenuContext}
+							open={filesAutoHide.visible}
+							autoHide={filesAutoHide.panelProps}
 						/>
+						{filesAutoHide.edgeProps && <div {...filesAutoHide.edgeProps} />}
 						<div
 							ref={filesResizeRef}
 							className="editor__files-resize"

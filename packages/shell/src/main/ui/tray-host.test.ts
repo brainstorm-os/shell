@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TrayHost, getTrayHost, resetTrayHost } from "./tray-host";
+import { TrayHost, TrayShellAction, getTrayHost, resetTrayHost } from "./tray-host";
 
 afterEach(() => resetTrayHost());
 
@@ -66,7 +66,7 @@ describe("TrayHost.compose — menu model", () => {
 		const kinds = h
 			.compose()
 			?.entries.map((e) =>
-				e.kind === "header" ? `H:${e.appId}` : e.kind === "separator" ? "—" : `I:${e.itemId}`,
+				e.kind === "header" ? `H:${e.appId}` : e.kind === "item" ? `I:${e.itemId}` : "—",
 			);
 		expect(kinds).toEqual(["H:app.one", "I:a", "—", "H:app.two", "I:b"]);
 	});
@@ -129,5 +129,46 @@ describe("getTrayHost", () => {
 		expect(getTrayHost()).toBe(a);
 		resetTrayHost();
 		expect(getTrayHost()).not.toBe(a);
+	});
+});
+
+describe("TrayHost shell items (7.16 close to tray)", () => {
+	const SHELL = [
+		{ action: TrayShellAction.Open, label: "Open Brainstorm" },
+		{ action: TrayShellAction.Quit, label: "Quit Brainstorm" },
+	];
+
+	it("keeps a tray alive with no app publishing, shell items only", () => {
+		const host = new TrayHost();
+		host.setShellItems(SHELL);
+		expect(host.compose()).toEqual({
+			tooltip: "Brainstorm",
+			entries: [
+				{ kind: "shell", action: TrayShellAction.Open, label: "Open Brainstorm" },
+				{ kind: "shell", action: TrayShellAction.Quit, label: "Quit Brainstorm" },
+			],
+		});
+	});
+
+	it("leads app sections, separated, and removing them tears the tray down again", () => {
+		const host = new TrayHost();
+		const changes: unknown[] = [];
+		host.setListener((tray) => changes.push(tray));
+		host.setShellItems(SHELL);
+		host.publish("io.x", { items: [{ id: "a", label: "A" }] });
+		const kinds = host.compose()?.entries.map((e) => e.kind);
+		expect(kinds).toEqual(["shell", "shell", "separator", "header", "item"]);
+		host.clear("io.x");
+		host.setShellItems([]);
+		expect(host.compose()).toBeNull();
+		expect(changes.at(-1)).toBeNull();
+	});
+
+	it("clearing shell items that were never set does not emit", () => {
+		const host = new TrayHost();
+		const listener = vi.fn();
+		host.setListener(listener);
+		host.setShellItems([]);
+		expect(listener).not.toHaveBeenCalled();
 	});
 });

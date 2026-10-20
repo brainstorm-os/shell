@@ -236,3 +236,34 @@ describe("PreviewApp layout contract (F-317)", () => {
 		await unmount();
 	});
 });
+
+describe("PreviewApp — auto-hide sidebar (7.15)", () => {
+	afterEach(() => {
+		document.documentElement.removeAttribute("data-bs-autohide-sidebars");
+	});
+
+	it("without the preference, collapsing takes the library out of the tab order", async () => {
+		const { container, unmount } = await renderInto(<PreviewApp />);
+		await flush();
+		const toggle = container.querySelector<HTMLButtonElement>('[data-testid="sidebar-toggle"]');
+		await act(async () => toggle?.click());
+		const sidebar = container.querySelector(".preview__sidebar");
+		expect(sidebar?.hasAttribute("inert")).toBe(true);
+		expect(sidebar?.hasAttribute("data-bs-autohide")).toBe(false);
+		expect(container.querySelector(".bs-autohide-edge")).toBeNull();
+		await unmount();
+	});
+
+	it("with the preference on, a collapsed library becomes a hidden overlay with an edge hot-zone", async () => {
+		document.documentElement.setAttribute("data-bs-autohide-sidebars", "on");
+		const { container, unmount } = await renderInto(<PreviewApp />);
+		await flush();
+		const toggle = container.querySelector<HTMLButtonElement>('[data-testid="sidebar-toggle"]');
+		await act(async () => toggle?.click());
+		const sidebar = container.querySelector(".preview__sidebar");
+		expect(sidebar?.getAttribute("data-bs-autohide")).toBe("hidden");
+		expect(sidebar?.hasAttribute("inert")).toBe(true);
+		expect(container.querySelector(".bs-autohide-edge")).not.toBeNull();
+		await unmount();
+	});
+});

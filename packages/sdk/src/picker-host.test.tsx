@@ -56,6 +56,7 @@ const labels = {
 	formatUrl: "URL",
 	formatEmail: "Email",
 	formatPhone: "Phone",
+	formatRichText: "Rich text",
 	formatCurrency: "Currency",
 	formatPercent: "Percent",
 	formatDuration: "Duration",
@@ -101,6 +102,20 @@ describe("openInlinePropertyForm", () => {
 			expect(panel?.getAttribute("aria-modal")).toBe("true");
 			expect(panel?.getAttribute("aria-label")).toBe(labels.region);
 			expect(panel?.querySelector(".bs-inline-property-form")).not.toBeNull();
+		} finally {
+			teardown();
+		}
+	});
+
+	it("builds every text input on the shared .bs-input face (F-511e)", () => {
+		try {
+			open();
+			const inputs = Array.from(
+				document.querySelectorAll('.bs-inline-property-form input[type="text"]'),
+			);
+			expect(inputs.length).toBeGreaterThan(0);
+			for (const input of inputs)
+				expect(input.classList.contains("bs-input"), input.outerHTML).toBe(true);
 		} finally {
 			teardown();
 		}

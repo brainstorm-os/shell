@@ -11,7 +11,12 @@
  */
 
 import type { Icon } from "@brainstorm-os/sdk-types";
-import { IconKind } from "@brainstorm-os/sdk-types";
+import {
+	DEFAULT_SHARE_ROLE,
+	IconKind,
+	RosterRole,
+	parseShareDefaultRole,
+} from "@brainstorm-os/sdk-types";
 import { parseIcon } from "@brainstorm-os/sdk/entity-icon";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { initialsFor } from "../dashboard/app-icon-palette";
@@ -20,6 +25,7 @@ import { Button, ButtonVariant } from "../ui/button";
 import { EntityIcon } from "../ui/entity-icon";
 import { IconName, Icon as UiIcon } from "../ui/icon";
 import { TextField, TextFieldSize } from "../ui/text-field";
+import { SettingSelect } from "./settings-controls";
 import "./identity-section.css";
 
 type ProfileView = {
@@ -38,6 +44,57 @@ function avatarIcon(avatarRef: string | null): Icon | null {
 	} catch {
 		return null;
 	}
+}
+
+/** Collab-C7 — the role new shares start at. Viewer unless the user widens
+ *  it; main re-validates (only Viewer / Editor are accepted). */
+function ShareDefaultRoleControl() {
+	const [role, setRole] = useState<RosterRole | null>(null);
+	useEffect(() => {
+		const bridge = window.brainstorm?.sharingSettings;
+		if (!bridge) {
+			setRole(DEFAULT_SHARE_ROLE);
+			return undefined;
+		}
+		let live = true;
+		void bridge
+			.getDefaultRole()
+			.then((value) => live && setRole(parseShareDefaultRole(value)))
+			.catch(() => live && setRole(DEFAULT_SHARE_ROLE));
+		return () => {
+			live = false;
+		};
+	}, []);
+	if (role === null) return null;
+	return (
+		<>
+			<h4 className="settings__section-title identity-section__fingerprint-title">
+				{t("shell.settings.identity.shareDefaultRole")}
+			</h4>
+			<p className="settings__hint">{t("shell.settings.identity.shareDefaultRoleHint")}</p>
+			<SettingSelect<RosterRole>
+				value={role}
+				options={[
+					{ value: RosterRole.Viewer, label: t("shell.settings.identity.shareRoleViewer") },
+					{ value: RosterRole.Editor, label: t("shell.settings.identity.shareRoleEditor") },
+				]}
+				onChange={(next) => {
+					const prior = role;
+					setRole(next);
+					// A refused save (vault locked, main rejects) must not leave the
+					// select showing a role that was never stored.
+					void window.brainstorm.sharingSettings
+						.setDefaultRole(next)
+						.then((applied) => setRole(parseShareDefaultRole(applied)))
+						.catch((error: unknown) => {
+							console.warn("[settings/identity] default share role save failed:", error);
+							setRole(prior);
+						});
+				}}
+				ariaLabel={t("shell.settings.identity.shareDefaultRole")}
+			/>
+		</>
+	);
 }
 
 export function IdentitySection() {
@@ -194,6 +251,7 @@ export function IdentitySection() {
 					</Button>
 				) : null}
 			</div>
+			<ShareDefaultRoleControl />
 		</section>
 	);
 }

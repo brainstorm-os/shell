@@ -33,19 +33,31 @@ import {
 	visibleAttachments,
 	withMentionAttachments,
 } from "@brainstorm-os/sdk/composer-context";
+import { CountBadge, CountBadgeTone } from "@brainstorm-os/sdk/count-badge";
 import { EmptyState } from "@brainstorm-os/sdk/empty-state";
 import { parseIcon } from "@brainstorm-os/sdk/entity-icon";
 import { resolveEntityTitle } from "@brainstorm-os/sdk/entity-title";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { MenuAlign, type SearchPickerItem, openSearchPicker } from "@brainstorm-os/sdk/menus";
 import { closeObjectMenu, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
-import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import {
+	type AutoHidePanelProps,
+	PanelSide,
+	PanelToggleButton,
+	useAutoHidePanel,
+} from "@brainstorm-os/sdk/panel-toggle";
 import { Popover } from "@brainstorm-os/sdk/popover";
-import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
+import {
+	PresenceActivity,
+	PresenceStack,
+	usePresence,
+	useSelf,
+} from "@brainstorm-os/sdk/presence-stack";
 import { ShareDialog, type ShareDialogLabels } from "@brainstorm-os/sdk/share-dialog";
 import { friendlyTypeName } from "@brainstorm-os/sdk/system-entities";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent, ReactElement } from "react";
+import { formatDay, formatTime, navigatorLanguage } from "./format";
 import { plural, t } from "./i18n";
 import { useChatT } from "./i18n-hooks";
 import {
@@ -66,29 +78,39 @@ import {
 	toPanelMembers,
 } from "./logic/chat";
 import { type LocalIdentity, mintPersonRef } from "./logic/identity";
+import { pinnedMessages, readPinned, setPinned } from "./logic/pins";
 import {
 	ProposalDecision,
 	ProposalDecisionFailure,
 	type ProposalDecisionResult,
 	readDecisionResult,
 } from "./logic/proposal";
-import {
-	type ReadWatermarks,
-	ackChannels,
-	channelMaxSeqs,
-	loadWatermarks,
-	saveWatermarks,
-	unreadTotal,
-} from "./logic/unread";
+import { type SearchHit, SearchScope, snippetFor } from "./logic/search";
+import { TYPING_IDLE_MS, typingLabel, typingPeers } from "./logic/typing";
+import { ackChannels, channelMaxSeqs, unreadByChannel } from "./logic/unread";
 import { ProposalCard, type ProposalHost } from "./proposal-card";
 import { getBrainstorm } from "./runtime";
+import { SearchPanel } from "./search-panel";
+import { ChatAction, useChatShortcut } from "./shortcuts";
+import { useChatUserState } from "./use-user-state";
 import "./styles.css";
 
 const DEFAULT_NAME = "You";
 
+/** Where the sovereign self (the synced read-state owner key) stands. */
+enum SelfStatus {
+	Pending = "pending",
+	Resolved = "resolved",
+	Failed = "failed",
+}
+
 const EMPTY_COMPOSER_DRAFT: CompactEditorPayload = { state: "", text: "", html: "", isEmpty: true };
 
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
+
+const FLASH_MS = 2400;
+
+const PENDING_PREFIX = "pending-";
 
 /** A pending optimistic echo of a just-sent message, keyed so it can be dropped
  *  once the persisted twin arrives over the reactive snapshot. */
@@ -251,6 +273,10 @@ export function ChatApp(): ReactElement {
 	}, [storage, attachments]);
 
 	const [pending, setPending] = useState<Pending[]>([]);
+	const [searchOpen, setSearchOpen] = useState(false);
+	const [searchQuery, setSearchQuery] = useState("");
+	const [searchScope, setSearchScope] = useState<SearchScope>(SearchScope.Channel);
+	const [highlight, setHighlight] = useState<{ messageId: string; nonce: number } | null>(null);
 	const [showSidebar, setShowSidebar] = useState(true);
 	const [showMembers, setShowMembers] = useState(false);
 	const [composeNew, setComposeNew] = useState(false);
@@ -279,21 +305,24 @@ export function ChatApp(): ReactElement {
 	// `mintPersonRef` fallback above keeps send working for the brief window before
 	// this resolves (an older personRef-authored message still renders via its
 	// denormalised name, just unlinked from the live roster).
+	const [selfStatus, setSelfStatus] = useState<SelfStatus>(SelfStatus.Pending);
 	useEffect(() => {
 		if (!roster) return;
 		let live = true;
 		roster
 			.self()
 			.then((self) => {
-				if (live)
-					setIdentity({
-						personRef: self.pubkey,
-						displayName: self.displayName || DEFAULT_NAME,
-						...(self.avatarRef ? { avatarRef: self.avatarRef } : {}),
-					});
+				if (!live) return;
+				setIdentity({
+					personRef: self.pubkey,
+					displayName: self.displayName || DEFAULT_NAME,
+					...(self.avatarRef ? { avatarRef: self.avatarRef } : {}),
+				});
+				setSelfStatus(SelfStatus.Resolved);
 			})
 			.catch((err) => {
 				console.warn("[chat] profile load failed; using local identity", err);
+				if (live) setSelfStatus(SelfStatus.Failed);
 			});
 		return () => {
 			live = false;
@@ -311,59 +340,97 @@ export function ChatApp(): ReactElement {
 
 	// PRES-3 — who's-here on the open channel (live avatars, distinct from the
 	// channel MEMBER roster). Cross-device in the shell; empty otherwise.
-	const channelPeers = usePresence(activeChannel?.id ?? null, CHANNEL_TYPE, useSelf());
+	// Chats-4 — typing rides this presence payload (ephemeral, never an
+	// entity). The flag flips on at a burst's first keystroke and off after
+	// TYPING_IDLE_MS quiet / on send / on channel switch: two publishes a burst.
+	const [typing, setTyping] = useState(false);
+	const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const stopTyping = useCallback(() => {
+		if (typingTimerRef.current !== null) clearTimeout(typingTimerRef.current);
+		typingTimerRef.current = null;
+		setTyping(false);
+	}, []);
+	const noteTyping = useCallback(() => {
+		setTyping(true);
+		if (typingTimerRef.current !== null) clearTimeout(typingTimerRef.current);
+		typingTimerRef.current = setTimeout(stopTyping, TYPING_IDLE_MS);
+	}, [stopTyping]);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: a channel switch is the trigger.
+	useEffect(() => stopTyping, [activeId, stopTyping]);
+
+	const channelPeers = usePresence(activeChannel?.id ?? null, CHANNEL_TYPE, useSelf(), {
+		activity: typing ? PresenceActivity.Typing : null,
+	});
+	const typingText = useMemo(() => {
+		const label = typingLabel(typingPeers(channelPeers, identity.personRef));
+		return label ? t(label.key, label.params) : "";
+	}, [channelPeers, identity.personRef]);
 
 	// ── 7.14 — the app-icon unread badge. Seen semantics are app-owned: the
 	// ACTIVE channel is continuously read (you're looking at it); a channel
 	// observed for the first time baselines at its current max seq (history
 	// never badges on first run); everything else counts others' messages
-	// above the per-channel watermark. Watermarks persist in the app-private
-	// kv store; `null` until loaded so a premature 0 never clears a live badge.
-	const [watermarks, setWatermarks] = useState<ReadWatermarks | null>(null);
-	useEffect(() => {
-		if (!storage) {
-			setWatermarks({});
-			return;
-		}
-		let live = true;
-		loadWatermarks(storage)
-			.then((marks) => {
-				if (live) setWatermarks(marks);
-			})
-			.catch(() => {
-				if (live) setWatermarks({});
-			});
-		return () => {
-			live = false;
-		};
-	}, [storage]);
+	// above the per-channel watermark. Chats-2: the watermarks follow the user
+	// on a synced per-user entity (`use-user-state.ts`), migrated once from the
+	// old device-local kv key; nothing acks until they're known, so a premature
+	// 0 never clears a live badge.
+	const userState = useChatUserState({
+		entities,
+		entitiesSvc,
+		storage,
+		canSync: !!roster && selfStatus !== SelfStatus.Failed,
+		ownerRef: selfStatus === SelfStatus.Resolved ? identity.personRef : "",
+		roster,
+	});
+	const { ready: marksReady, watermarks, raiseWatermarks, prefs, setPrefs } = userState;
+	const [composerExpanded, setComposerExpanded] = useState(false);
+	useChatShortcut(ChatAction.ToggleComposer, () => setComposerExpanded((v) => !v), {
+		enabled: !!activeId,
+	});
 
 	useEffect(() => {
-		if (watermarks === null) return;
+		if (!marksReady) return;
 		const maxes = channelMaxSeqs(entities);
 		const toAck = [...maxes.keys()].filter((id) => watermarks[id] === undefined);
 		if (activeId !== null) toAck.push(activeId);
 		const next = ackChannels(watermarks, maxes, toAck);
-		if (next === watermarks) return;
-		setWatermarks(next);
-		if (storage) void saveWatermarks(storage, next).catch(() => undefined);
-	}, [watermarks, entities, activeId, storage]);
+		if (next !== watermarks) raiseWatermarks(next);
+	}, [marksReady, watermarks, entities, activeId, raiseWatermarks]);
 
-	const unread = useMemo(
-		() => (watermarks === null ? 0 : unreadTotal(entities, identity.personRef, watermarks)),
-		[entities, identity.personRef, watermarks],
+	const unreadCounts = useMemo(
+		() =>
+			marksReady
+				? unreadByChannel(entities, identity.personRef, watermarks)
+				: new Map<string, number>(),
+		[marksReady, entities, identity.personRef, watermarks],
 	);
+	const unread = useMemo(() => {
+		let total = 0;
+		for (const n of unreadCounts.values()) total += n;
+		return total;
+	}, [unreadCounts]);
+
+	const markRead = useCallback(
+		(channelIds: readonly string[]) => {
+			if (!marksReady) return;
+			const next = ackChannels(watermarks, channelMaxSeqs(entities), channelIds);
+			if (next !== watermarks) raiseWatermarks(next);
+		},
+		[marksReady, watermarks, entities, raiseWatermarks],
+	);
+	const markAllRead = useCallback(() => markRead(channels.map((c) => c.id)), [markRead, channels]);
+	useChatShortcut(ChatAction.MarkAllRead, markAllRead);
 
 	// Mirror the unread count onto the dashboard app-icon badge (cap
 	// `ui.badge`; the Mailbox pattern). `set({count})` treats count<=0 as a
 	// clear, so draining to all-read clears the chip. Keyed on the derived
 	// count; fire-and-forget and a no-op on shells without the badge service.
 	useEffect(() => {
-		if (watermarks === null) return;
+		if (!marksReady) return;
 		const badge = services?.ui?.badge;
 		if (!badge) return;
 		void badge.set({ count: unread }).catch(() => undefined);
-	}, [unread, watermarks, services]);
+	}, [unread, marksReady, services]);
 
 	const persisted = useMemo(
 		() => (activeId ? channelMessages(entities, activeId) : []),
@@ -512,7 +579,7 @@ export function ChatApp(): ReactElement {
 			const now = new Date().toISOString();
 			const seq = nextSeq(messages);
 			const echo: ChatMessage = {
-				id: `pending-${now}-${seq}`,
+				id: `${PENDING_PREFIX}${now}-${seq}`,
 				channelId: activeId,
 				body: text,
 				...(rich ? { richBody: rich } : {}),
@@ -576,6 +643,108 @@ export function ChatApp(): ReactElement {
 		[roster, activeId, identity.avatarRef],
 	);
 
+	const openSearch = useCallback(
+		(scope: SearchScope) => {
+			setSearchScope(activeId ? scope : SearchScope.All);
+			setSearchOpen(true);
+		},
+		[activeId],
+	);
+	const sidebarAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !showSidebar });
+	useChatShortcut(ChatAction.ToggleSidebar, () => {
+		if (sidebarAutoHide.active) sidebarAutoHide.toggle();
+		else setShowSidebar((v) => !v);
+	});
+	useChatShortcut(ChatAction.Search, () => openSearch(SearchScope.Channel));
+	useChatShortcut(ChatAction.SearchAll, () => openSearch(SearchScope.All));
+	const jumpToHit = useCallback((hit: SearchHit) => {
+		setActiveId(hit.channelId);
+		setHighlight((prev) => ({ messageId: hit.messageId, nonce: (prev?.nonce ?? 0) + 1 }));
+	}, []);
+
+	// Chats-4 — pins live on the channel row. The override shows a pin the
+	// instant it's toggled; it drops once the snapshot carries the same list.
+	const [pinOverride, setPinOverride] = useState<ReadonlyMap<string, readonly string[]>>(
+		() => new Map(),
+	);
+	useEffect(() => {
+		setPinOverride((prev) => {
+			if (prev.size === 0) return prev;
+			let next: Map<string, readonly string[]> | null = null;
+			for (const [id, list] of prev) {
+				const live = channels.find((c) => c.id === id)?.pinned;
+				if (live && live.length === list.length && live.every((x, i) => x === list[i])) {
+					next = next ?? new Map(prev);
+					next.delete(id);
+				}
+			}
+			return next ?? prev;
+		});
+	}, [channels]);
+	const activePinned = useMemo<readonly string[]>(
+		() => (activeChannel ? (pinOverride.get(activeChannel.id) ?? activeChannel.pinned) : []),
+		[activeChannel, pinOverride],
+	);
+	const pinnedSet = useMemo(() => new Set(activePinned), [activePinned]);
+	const pinChainRef = useRef<Promise<void>>(Promise.resolve());
+	const togglePinMessage = useCallback(
+		async (messageId: string) => {
+			if (!entitiesSvc || !activeChannel) return;
+			const channelId = activeChannel.id;
+			const pin = !activePinned.includes(messageId);
+			setPinOverride((prev) => new Map(prev).set(channelId, setPinned(activePinned, messageId, pin)));
+			// Serialized + re-read: the write is the CURRENT stored list with this
+			// one change, so a pin another member (or a rapid second click) landed
+			// meanwhile survives instead of being overwritten by a stale copy.
+			const run = pinChainRef.current.then(async () => {
+				const fresh = await entitiesSvc.get(channelId);
+				const base = fresh ? readPinned(fresh.properties.pinned) : activePinned;
+				const next = setPinned(base, messageId, pin);
+				setPinOverride((prev) => new Map(prev).set(channelId, next));
+				await entitiesSvc.update(channelId, { pinned: next });
+			});
+			pinChainRef.current = run.catch(() => undefined);
+			try {
+				await run;
+			} catch (err) {
+				console.warn("[chat] failed to update pins:", err);
+				setPinOverride((prev) => {
+					const rolled = new Map(prev);
+					rolled.delete(channelId);
+					return rolled;
+				});
+			}
+		},
+		[entitiesSvc, activeChannel, activePinned],
+	);
+	const pinsRef = useRef<HTMLButtonElement>(null);
+	const pinnedList = useMemo(() => pinnedMessages(activePinned, messages), [activePinned, messages]);
+	const openPins = useCallback(() => {
+		const el = pinsRef.current;
+		if (!el) return;
+		const r = el.getBoundingClientRect();
+		const items =
+			pinnedList.length > 0
+				? pinnedList.map((m) => ({
+						label: t("pins.item", {
+							author: m.authorName,
+							text: snippetFor(m.body, []) || t("pins.noText"),
+						}),
+						icon: IconName.Pin,
+						onSelect: () => setHighlight((prev) => ({ messageId: m.id, nonce: (prev?.nonce ?? 0) + 1 })),
+					}))
+				: [{ label: t("pins.empty"), disabled: true }];
+		openAnchoredMenu({ x: r.right, y: r.bottom + 4 }, items, {
+			menuLabel: t("pins.title"),
+			anchor: el,
+			align: MenuAlign.End,
+		});
+	}, [pinnedList]);
+
+	const pinsLabel = activeChannel
+		? plural(pinnedList.length, "pins.open.one", "pins.open.other")
+		: t("pins.disabled");
+
 	const moreRef = useRef<HTMLButtonElement>(null);
 	const [shareOpen, setShareOpen] = useState(false);
 	useEffect(() => closeObjectMenu, []);
@@ -591,6 +760,18 @@ export function ChatApp(): ReactElement {
 					label: t("sidebar.newChannel"),
 					icon: IconName.Plus,
 					onSelect: () => setComposeNew(true),
+				},
+				{
+					label: t("menu.markAllRead"),
+					icon: IconName.Read,
+					shortcut: t("shortcut.markAllRead"),
+					disabled: unread === 0,
+					onSelect: markAllRead,
+				},
+				{
+					label: t("menu.absoluteTimestamps"),
+					selected: prefs.absoluteTimestamps,
+					onSelect: () => setPrefs({ absoluteTimestamps: !prefs.absoluteTimestamps }),
 				},
 				...(canShare
 					? [
@@ -609,7 +790,7 @@ export function ChatApp(): ReactElement {
 			],
 			{ menuLabel: t("header.moreActions"), anchor: el, align: MenuAlign.End },
 		);
-	}, [canShare]);
+	}, [canShare, unread, markAllRead, prefs.absoluteTimestamps, setPrefs]);
 
 	return (
 		<div
@@ -634,6 +815,31 @@ export function ChatApp(): ReactElement {
 				</div>
 				<div className="app-header__right">
 					{channelPeers.length > 0 && <PresenceStack peers={channelPeers} />}
+					<button
+						type="button"
+						className="chat__icon-btn"
+						data-bs-tooltip={t("search.open")}
+						aria-label={t("search.open")}
+						aria-pressed={searchOpen}
+						onClick={() => (searchOpen ? setSearchOpen(false) : openSearch(SearchScope.Channel))}
+						data-testid="search-toggle"
+					>
+						<Icon name={IconName.Search} size={18} />
+					</button>
+					<button
+						ref={pinsRef}
+						type="button"
+						className="chat__icon-btn"
+						data-bs-tooltip={pinsLabel}
+						aria-label={pinsLabel}
+						title={activeChannel ? undefined : pinsLabel}
+						aria-haspopup="menu"
+						disabled={!activeChannel}
+						onClick={openPins}
+						data-testid="pins-toggle"
+					>
+						<Icon name={IconName.Pin} size={18} />
+					</button>
 					<PanelToggleButton
 						side={PanelSide.Left}
 						open={showSidebar}
@@ -666,14 +872,32 @@ export function ChatApp(): ReactElement {
 
 			<div className="chat__body">
 				<ChannelSidebar
-					open={showSidebar}
+					open={sidebarAutoHide.visible}
+					autoHide={sidebarAutoHide.panelProps}
 					channels={channels}
 					activeId={activeId}
+					unreadCounts={unreadCounts}
 					onSelect={setActiveId}
 					onNew={() => setComposeNew(true)}
+					onMarkRead={(id) => markRead([id])}
+					onMarkAllRead={markAllRead}
 				/>
+				{sidebarAutoHide.edgeProps && <div {...sidebarAutoHide.edgeProps} />}
 
 				<main className="chat__main">
+					{searchOpen ? (
+						<SearchPanel
+							entities={entities}
+							activeChannelId={activeChannel?.id ?? null}
+							activeChannelName={activeChannel?.name ?? null}
+							query={searchQuery}
+							scope={searchScope}
+							onQueryChange={setSearchQuery}
+							onScopeChange={setSearchScope}
+							onSelect={jumpToHit}
+							onClose={() => setSearchOpen(false)}
+						/>
+					) : null}
 					{activeChannel ? (
 						<>
 							<MessageView
@@ -682,10 +906,21 @@ export function ChatApp(): ReactElement {
 								avatarByAuthor={avatarByAuthor}
 								emptyName={activeChannel.name}
 								proposalHost={proposalHost}
+								highlight={highlight}
+								absoluteTimestamps={prefs.absoluteTimestamps}
+								pinnedIds={pinnedSet}
+								onTogglePin={entitiesSvc ? (id) => void togglePinMessage(id) : null}
 							/>
 							<Composer
+								expanded={composerExpanded}
+								onToggleExpanded={() => setComposerExpanded((v) => !v)}
 								channelName={activeChannel.name}
-								onSend={sendMessage}
+								typingText={typingText}
+								onDraftChange={noteTyping}
+								onSend={(body, rich, atts) => {
+									stopTyping();
+									void sendMessage(body, rich, atts);
+								}}
 								disabled={!entitiesSvc}
 								host={contextHost}
 								attachments={attachments}
@@ -751,21 +986,54 @@ export function ChatApp(): ReactElement {
 
 function ChannelSidebar({
 	open,
+	autoHide,
 	channels,
 	activeId,
+	unreadCounts,
 	onSelect,
 	onNew,
+	onMarkRead,
+	onMarkAllRead,
 }: {
 	/** The CSS guard lands only at the END of the 180ms slide (F-489); `inert`
 	 *  removes the panel from the tab order and the a11y tree immediately. */
 	open: boolean;
+	/** 7.15 — auto-hide overlay wiring from `useAutoHidePanel`. */
+	autoHide?: AutoHidePanelProps;
 	channels: readonly ChatChannel[];
 	activeId: string | null;
+	unreadCounts: ReadonlyMap<string, number>;
 	onSelect: (id: string) => void;
 	onNew: () => void;
+	onMarkRead: (channelId: string) => void;
+	onMarkAllRead: () => void;
 }): ReactElement {
+	const anyUnread = unreadCounts.size > 0;
+	const openChannelMenu = (event: MouseEvent, channelId: string): void => {
+		event.preventDefault();
+		openAnchoredMenu(
+			{ x: event.clientX, y: event.clientY },
+			[
+				{
+					label: t("menu.markRead"),
+					icon: IconName.Read,
+					disabled: !unreadCounts.has(channelId),
+					onSelect: () => onMarkRead(channelId),
+				},
+				{
+					label: t("menu.markAllRead"),
+					icon: IconName.Read,
+					shortcut: t("shortcut.markAllRead"),
+					disabled: !anyUnread,
+					onSelect: onMarkAllRead,
+				},
+			],
+			{ menuLabel: t("sidebar.channelMenu") },
+		);
+	};
 	return (
 		<nav
+			{...autoHide}
 			className="chat__sidebar"
 			aria-label={t("sidebar.channels")}
 			aria-hidden={open ? undefined : true}
@@ -787,21 +1055,41 @@ function ChannelSidebar({
 				<p className="chat__sidebar-empty">{t("sidebar.empty")}</p>
 			) : (
 				<ul className="chat__channel-list">
-					{channels.map((c) => (
-						<li key={c.id}>
-							<button
-								type="button"
-								className={`chat__channel${c.id === activeId ? " chat__channel--active" : ""}`}
-								aria-current={c.id === activeId ? "true" : undefined}
-								onClick={() => onSelect(c.id)}
-							>
-								<span className="chat__channel-hash" aria-hidden="true">
-									#
-								</span>
-								<span className="chat__channel-name">{c.name}</span>
-							</button>
-						</li>
-					))}
+					{channels.map((c) => {
+						const count = unreadCounts.get(c.id) ?? 0;
+						const active = c.id === activeId;
+						return (
+							<li key={c.id}>
+								<button
+									type="button"
+									className={`chat__channel${active ? " chat__channel--active" : ""}${count > 0 ? " chat__channel--unread" : ""}`}
+									aria-current={active ? "true" : undefined}
+									aria-label={
+										count > 0
+											? plural(count, "sidebar.channelUnread.one", "sidebar.channelUnread.other", {
+													name: c.name,
+												})
+											: undefined
+									}
+									onClick={() => onSelect(c.id)}
+									onContextMenu={(e) => openChannelMenu(e.nativeEvent, c.id)}
+								>
+									<span className="chat__channel-hash" aria-hidden="true">
+										#
+									</span>
+									<span className="chat__channel-name">{c.name}</span>
+									{count > 0 ? (
+										<CountBadge
+											count={count}
+											max={99}
+											tone={active ? CountBadgeTone.Accent : CountBadgeTone.Neutral}
+											className="chat__channel-badge"
+										/>
+									) : null}
+								</button>
+							</li>
+						);
+					})}
 				</ul>
 			)}
 		</nav>
@@ -855,13 +1143,45 @@ function MessageView({
 	avatarByAuthor,
 	emptyName,
 	proposalHost,
+	highlight,
+	absoluteTimestamps,
+	pinnedIds,
+	onTogglePin,
 }: {
 	channel: ChatChannel;
 	groups: ReturnType<typeof groupMessages>;
 	avatarByAuthor: ReadonlyMap<string, string>;
 	emptyName: string;
 	proposalHost: ProposalHost;
+	/** Chats-1 — a search jump target; `nonce` re-fires a repeat pick. */
+	highlight: { messageId: string; nonce: number } | null;
+	/** Chats-3 — full date + time instead of Today / Yesterday + clock. */
+	absoluteTimestamps: boolean;
+	/** Chats-4 — this channel's pinned message ids. */
+	pinnedIds: ReadonlySet<string>;
+	/** Null when the host can't write the channel (no pin affordance). */
+	onTogglePin: ((messageId: string) => void) | null;
 }): ReactElement {
+	const openMessageMenu = (
+		point: { x: number; y: number },
+		m: ChatMessage,
+		anchor?: HTMLElement,
+	) => {
+		if (!onTogglePin) return;
+		const pinned = pinnedIds.has(m.id);
+		openAnchoredMenu(
+			point,
+			[
+				{
+					label: pinned ? t("pins.unpin") : t("pins.pin"),
+					icon: pinned ? IconName.PinSlash : IconName.Pin,
+					disabled: m.id.startsWith(PENDING_PREFIX),
+					onSelect: () => onTogglePin(m.id),
+				},
+			],
+			{ menuLabel: t("message.menu"), ...(anchor ? { anchor, align: MenuAlign.End } : {}) },
+		);
+	};
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const count = groups.reduce((n, g) => n + g.messages.length, 0);
 	// Pin to the latest message as the transcript grows. `count` both gates the
@@ -871,6 +1191,24 @@ function MessageView({
 		const el = scrollRef.current;
 		if (el) el.scrollTop = el.scrollHeight;
 	}, [count]);
+
+	// Declared after the pin-to-latest effect so a jump that also switched
+	// channels lands on the hit, not the bottom.
+	const [flashId, setFlashId] = useState<string | null>(null);
+	const targetId = highlight?.messageId ?? null;
+	const targetNonce = highlight?.nonce ?? 0;
+	useEffect(() => {
+		if (!targetId || targetNonce === 0 || !channel.id) return;
+		const host = scrollRef.current;
+		const el = [...(host?.querySelectorAll<HTMLElement>("[data-message-id]") ?? [])].find(
+			(node) => node.dataset.messageId === targetId,
+		);
+		if (!el) return;
+		el.scrollIntoView?.({ block: "center" });
+		setFlashId(targetId);
+		const timer = setTimeout(() => setFlashId(null), FLASH_MS);
+		return () => clearTimeout(timer);
+	}, [targetId, targetNonce, channel.id]);
 
 	if (groups.length === 0) {
 		return (
@@ -894,7 +1232,7 @@ function MessageView({
 				const avatarRef = avatarByAuthor.get(g.authorRef);
 				return (
 					<div key={`${channel.id}-${first?.id ?? i}`}>
-						{showDivider ? <DayDivider dayKey={g.dayKey} /> : null}
+						{showDivider ? <DayDivider dayKey={g.dayKey} absolute={absoluteTimestamps} /> : null}
 						<article className="chat__group">
 							<Avatar name={g.authorName} color={g.color} {...(avatarRef ? { avatarRef } : {})} />
 							<div className="chat__group-body">
@@ -903,13 +1241,48 @@ function MessageView({
 										{g.authorName}
 									</span>
 									<time className="chat__time" dateTime={first?.createdAt}>
-										{formatTime(first?.createdAt ?? "")}
+										{formatTime(first?.createdAt ?? "", absoluteTimestamps)}
 									</time>
 								</header>
 								{g.messages.map((m) => {
 									const chips = visibleAttachments(m);
 									return (
-										<div key={m.id} className="chat__line-wrap">
+										<div
+											key={m.id}
+											className={`chat__line-wrap${m.id === flashId ? " chat__line-wrap--flash" : ""}${pinnedIds.has(m.id) ? " chat__line-wrap--pinned" : ""}`}
+											data-message-id={m.id}
+											onContextMenu={(e) => {
+												if (!onTogglePin) return;
+												e.preventDefault();
+												openMessageMenu({ x: e.clientX, y: e.clientY }, m);
+											}}
+										>
+											{pinnedIds.has(m.id) ? (
+												<span
+													className="chat__line-pin"
+													role="img"
+													aria-label={t("pins.pinned")}
+													title={t("pins.pinned")}
+												>
+													<Icon name={IconName.Pin} size={12} />
+												</span>
+											) : null}
+											{onTogglePin ? (
+												<button
+													type="button"
+													className="chat__icon-btn chat__line-more"
+													aria-label={t("message.menu")}
+													aria-haspopup="menu"
+													data-bs-tooltip={t("message.menu")}
+													onClick={(e) => {
+														const el = e.currentTarget;
+														const r = el.getBoundingClientRect();
+														openMessageMenu({ x: r.right, y: r.bottom + 4 }, m, el);
+													}}
+												>
+													<Icon name={IconName.More} size={14} />
+												</button>
+											) : null}
 											{m.richBody ? (
 												<div className="chat__line chat__line--rich bs-editor bs-editor--readonly">
 													{renderEditorState(m.richBody)}
@@ -942,10 +1315,10 @@ function MessageView({
 	);
 }
 
-function DayDivider({ dayKey }: { dayKey: string }): ReactElement {
+function DayDivider({ dayKey, absolute }: { dayKey: string; absolute: boolean }): ReactElement {
 	return (
 		<div className="chat__day">
-			<span className="chat__day-label">{formatDay(dayKey)}</span>
+			<span className="chat__day-label">{formatDay(dayKey, absolute)}</span>
 		</div>
 	);
 }
@@ -953,7 +1326,11 @@ function DayDivider({ dayKey }: { dayKey: string }): ReactElement {
 // ───────────────────────────── composer ─────────────────────────────
 
 function Composer({
+	expanded,
+	onToggleExpanded,
 	channelName,
+	typingText,
+	onDraftChange,
 	onSend,
 	disabled,
 	host,
@@ -961,7 +1338,14 @@ function Composer({
 	onLinkDocument,
 	onUploadMedia,
 }: {
+	/** Chats-3 — the taller drafting mode (`chat.toggle-composer`). */
+	expanded: boolean;
+	onToggleExpanded: () => void;
 	channelName: string;
+	/** Chats-4 — "Ada is typing…", or "" when nobody is. */
+	typingText: string;
+	/** Fires on each non-empty draft edit (drives the typing presence). */
+	onDraftChange: () => void;
 	onSend: (body: string, richBody: string, atts: readonly MessageAttachment[]) => void;
 	disabled: boolean;
 	host: ComposerContextHost;
@@ -990,9 +1374,13 @@ function Composer({
 	const placeholder = t("composer.placeholder", { name: channelName });
 	return (
 		<div
-			className={`chat__composer-wrap${objectDrop.isOver ? " chat__composer-wrap--drop" : ""}`}
+			className={`chat__composer-wrap${objectDrop.isOver ? " chat__composer-wrap--drop" : ""}${expanded ? " chat__composer-wrap--expanded" : ""}`}
+			data-testid="composer"
 			{...objectDrop.dropProps}
 		>
+			<p className="chat__typing" aria-live="polite" data-testid="typing">
+				{typingText}
+			</p>
 			<ComposerContextRail
 				attachments={attachments.attachments}
 				onRemove={attachments.remove}
@@ -1019,8 +1407,10 @@ function Composer({
 					disabled={disabled}
 					additionalNodes={[MentionNode]}
 					onChange={(p) => {
+						const changed = p.text !== draftRef.current.text;
 						draftRef.current = p;
 						setDraftEmpty(p.isEmpty);
+						if (changed && !p.isEmpty) onDraftChange();
 					}}
 					onSubmit={commit}
 				>
@@ -1035,6 +1425,17 @@ function Composer({
 						emptyLabel={t("composer.attach.empty")}
 					/>
 				</CompactEditor>
+				<button
+					type="button"
+					className="chat__icon-btn chat__composer-expand"
+					aria-pressed={expanded}
+					aria-label={expanded ? t("composer.collapse") : t("composer.expand")}
+					data-bs-tooltip={expanded ? t("composer.collapse") : t("composer.expand")}
+					onClick={onToggleExpanded}
+					data-testid="composer-expand"
+				>
+					<Icon name={expanded ? IconName.CaretDown : IconName.CaretUp} size={16} />
+				</button>
 				<button
 					type="button"
 					className="chat__send"
@@ -1224,37 +1625,4 @@ function IdentityPopover({
 			</label>
 		</Popover>
 	);
-}
-
-// ───────────────────────────── formatting ─────────────────────────────
-
-function navigatorLanguage(): string {
-	return typeof navigator !== "undefined" ? navigator.language || "en" : "en";
-}
-
-/** `HH:MM` in the user's locale; "" for an unparseable stamp. */
-function formatTime(iso: string): string {
-	const ms = Date.parse(iso);
-	if (!Number.isFinite(ms)) return "";
-	return new Date(ms).toLocaleTimeString(navigatorLanguage(), {
-		hour: "2-digit",
-		minute: "2-digit",
-	});
-}
-
-/** A friendly day-divider label: Today / Yesterday / a localized date. */
-function formatDay(dayKey: string): string {
-	const ms = Date.parse(dayKey);
-	if (!Number.isFinite(ms)) return dayKey;
-	const that = new Date(ms);
-	const now = new Date();
-	const startOf = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-	const diffDays = Math.round((startOf(now) - startOf(that)) / 86_400_000);
-	if (diffDays === 0) return t("day.today");
-	if (diffDays === 1) return t("day.yesterday");
-	return that.toLocaleDateString(navigatorLanguage(), {
-		weekday: "long",
-		month: "short",
-		day: "numeric",
-	});
 }

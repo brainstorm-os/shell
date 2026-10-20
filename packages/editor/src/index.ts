@@ -100,7 +100,45 @@ export {
 	type BlockGutterPluginProps,
 	BlockGutterPlugin,
 } from "./plugins/block-gutter-plugin";
-export { useEditorShortcut } from "./plugins/editor-shortcut";
+export { isEventInNestedEditor, useEditorShortcut } from "./plugins/editor-shortcut";
+export { TaskCheckbox } from "./task-checkbox";
+export {
+	TASK_CHECK_ATTR,
+	TASK_ENTITY_TYPE,
+	isTaskClosed,
+	isTaskDone,
+	isTaskWontDo,
+	newTaskProperties,
+	taskCompletionPatch,
+} from "./task-entity";
+export { createTaskCommand, insertTaskMention, newTaskId, taskPickerRows } from "./task-mention";
+export {
+	$canHaveBlockBackground,
+	BLOCK_BACKGROUND_ATTR,
+	BLOCK_BACKGROUND_STYLE_PROP,
+	BackgroundSwatch,
+	BlockBackgroundPlugin,
+	applyBlockBackground,
+	blockBackgroundExportCss,
+	blockBackgroundToken,
+	createBlockBackgroundActions,
+	readBlockBackground,
+	registerBlockBackground,
+	serializedStateWithBlockStyles,
+	swatchLabel,
+	withBlockBackground,
+} from "./block-background";
+export {
+	INSERT_MENU_CHORDS,
+	InsertPosition,
+	type OpenInsertMenuOptions,
+	createInsertBlockActions,
+	insertBlockWithCommand,
+	insertEmptyBlock,
+	insertMenuRows,
+	openInsertMenu,
+	pickInsertTarget,
+} from "./plugins/insert-menu";
 export {
 	type SlashMenuPluginProps,
 	SlashMenuPlugin,
@@ -146,8 +184,13 @@ export {
 	Heading1Icon,
 	Heading2Icon,
 	Heading3Icon,
+	BlockBackgroundIcon,
 	ImageIcon,
 	IndentIcon,
+	InsertAboveIcon,
+	InsertBelowIcon,
+	TaskIcon,
+	TurnIntoPageIcon,
 	InlineCodeIcon,
 	ItalicIcon,
 	LinkIcon,
@@ -176,6 +219,7 @@ export {
 	VideoIcon,
 } from "./icons";
 export { ColumnsPlugin, INSERT_COLUMNS_COMMAND } from "./plugins/columns-plugin";
+export { INSERT_TABS_COMMAND, TabsPlugin } from "./plugins/tabs-plugin";
 export { EditablePlugin, type EditablePluginProps } from "./plugins/editable-plugin";
 export { InitialFocusPlugin } from "./plugins/initial-focus-plugin";
 export { TablesPlugin } from "./plugins/table-plugin";
@@ -256,6 +300,22 @@ export {
 	type SerializedImageBlockNode,
 } from "./nodes/image-block-node";
 export {
+	$createInlineImageNode,
+	$isInlineImageNode,
+	DEFAULT_INLINE_IMAGE_HEIGHT_EM,
+	INLINE_IMAGE_TYPE,
+	InlineImageNode,
+	type SerializedInlineImageNode,
+} from "./nodes/inline-image-node";
+export {
+	VaultMediaFilter,
+	type VaultMedia,
+	filterVaultMedia,
+	isImageMime,
+	vaultMediaFromEntity,
+} from "./vault-media";
+export { openVaultMediaPicker, type VaultMediaPick } from "./vault-media-picker";
+export {
 	$createVideoBlockNode,
 	$isVideoBlockNode,
 	VIDEO_BLOCK_TYPE,
@@ -279,9 +339,11 @@ export {
 } from "./nodes/file-block-node";
 export {
 	type EditorBlocksHost,
+	type EditorEntitiesHost,
 	type EditorHost,
 	type EditorUploadFn,
 	type EditorUploadResult,
+	editorEntitiesHost,
 	getEditorHost,
 	setEditorHost,
 } from "./plugins/editor-host";
@@ -303,7 +365,9 @@ export {
 	fetchEntities,
 	getEntityDisplayIcon,
 	getEntityIcon,
+	getEntityProperties,
 	getEntityTitle,
+	getEntityType,
 	setEntityIndexSource,
 	subscribeEntityIcons,
 	subscribeEntityTitles,
@@ -480,6 +544,18 @@ export {
 	type SerializedColumnsNode,
 } from "./nodes/columns-node";
 export {
+	$createTabPaneNode,
+	$createTabsNode,
+	$isTabPaneNode,
+	$isTabsNode,
+	type SerializedTabPaneNode,
+	type SerializedTabsNode,
+	TAB_PANE_NODE_TYPE,
+	TABS_NODE_TYPE,
+	TabPaneNode,
+	TabsNode,
+} from "./nodes/tabs-node";
+export {
 	$createTitleNode,
 	$isTitleNode,
 	TITLE_NODE_TYPE,
@@ -515,6 +591,7 @@ export {
 	type CompactEditorProps,
 	CompactEditor,
 } from "./compact-editor";
+export { RichTextPropertyEditor, richTextValueFromPayload } from "./rich-text-property-editor";
 export {
 	type MentionComposerHandle,
 	type MentionComposerPluginProps,
@@ -649,6 +726,7 @@ export {
 } from "./preview";
 export { serializedStateToHtml } from "./serialize-html";
 export { serializedStateToMarkdown } from "./serialize-markdown";
+export { serializedStateFromDoc } from "./serialized-state-from-doc";
 export { baselineTheme, mergeTheme, richTextTheme } from "./theme";
 export {
 	blockParentOf,

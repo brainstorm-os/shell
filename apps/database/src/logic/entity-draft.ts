@@ -23,7 +23,9 @@ import {
 	type FilterNode,
 	FilterNodeKind,
 	type PropertyPredicate,
+	type PropertyRef,
 	type ScalarValue,
+	isHostRef,
 	isPropertyRef,
 } from "../types/predicate";
 
@@ -47,6 +49,9 @@ export type DraftInputs = {
 	source: ListSource | null;
 	viewFilters: FilterNode | null;
 	defaultTypeUrl: string | null;
+	/** The host an embedded view renders inside (9.12.24): a `$host` pin
+	 *  ("author contains this object") pre-fills the new row with it. */
+	hostEntityId?: string;
 };
 
 /**
@@ -61,11 +66,12 @@ export type DraftInputs = {
 export function draftForList(inputs: DraftInputs): EntityDraft {
 	const properties: Record<string, DraftValue> = {};
 
+	const host = inputs.hostEntityId;
 	for (const pred of collectAndOnlyPredicates(inputs.source)) {
-		pinFromPredicate(pred, properties);
+		pinFromPredicate(pred, properties, host);
 	}
 	for (const pred of collectAndOnlyPredicatesFromFilterNode(inputs.viewFilters)) {
-		pinFromPredicate(pred, properties);
+		pinFromPredicate(pred, properties, host);
 	}
 
 	const draft: EntityDraft = { properties };
@@ -117,10 +123,24 @@ export function collectAndOnlyPredicatesFromFilterNode(
 	return node.children.flatMap(collectAndOnlyPredicatesFromFilterNode);
 }
 
+/** The concrete value a predicate RHS pins, or `undefined`: literals pass,
+ *  `$host` becomes the host id (if any), every other ref pins nothing. */
+function pinnable(
+	value: ScalarValue | PropertyRef,
+	host: string | undefined,
+): ScalarValue | undefined {
+	if (!isPropertyRef(value)) return value;
+	return isHostRef(value) ? host : undefined;
+}
+
 /** Drain a `PropertyPredicate` into `out` if it pins a property. Mutates `out`. */
-function pinFromPredicate(pred: PropertyPredicate, out: Record<string, DraftValue>): void {
+function pinFromPredicate(
+	pred: PropertyPredicate,
+	out: Record<string, DraftValue>,
+	host: string | undefined,
+): void {
 	if ("$and" in pred) {
-		for (const child of pred.$and) pinFromPredicate(child, out);
+		for (const child of pred.$and) pinFromPredicate(child, out, host);
 		return;
 	}
 	// $or / $not — non-pinnable; user picks at create time.
@@ -129,8 +149,10 @@ function pinFromPredicate(pred: PropertyPredicate, out: Record<string, DraftValu
 	if ("$eq" in pred) {
 		for (const [path, value] of Object.entries(pred.$eq)) {
 			// A computed RHS (another property / the clock) isn't a concrete
-			// default the new entity should hold — skip it (9.12.21).
-			if (!isPropertyRef(value)) out[path] = value;
+			// default the new entity should hold — skip it (9.12.21); the host
+			// is, when there is one (9.12.24).
+			const pinned = pinnable(value, host);
+			if (pinned !== undefined) out[path] = pinned;
 		}
 		return;
 	}
@@ -143,7 +165,9 @@ function pinFromPredicate(pred: PropertyPredicate, out: Record<string, DraftValu
 		return;
 	}
 	if ("$contains" in pred) {
-		for (const [path, value] of Object.entries(pred.$contains)) {
+		for (const [path, raw] of Object.entries(pred.$contains)) {
+			const value = pinnable(raw, host);
+			if (value === undefined) continue;
 			const existing = out[path];
 			if (Array.isArray(existing)) {
 				out[path] = existing.includes(value) ? existing : [...existing, value];

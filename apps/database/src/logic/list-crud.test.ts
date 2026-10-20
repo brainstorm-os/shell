@@ -13,6 +13,8 @@ import {
 	renameList,
 	renameView,
 	resolveListView,
+	seedColumnsForNewView,
+	setListDescription,
 	setListIcon,
 	uniqueName,
 } from "./list-crud";
@@ -120,6 +122,21 @@ describe("renameList", () => {
 		const list = emptyList("a", "Tasks");
 		expect(renameList(list, "Tasks")).toBe(list);
 		expect(renameList(list, "   ")).toBe(list);
+	});
+});
+
+describe("setListDescription (9.12.27)", () => {
+	test("trims and updates the description + updatedAt", () => {
+		const list = emptyList("a", "Tasks");
+		const next = setListDescription(list, "  Everything due this week  ");
+		expect(next.description).toBe("Everything due this week");
+		expect(next.updatedAt).toBeGreaterThan(list.updatedAt);
+	});
+
+	test("clears to empty, and returns the same instance when unchanged", () => {
+		const described = { ...emptyList("a", "Tasks"), description: "Due soon" };
+		expect(setListDescription(described, "   ").description).toBe("");
+		expect(setListDescription(described, "Due soon ")).toBe(described);
 	});
 });
 
@@ -262,5 +279,66 @@ describe("resolveListView", () => {
 
 	test("returns undefined for a List with no views", () => {
 		expect(resolveListView([], "v1", "v1")).toBeUndefined();
+	});
+});
+
+describe("a locked List is read-only in the pure CRUD (9.16.14 at-commit)", () => {
+	const locked: List = { ...emptyList("l1", "Sprint"), locked: true };
+
+	test("rename, description and icon return the same object", () => {
+		expect(renameList(locked, "Renamed")).toBe(locked);
+		expect(setListDescription(locked, "A description")).toBe(locked);
+		expect(setListIcon(locked, { kind: IconKind.Emoji, value: "📁" })).toBe(locked);
+	});
+
+	test("delete keeps the List and its views", () => {
+		const views = [emptyView("v1", "l1", "Grid"), emptyView("v2", "l2", "Grid")];
+		const result = deleteList([locked, emptyList("l2", "Other")], views, "l1");
+		expect(result.lists.map((l) => l.id)).toEqual(["l1", "l2"]);
+		expect(result.views.map((v) => v.id)).toEqual(["v1", "v2"]);
+	});
+});
+
+describe("seedColumnsForNewView (F-511c)", () => {
+	const withColumns = (id: string, columns: ListView["columns"]): ListView => ({
+		...emptyView(id, "a", id),
+		columns,
+	});
+	const grid = withColumns("grid", [
+		{ propertyId: "status", visible: true, width: 160 },
+		{ propertyId: "secret", visible: false },
+		{ propertyId: "url", visible: true },
+	]);
+	const other = withColumns("other", [{ propertyId: "owner", visible: true }]);
+
+	test("copies the visible columns of the view the user is looking at", () => {
+		expect(seedColumnsForNewView([other, grid], "grid")).toEqual([
+			{ propertyId: "status", visible: true, width: 160 },
+			{ propertyId: "url", visible: true },
+		]);
+	});
+
+	test("falls back to the list's first view when no sibling is active", () => {
+		expect(seedColumnsForNewView([other, grid], null).map((c) => c.propertyId)).toEqual(["owner"]);
+	});
+
+	test("yields no columns for a list without views", () => {
+		expect(seedColumnsForNewView([], "grid")).toEqual([]);
+	});
+
+	test("copies, never shares, the column specs", () => {
+		const seeded = seedColumnsForNewView([grid], "grid");
+		expect(seeded[0]).not.toBe(grid.columns[0]);
+	});
+
+	test("createView carries the seeded columns onto the new view", () => {
+		const v = createView({
+			listId: "a",
+			name: "Gallery",
+			kind: ListViewKind.Gallery,
+			existingViewsForList: [grid],
+			columns: seedColumnsForNewView([grid], "grid"),
+		});
+		expect(v.columns.map((c) => c.propertyId)).toEqual(["status", "url"]);
 	});
 });

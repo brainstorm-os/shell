@@ -50,6 +50,17 @@ export function indexOfId(state: HostState, id: string): number {
 	return -1;
 }
 
+/** Drop a sibling (e.g. it was moved to the Bin) and keep the cursor on the
+ *  file that slid into its place — the next one, or the new last one when
+ *  the removed file was last. Unknown ids leave the state unchanged. */
+export function removeById(state: HostState, id: string): HostState {
+	const index = indexOfId(state, id);
+	if (index < 0) return state;
+	const siblings = state.siblings.filter((_, i) => i !== index);
+	const cursor = state.cursor > index ? state.cursor - 1 : state.cursor;
+	return { siblings, cursor: clampCursor(cursor, siblings.length) };
+}
+
 function wrap(n: number, len: number): number {
 	if (len <= 0) return 0;
 	return ((n % len) + len) % len;

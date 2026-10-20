@@ -194,7 +194,9 @@
    auto-grow textarea mounted — every row below jumped. */
 :root
 	.bs-props__row-value
-	> :first-child:not(.bs-cell-multiline):not(.bs-cell-multiline-input) {
+	> :first-child:not(.bs-cell-multiline):not(.bs-cell-multiline-input):not(
+		.bs-cell-richtext-editor
+	) {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;

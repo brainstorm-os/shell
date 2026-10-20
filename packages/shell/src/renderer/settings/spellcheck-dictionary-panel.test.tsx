@@ -15,6 +15,7 @@ type Stub = {
 	listWords: ReturnType<typeof vi.fn>;
 	removeWord: ReturnType<typeof vi.fn>;
 	languages: ReturnType<typeof vi.fn>;
+	setLanguages: ReturnType<typeof vi.fn>;
 };
 
 let stub: Stub;
@@ -25,7 +26,12 @@ beforeEach(() => {
 	stub = {
 		listWords: vi.fn().mockResolvedValue(["Brainstorm", "Yjs"]),
 		removeWord: vi.fn().mockResolvedValue(["Yjs"]),
-		languages: vi.fn().mockResolvedValue({ active: ["en-US"], available: ["en-US"] }),
+		languages: vi
+			.fn()
+			.mockResolvedValue({ active: ["en-US"], available: ["en-US", "de"], chosen: null }),
+		setLanguages: vi
+			.fn()
+			.mockResolvedValue({ active: ["en-US"], available: ["en-US", "de"], chosen: null }),
 	};
 	(globalThis as { window?: unknown }).window = globalThis.window ?? {};
 	(window as unknown as { brainstorm: { spellcheck: Stub } }).brainstorm = { spellcheck: stub };
@@ -69,5 +75,42 @@ describe("SpellcheckDictionaryPanel", () => {
 			root.render(<SpellcheckDictionaryPanel />);
 		});
 		expect(host.textContent).toContain("No custom words yet");
+	});
+
+	it("offers the available dictionaries as an editable spelling-language picker", async () => {
+		await act(async () => {
+			root.render(<SpellcheckDictionaryPanel />);
+		});
+		const picker = host.querySelector<HTMLButtonElement>(
+			'button.bs-select[aria-label="Spelling languages"]',
+		);
+		expect(picker).not.toBeNull();
+		expect(host.textContent).toContain("Following your system languages");
+		expect(host.textContent).not.toContain("Use system languages");
+	});
+
+	it("shows the saved choice with a reset back to the system languages", async () => {
+		stub.languages.mockResolvedValue({ active: ["de"], available: ["en-US", "de"], chosen: ["de"] });
+		await act(async () => {
+			root.render(<SpellcheckDictionaryPanel />);
+		});
+		const reset = Array.from(host.querySelectorAll("button")).find((b) =>
+			b.textContent?.includes("Use system languages"),
+		);
+		expect(reset).toBeDefined();
+		await act(async () => {
+			reset?.click();
+		});
+		expect(stub.setLanguages).toHaveBeenCalledWith(null);
+		expect(host.textContent).toContain("Following your system languages");
+	});
+
+	it("keeps the read-only auto-detect note where the platform exposes no list (macOS)", async () => {
+		stub.languages.mockResolvedValue({ active: [], available: [], chosen: null });
+		await act(async () => {
+			root.render(<SpellcheckDictionaryPanel />);
+		});
+		expect(host.querySelector("button.bs-select")).toBeNull();
+		expect(host.textContent).toContain("detected automatically");
 	});
 });

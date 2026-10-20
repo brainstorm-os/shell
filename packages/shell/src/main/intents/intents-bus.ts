@@ -349,6 +349,10 @@ export type IntentsBusOptions = {
 	 *  Resolved once per call (off the active vault's dashboard doc); absent ⇒
 	 *  nothing is disabled. */
 	resolveDisabledContributors?: () => ReadonlySet<string> | Promise<ReadonlySet<string>>;
+	/** 9.22.7 — told the id of every entity an `open` actually delivered, so
+	 *  the launcher can list recent objects. Fire-and-forget: a throw here
+	 *  never fails the open. */
+	onEntityOpened?: (entityId: string) => void;
 };
 
 export class IntentsBus {
@@ -546,12 +550,24 @@ export class IntentsBus {
 		}
 
 		const launched = await this.launchInto(handler.appId, launchContext, envelope, source);
+		this.noteEntityOpened(envelope, launched);
 		// The entity-flow + verb-with-explicit-handler paths land here.
 		// Stamp `InVaultOpeners` so the renderer-side explainer (OpenRes-1c)
 		// can surface "Opened in <App>" toasts uniformly. The external-open
 		// branch stamps its own rung via `stampRung(...)` on each arm
 		// (InVaultOpeners / StoredDefault / OsHandoff / Refused).
 		return stampRung(launched, OpenRung.InVaultOpeners);
+	}
+
+	private noteEntityOpened(envelope: IntentEnvelope, result: IntentDispatchResult): void {
+		if (envelope.verb !== OPEN_VERB || !result.handled || !this.options.onEntityOpened) return;
+		const entityId = stringOrUndefined(envelope.payload.entityId);
+		if (!entityId) return;
+		try {
+			this.options.onEntityOpened(entityId);
+		} catch (error) {
+			console.warn("[brainstorm] intents: onEntityOpened failed:", error);
+		}
 	}
 
 	/**
@@ -573,8 +589,9 @@ export class IntentsBus {
 		const route = launchContext.reason === "open-entity" ? entityRoute(launchContext.entityId) : null;
 
 		// Focus-existing: a plain click or new-tab on an already-open route focuses
-		// that tab instead of opening a duplicate. Explicit new-window skips it.
-		if (route && mode !== NavigationMode.NewWindow) {
+		// that tab instead of opening a duplicate. Explicit new-window and
+		// open-to-the-side skip it — both ask for a second view on purpose.
+		if (route && mode !== NavigationMode.NewWindow && mode !== NavigationMode.NewPanel) {
 			const focused = this.options.launcher?.focusTabByRoute?.(route);
 			if (focused) return { handled: true, handler: { appId, windowId: focused.windowId } };
 		}
@@ -585,6 +602,8 @@ export class IntentsBus {
 				window = await this.options.orchestrator.openInNewWindow({ appId, launch: launchContext });
 			} else if (mode === NavigationMode.NewTab) {
 				window = await this.openInNewTab(appId, launchContext, source);
+			} else if (mode === NavigationMode.NewPanel) {
+				window = await this.openToSide(appId, launchContext, source);
 			} else {
 				// Replace — focus/create the app's main window; if it was already
 				// running, push the intent so the renderer navigates in place.
@@ -624,6 +643,29 @@ export class IntentsBus {
 			return this.options.orchestrator.addTab(targetContainerId, { appId, launch: launchContext });
 		}
 		return this.options.orchestrator.launch({ appId, launch: launchContext });
+	}
+
+	/** Split view (6.14): open beside the SOURCE pane, in the source's window.
+	 *  Only a source that is itself an app pane has a window to split; a
+	 *  dashboard / shell-sourced open, or a window that refuses a split, falls
+	 *  back to new-tab placement so the open is never lost. */
+	private async openToSide(
+		appId: string,
+		launchContext: LaunchContext,
+		source: { app: string; webContentsId?: number },
+	): Promise<AppWindow> {
+		const containerId =
+			source.webContentsId !== undefined
+				? (this.options.launcher?.containerIdForWebContents(source.webContentsId) ?? null)
+				: null;
+		if (containerId) {
+			const side = await this.options.orchestrator.openSidePane(containerId, {
+				appId,
+				launch: launchContext,
+			});
+			if (side) return side;
+		}
+		return this.openInNewTab(appId, launchContext, source);
 	}
 
 	/**
@@ -1036,6 +1078,7 @@ function navModeFromPayload(payload: Record<string, unknown>): NavigationMode {
 	const raw = payload.navMode;
 	if (raw === NavigationMode.NewTab) return NavigationMode.NewTab;
 	if (raw === NavigationMode.NewWindow) return NavigationMode.NewWindow;
+	if (raw === NavigationMode.NewPanel) return NavigationMode.NewPanel;
 	return NavigationMode.Replace;
 }
 

@@ -225,5 +225,18 @@
   "template.email-follow-up-nudge.name": "Anstoß für E-Mail-Nachfassen",
   "template.email-follow-up-nudge.desc": "Eine tägliche Erinnerung, E-Mail-Verläufe nachzufassen, die noch auf Antwort warten.",
   "template.email-follow-up-nudge.trigger": "Jeden Werktag um 16:00 Uhr",
-  "menu.more": "Weitere Aktionen"
+  "menu.more": "Weitere Aktionen",
+  "runs.denied.title": "Durch eine fehlende Berechtigung blockiert",
+  "runs.denied.hint": "Gewähren Sie sie in den Einstellungen oder kürzen Sie die Berechtigungsliste des Workflows, dann erneut ausführen.",
+  "runs.denialBadge.one": "{count} Ablehnung",
+  "runs.denialBadge.other": "{count} Ablehnungen",
+  "runs.trace.title": "Agenten-Protokoll",
+  "runs.trace.loading": "Protokoll wird geladen…",
+  "runs.trace.empty": "Für diesen Lauf wurde kein Agenten-Protokoll aufgezeichnet.",
+  "runs.trace.denied": "Abgelehnt — fehlende Berechtigung {capability}",
+  "runs.trace.deniedUnknown": "Abgelehnt",
+  "runs.trace.durationMs": "{ms} ms",
+  "runs.trace.outcome.ok": "OK",
+  "runs.trace.outcome.error": "Fehler",
+  "runs.trace.outcome.denied": "Abgelehnt"
 }

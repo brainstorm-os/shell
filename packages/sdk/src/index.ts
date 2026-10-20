@@ -70,6 +70,9 @@ export {
 	type InlinePropertyDraft,
 	type InlinePropertyDraftResult,
 	type InlinePropertyFormInput,
+	type InverseCandidate,
+	type InverseChoice,
+	InverseChoiceKind,
 	type RelationTargetType,
 	dedupeSelectOptions,
 	draftInlineProperty,
@@ -103,6 +106,7 @@ export {
 export {
 	LIST_ENTITY_TYPE,
 	type ListEntityProperties,
+	type ListEntityRow,
 	entityToList,
 	listToEntityProperties,
 } from "./list-entity-codec";

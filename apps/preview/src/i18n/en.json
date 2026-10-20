@@ -76,5 +76,14 @@
   "inspector.properties": "Properties",
   "inspector.noProperties": "No properties yet",
   "inspector.addProperty": "Add property",
-  "inspector.removeProperty": "Remove {name}"
+  "inspector.removeProperty": "Remove {name}",
+  "inspector.caption": "Caption",
+  "inspector.linkedFrom.one": "Linked from {count} object",
+  "inspector.linkedFrom.other": "Linked from {count} objects",
+  "inspector.noBacklinks": "Nothing links here yet",
+  "inspector.openInNewTab": "Open “{name}” in a new tab",
+  "inspector.moveToBin": "Move to Bin",
+  "inspector.lockedHint": "Unlock this file to change it",
+  "inspector.deleted": "Moved “{name}” to the Bin",
+  "inspector.deleteFailed": "Could not move “{name}” to the Bin"
 }

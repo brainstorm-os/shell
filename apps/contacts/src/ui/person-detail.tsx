@@ -13,6 +13,7 @@
  * company routes an `open` intent to its owning app.
  */
 
+import { RichTextPropertyEditor } from "@brainstorm-os/editor";
 import type { PropertiesService } from "@brainstorm-os/sdk-types";
 import { CoverPicker, type CoverPickerService } from "@brainstorm-os/sdk/cover-picker";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
@@ -381,6 +382,7 @@ export function PersonDetail({
 	// slide-over inspector) — one store, one catalog `list()` IPC, not two.
 	return propertiesRuntime ? (
 		<PropertiesProvider
+			richTextEditor={RichTextPropertyEditor}
 			runtime={propertiesRuntime}
 			entityTitleSource={entityTitleSource}
 			labels={propertyUiLabels}

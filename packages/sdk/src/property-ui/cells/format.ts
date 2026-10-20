@@ -19,6 +19,7 @@ import {
 	type PropertyDef,
 	PropertyFormat,
 	ValueType,
+	richTextPlain,
 } from "@brainstorm-os/sdk-types";
 
 export type FormatOptions = {
@@ -80,7 +81,7 @@ export function formatScalar(def: PropertyDef, value: unknown, opts: FormatOptio
 		case ValueType.Boolean:
 			return value ? "✓" : "";
 		case ValueType.RichText:
-			return "";
+			return richTextPlain(value);
 	}
 }
 
@@ -127,8 +128,14 @@ export function formatNumber(
 		case PropertyFormat.Duration:
 			return formatDuration(value);
 		default:
-			return numberFormatter(locale, formatOpts).format(value);
+			return withUnit(numberFormatter(locale, formatOpts).format(value), def.unit);
 	}
+}
+
+/** Append a plain number's free-text unit suffix (9.12.33). */
+export function withUnit(text: string, unit: string | undefined): string {
+	const u = unit?.trim();
+	return u ? `${text} ${u}` : text;
 }
 
 /** Render a number of **hours** as a human duration: `3h 30m`, `45m`,
@@ -205,7 +212,7 @@ export function parseScalar(def: PropertyDef, raw: string): unknown {
 		case ValueType.Boolean:
 			return /^(true|yes|1|on)$/i.test(trimmed);
 		case ValueType.RichText:
-			return null;
+			return trimmed.length === 0 ? null : { text: raw };
 	}
 }
 

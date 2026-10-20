@@ -31,7 +31,7 @@ import {
 	ObjectMenuTrigger,
 	openAnchoredMenu,
 } from "@brainstorm-os/sdk/object-menu";
-import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { PanelSide, PanelToggleButton, useAutoHidePanel } from "@brainstorm-os/sdk/panel-toggle";
 import { Searchbar } from "@brainstorm-os/sdk/searchbar";
 import {
 	type ReactElement,
@@ -572,6 +572,7 @@ export function WhiteboardApp(): ReactElement {
 
 	const canStyle = snap?.canStyle ?? false;
 	const navOpen = snap?.navOpen ?? true;
+	const navAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !navOpen });
 	const tool = snap?.tool;
 	const exportLabel = confirm ? t(confirm.key) : t("whiteboard.export.menu");
 
@@ -671,7 +672,14 @@ export function WhiteboardApp(): ReactElement {
 				ref={rootRef}
 				data-nav-open={navOpen ? "true" : "false"}
 			>
-				<aside className="whiteboard__nav" id="whiteboard-nav" aria-label={t("whiteboard.nav.aria")}>
+				<aside
+					{...navAutoHide.panelProps}
+					className="whiteboard__nav"
+					id="whiteboard-nav"
+					aria-label={t("whiteboard.nav.aria")}
+					aria-hidden={navAutoHide.visible ? undefined : true}
+					inert={navAutoHide.visible ? undefined : true}
+				>
 					<div className="whiteboard__search">
 						<Searchbar
 							value={navQuery}
@@ -685,6 +693,7 @@ export function WhiteboardApp(): ReactElement {
 					</div>
 					<div className="whiteboard__nav-list" aria-label={t("whiteboard.nav.aria")} ref={navListRef} />
 				</aside>
+				{navAutoHide.edgeProps && <div {...navAutoHide.edgeProps} />}
 				<div className="whiteboard__canvas-host" ref={canvasHostRef}>
 					<WhiteboardToolbar tool={tool} onSetTool={(next) => eng()?.setTool(next)} />
 					<div className="whiteboard__zoom">

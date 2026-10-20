@@ -263,6 +263,32 @@ describe("makeBpGraphRouter — queryEntities", () => {
 		expect(Object.keys(wireData.results.vertices)).toEqual(["ent_a", "ent_b"]);
 	});
 
+	it("coalesces identical concurrent queries from one app into one entities call", async () => {
+		const releases: Array<(rows: Entity[]) => void> = [];
+		const entities = vi.fn<EntitiesInvoker>(
+			() =>
+				new Promise<Entity[]>((resolve) => {
+					releases.push(resolve);
+				}),
+		);
+		const router = makeBpGraphRouter({ entities });
+		const scan = () => router(envReq("queryEntities", { operation: {} }), ctx);
+		const pending = [scan(), scan(), scan()];
+		const other = router(envReq("queryEntities", { operation: {} }), { ...ctx, app: "io.other" });
+		expect(entities).toHaveBeenCalledTimes(2);
+		releases[0]?.([fakeEntity("ent_a", "io.example/Note/v1")]);
+		releases[1]?.([]);
+		const results = await Promise.all(pending);
+		for (const r of results) {
+			expect((r?.data as { results: { roots: string[] } }).results.roots).toEqual(["ent_a"]);
+		}
+		await other;
+		const again = scan();
+		releases[2]?.([]);
+		await again;
+		expect(entities).toHaveBeenCalledTimes(3);
+	});
+
 	it("returns NOT_IMPLEMENTED for graphResolveDepths > 0 (v1 deferral)", async () => {
 		const router = makeBpGraphRouter({ entities: vi.fn() });
 		const response = await router(

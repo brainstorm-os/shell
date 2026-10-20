@@ -36,11 +36,13 @@ import type { SelectionCommentAnchor } from "../comments/selection-anchor";
 import { type EditorT, useEditorT } from "../i18n";
 import { createMediaBlockCommands } from "../media-commands";
 import { createEntityEmbedCommand, createTransclusionCommand } from "../standard-commands";
+import { createTaskCommand } from "../task-mention";
 import { BlockEmbedPickerPlugin } from "./block-embed-picker-plugin";
 import { CodeBlockPlugin } from "./code-block-plugin";
 import { CodeBlockToolbarPlugin } from "./code-block-toolbar-plugin";
 import { CodeHighlightPlugin } from "./code-highlight-plugin";
 import { CodeLineNumbersPlugin } from "./code-line-numbers-plugin";
+import { getEditorHost } from "./editor-host";
 import { EmbedPlugin } from "./embed-plugin";
 import { EmojiTypeaheadPlugin } from "./emoji-typeahead-plugin";
 import { EmptyParagraphHintPlugin } from "./empty-paragraph-hint-plugin";
@@ -106,6 +108,10 @@ export type FullEditorPluginsProps = {
 	 *  (defaults to on when `currentEntityId` is provided — same host gate
 	 *  as transclusion, F-070 embed parity). */
 	entityEmbed?: boolean;
+	/** Override: force the `/task` inline-task command on/off (B11.24). Defaults
+	 *  to on when `currentEntityId` is provided AND the host wired
+	 *  `setEditorHost({ entities })` — without it the command could only no-op. */
+	task?: boolean;
 	/** Host-specific plugins/decorators rendered inside the selection
 	 *  provider alongside the shared set (e.g. the app's AutosavePlugin,
 	 *  TitlePlugin, mention/transclusion typeaheads). */
@@ -129,6 +135,7 @@ export function fullEditorExtraCommands(
 		media?: boolean;
 		entityEmbed?: boolean;
 		transclusion?: boolean;
+		task?: boolean;
 	} = {},
 ): readonly BlockCommand[] {
 	const extras = options.extraCommands ? [...options.extraCommands] : [];
@@ -136,6 +143,7 @@ export function fullEditorExtraCommands(
 	// Order mirrors Notes' catalogue: Embed before Reference.
 	if (options.entityEmbed) extras.push(createEntityEmbedCommand(t));
 	if (options.transclusion) extras.push(createTransclusionCommand(t));
+	if (options.task) extras.push(createTaskCommand(t));
 	return extras;
 }
 
@@ -158,6 +166,7 @@ export function FullEditorPlugins({
 	mentions,
 	transclusion,
 	entityEmbed,
+	task,
 	children,
 }: FullEditorPluginsProps): ReactNode {
 	const hasEntity = currentEntityId !== undefined;
@@ -165,6 +174,7 @@ export function FullEditorPlugins({
 	const showMentions = mentions ?? hasEntity;
 	const showTransclusion = transclusion ?? hasEntity;
 	const showEntityEmbed = entityEmbed ?? hasEntity;
+	const showTask = task ?? (hasEntity && getEditorHost().entities !== undefined);
 	const t = useEditorT();
 	// When transclusion / entity-embed are on, the "Embed" command (opens the
 	// anchored entity picker) and the "Reference" command (opens the `!@`
@@ -179,8 +189,9 @@ export function FullEditorPlugins({
 				media,
 				entityEmbed: showEntityEmbed,
 				transclusion: showTransclusion,
+				task: showTask,
 			}),
-		[t, extraCommands, showTransclusion, showEntityEmbed, media],
+		[t, extraCommands, showTransclusion, showEntityEmbed, showTask, media],
 	);
 	return (
 		<StandardEditingPlugins

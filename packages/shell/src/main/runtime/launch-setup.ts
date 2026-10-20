@@ -7,6 +7,7 @@
 
 import { join } from "node:path";
 import { regionalToFormatContext } from "@brainstorm-os/protocol/format-context";
+import { encodeDisplayPrefs } from "@brainstorm-os/protocol/shell-prefs";
 import {
 	ActionTrustTier,
 	type OpenTarget,
@@ -33,10 +34,12 @@ import { IntentsBus, OPEN_VERB } from "../intents/intents-bus";
 import { getOpenWithPromptHost } from "../ipc/open-with-prompt";
 import { getOsHandoffPromptHost } from "../ipc/os-handoff-prompt";
 import type { RendererIdentityRegistry } from "../ipc/renderer-identity";
+import { LauncherMemory } from "../search/launcher-memory";
 import { EntitiesRepository } from "../storage/entities-repo";
 import { AppsRepository } from "../storage/registry-repo/apps-repo";
 import { IntentsRepository } from "../storage/registry-repo/intents-repo";
 import { OpenersRepository } from "../storage/registry-repo/openers-repo";
+import { SettingsRepository } from "../storage/settings-repo";
 import type { AppCallHost } from "../tools/app-call-host";
 import { getActiveVaultSession } from "../vault/session";
 import { readSpellcheckDictionary } from "../vault/vault-spellcheck-dictionary-store";
@@ -188,6 +191,11 @@ export function createLaunchSetup(args: {
 				// which origins may reach an app renderer.
 				return wallpaperImageUrl(dashboard.activeWallpaper(nativeTheme.shouldUseDarkColors));
 			},
+			getActiveDisplay: async () => {
+				const active = getActiveVaultSession();
+				if (!active) return null;
+				return encodeDisplayPrefs((await active.dashboardStore()).displayPrefs());
+			},
 			getActiveLocale: async () => {
 				const active = getActiveVaultSession();
 				if (!active) return null;
@@ -219,6 +227,18 @@ export function createLaunchSetup(args: {
 			// Default editor for an object no app specifically claims (per
 			// the universal-body design + doc-31 §Resolution fallback).
 			genericEntityViewerAppId: GENERIC_OBJECT_EDITOR_APP_ID,
+			// 9.22.7 — the launcher's empty-query "Recent" list. Recorded against
+			// the vault active at open time; a failed write only loses one entry.
+			onEntityOpened: (entityId) => {
+				const active = getActiveVaultSession();
+				if (!active) return;
+				void active.dataStores
+					.open("settings")
+					.then((db) => new LauncherMemory(new SettingsRepository(db)).recordOpen(entityId))
+					.catch((error: unknown) => {
+						console.warn("[brainstorm] launcher: recording a recent open failed:", error);
+					});
+			},
 			// Settings → Defaults override — read from the active vault's
 			// dashboard doc at dispatch time (never the captured `session`;
 			// a vault switch swaps the store). A missing override → null →

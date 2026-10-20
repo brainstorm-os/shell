@@ -152,9 +152,21 @@ export type PipelineContext = {
 	 */
 	onSent?: (frameBytes: number) => void;
 	onReceived?: (frameBytes: number) => void;
+	/**
+	 * Collab-C7 — an inbound `Update` was authenticated (signature), authorized
+	 * (`authorizeWriter`) and applied. `editorPubB64` is the verified sender's
+	 * key in std base64 (the roster / access-record spelling). Fired only on
+	 * that success path; contained — a throw never affects the apply.
+	 */
+	onApplied?: (resolvedEntityId: string, editorPubB64: string) => void;
 };
 
-export type ApplyPlaintextFn = (plaintext: Uint8Array) => void | Promise<void>;
+/** `senderB64Url` is the frame's AUTHENTICATED sender (signature verified,
+ *  writer authorized) — safe to attribute the write to (10.16). */
+export type ApplyPlaintextFn = (
+	plaintext: Uint8Array,
+	senderB64Url: string,
+) => void | Promise<void>;
 
 /**
  * Encrypt one Yjs update and emit it through the relay.
@@ -300,8 +312,13 @@ export async function receiveAndApply(
 				`envelope-pipeline: sender ${decoded.header.sender} is not an authorized writer of ${resolved.id}`,
 			);
 		}
-		await applyUpdate(plaintext);
+		await applyUpdate(plaintext, decoded.header.sender);
 		ctx.onReceived?.(frame.byteLength);
+		try {
+			ctx.onApplied?.(resolved.id, bytesToBase64(senderPub));
+		} catch {
+			// Contained: last-editor bookkeeping never fails an apply.
+		}
 	} finally {
 		ctx.dekStore.close(handle.dek);
 	}

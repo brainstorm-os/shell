@@ -7,13 +7,13 @@
  * shared `EditableCell` (covered by the grid's real-shell cell-editing spec).
  */
 
-import { type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
+import { type PropertyDef, PropertyFormat, ValueType } from "@brainstorm-os/sdk-types";
 import { type ReactElement, act, createElement } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EntityRow } from "../logic/in-memory-entities";
 import type { ColumnSpec } from "../types/list-view";
-import { CardFields } from "./card-fields";
+import { CardFields, openableUrl } from "./card-fields";
 
 function must<T>(value: T | null | undefined): T {
 	if (value === null || value === undefined) throw new Error("Expected a value");
@@ -102,5 +102,69 @@ describe("CardFields — gallery card editing (9.12.23)", () => {
 		const fields = must(container.querySelector<HTMLElement>(".dbv-card__fields"));
 		act(() => fields.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 		expect(parentClick).not.toHaveBeenCalled();
+	});
+});
+
+describe("CardFields — gallery polish (9.12.31)", () => {
+	let root: Root | null = null;
+	afterEach(() => {
+		act(() => root?.unmount());
+		root = null;
+		document.body.innerHTML = "";
+	});
+
+	const urlDef: PropertyDef = {
+		...def("site", "Website", ValueType.Text),
+		format: PropertyFormat.Url,
+	};
+
+	function mount(
+		entity: EntityRow,
+		opts: { hideLabels?: boolean; urlAsButton?: boolean },
+	): HTMLElement {
+		const host = document.createElement("div");
+		document.body.append(host);
+		root = createRoot(host);
+		act(() =>
+			root?.render(
+				<CardFields
+					entity={entity}
+					columns={[{ propertyId: "site", visible: true }]}
+					columnDefs={new Map([["site", urlDef]])}
+					onEdit={vi.fn()}
+					{...opts}
+				/>,
+			),
+		);
+		return host;
+	}
+
+	it("renders an http(s) URL as an open-link button through external routing", () => {
+		const host = mount(
+			{ ...ENTITY, properties: { site: "https://example.com/a" } },
+			{ urlAsButton: true },
+		);
+		const link = must(host.querySelector<HTMLAnchorElement>(".dbv-card__url"));
+		expect(link.href).toBe("https://example.com/a");
+		expect(link.target).toBe("_blank");
+		expect(link.rel).toBe("noopener noreferrer");
+		expect(link.textContent).toBe("example.com");
+	});
+
+	it("never turns a non-web scheme into a link", () => {
+		expect(openableUrl(urlDef, "javascript:alert(1)")).toBeNull();
+		expect(openableUrl(urlDef, "not a url")).toBeNull();
+		expect(openableUrl(def("x", "X", ValueType.Text), "https://a.test")).toBeNull();
+		const host = mount(
+			{ ...ENTITY, properties: { site: "javascript:alert(1)" } },
+			{ urlAsButton: true },
+		);
+		expect(host.querySelector(".dbv-card__url")).toBeNull();
+	});
+
+	it("hides field names visually but keeps them in the markup", () => {
+		const host = mount({ ...ENTITY, properties: { site: "x" } }, { hideLabels: true });
+		expect(host.querySelector(".dbv-card__fields")?.getAttribute("data-hide-labels")).toBe("true");
+		expect(host.querySelector(".dbv-card__field-label")?.textContent).toBe("Website");
 	});
 });

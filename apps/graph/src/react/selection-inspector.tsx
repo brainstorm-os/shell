@@ -84,6 +84,7 @@ export function SelectionInspector({
 						title={t("inspector.label")}
 						rows={rows}
 						entityId={entity.id}
+						authorship={{ properties: entity.properties }}
 						{...(tabbed ? { hideHeader: true } : {})}
 					/>
 				)}

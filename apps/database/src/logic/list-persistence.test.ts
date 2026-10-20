@@ -8,7 +8,9 @@ import {
 } from "@brainstorm-os/sdk-types";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+	DeleteListOutcome,
 	type ListEntitiesService,
+	SaveListOutcome,
 	deleteUserList,
 	loadUserLists,
 	planListReconcile,
@@ -130,6 +132,42 @@ describe("list-persistence", () => {
 		await deleteUserList(svc, "list-projects");
 		expect(svc.store.has("list-projects")).toBe(false);
 		expect(await loadUserLists(svc)).toEqual([]);
+	});
+
+	it("reports whether a save created or updated the row", async () => {
+		expect((await saveUserList(svc, sampleList())).outcome).toBe(SaveListOutcome.Created);
+		expect((await saveUserList(svc, sampleList({ name: "Renamed" }))).outcome).toBe(
+			SaveListOutcome.Saved,
+		);
+	});
+
+	it("refuses to update a row locked since the check and hands back what is persisted", async () => {
+		await saveUserList(svc, sampleList());
+		await svc.update("list-projects", { locked: true });
+		const stale = sampleList({
+			name: "Renamed",
+			members: { include: [{ entityId: "e1", addedAt: NOW, by: "user" }], exclude: [] },
+		});
+		const result = await saveUserList(svc, stale);
+		expect(result.outcome).toBe(SaveListOutcome.RefusedLocked);
+		if (result.outcome !== SaveListOutcome.RefusedLocked) throw new Error("outcome");
+		expect(result.persisted?.name).toBe("Projects");
+		expect(result.persisted?.members.include).toEqual([]);
+		expect(result.persisted?.locked).toBe(true);
+		const row = svc.store.get("list-projects");
+		expect(row?.properties.name).toBe("Projects");
+		expect(row?.properties.members).toEqual({ include: [], exclude: [] });
+	});
+
+	it("refuses to delete a locked row", async () => {
+		await saveUserList(svc, sampleList());
+		await svc.update("list-projects", { locked: true });
+		const result = await deleteUserList(svc, "list-projects");
+		expect(result.outcome).toBe(DeleteListOutcome.RefusedLocked);
+		expect(svc.store.has("list-projects")).toBe(true);
+		await svc.update("list-projects", { locked: false });
+		expect((await deleteUserList(svc, "list-projects")).outcome).toBe(DeleteListOutcome.Deleted);
+		expect(svc.store.has("list-projects")).toBe(false);
 	});
 
 	it("queries scoped to the List type", async () => {

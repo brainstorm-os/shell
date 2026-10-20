@@ -42,6 +42,14 @@ export const SHORTCUT_GROUPS: ReadonlyArray<ShortcutGroup> = [
 			{ id: "shell/switch-window", labelKey: "shell.settings.keyboard.action.switchWindow" },
 			{ id: "shell/close-window", labelKey: "shell.settings.keyboard.action.closeWindow" },
 			{ id: "shell/quit", labelKey: "shell.settings.keyboard.action.quit" },
+			{ id: "shell/split.open", labelKey: "shell.settings.keyboard.action.splitOpen" },
+			{ id: "shell/split.focus-other", labelKey: "shell.settings.keyboard.action.splitFocusOther" },
+			{ id: "shell/split.swap", labelKey: "shell.settings.keyboard.action.splitSwap" },
+			{ id: "shell/split.divider-left", labelKey: "shell.settings.keyboard.action.splitDividerLeft" },
+			{
+				id: "shell/split.divider-right",
+				labelKey: "shell.settings.keyboard.action.splitDividerRight",
+			},
 		],
 	},
 	{

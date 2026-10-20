@@ -33,6 +33,7 @@ export {
 	BlockFramePhase,
 	buildBlockSrcdoc,
 	makeBlockFrameUrl,
+	sanitizeHostEntityId,
 } from "./block-frame-constants";
 export {
 	type BlockFrameHandle,

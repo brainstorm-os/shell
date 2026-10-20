@@ -6,6 +6,7 @@
  * (matching Notes' chrome-light sidebar).
  */
 
+import type { AutoHidePanelProps } from "@brainstorm-os/sdk/panel-toggle";
 import { Searchbar } from "@brainstorm-os/sdk/searchbar";
 import { useMemo, useState } from "react";
 import type { ReactElement } from "react";
@@ -20,6 +21,8 @@ export type LibraryPanelProps = {
 	/** Collapsed via CSS (not unmounted) so search state survives the header
 	 *  toggle. */
 	open: boolean;
+	/** 7.15 — auto-hide overlay wiring from `useAutoHidePanel`. */
+	autoHide?: AutoHidePanelProps;
 	onSelect: (id: string) => void;
 	/** A user-facing import failure (e.g. capability not granted) — shown as a
 	 *  dismissable banner so a failed import is never silent. */
@@ -31,6 +34,7 @@ export function LibraryPanel({
 	books,
 	selectedId,
 	open,
+	autoHide,
 	onSelect,
 	importError,
 	onDismissError,
@@ -57,6 +61,7 @@ export function LibraryPanel({
 
 	return (
 		<aside
+			{...autoHide}
 			className={open ? "books__library" : "books__library books__library--closed"}
 			aria-label={t("library.title")}
 			aria-hidden={!open}

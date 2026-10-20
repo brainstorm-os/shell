@@ -48,6 +48,15 @@ describe("subtask-tree", () => {
 		expect(subtaskProgress(tasks, "solo")).toEqual({ done: 0, total: 0 });
 	});
 
+	it("subtaskProgress counts a won't-do child as closed", () => {
+		const kids = [
+			task("q"),
+			task("q1", { parentId: "q", completedAt: 5 }),
+			task("q2", { parentId: "q", statusKey: "cancelled" }),
+		];
+		expect(subtaskProgress(kids, "q")).toEqual({ done: 2, total: 2 });
+	});
+
 	it("wouldCreateCycle rejects self, descendants, and grandchildren", () => {
 		expect(wouldCreateCycle(tasks, "p", "p")).toBe(true); // self
 		expect(wouldCreateCycle(tasks, "p", "a")).toBe(true); // direct child

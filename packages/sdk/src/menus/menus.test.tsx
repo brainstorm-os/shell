@@ -7,7 +7,7 @@
  *     the source is removed when the provider unmounts.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
@@ -23,7 +23,9 @@ import {
 	BrainstormMenuProvider,
 	CONTEXT_MENU_ID,
 	CONTEXT_SUBMENU_ID,
+	type ContextMenuItem,
 	MenuAlign,
+	RowKind,
 	blankMenuIcon,
 	closeContextMenu,
 	contextMenuConfig,
@@ -158,6 +160,20 @@ describe("<BrainstormMenuProvider> suppression seam", () => {
 		expect(rect).toMatchObject({ left: 120, top: 240, width: 0, height: 0 });
 		act(() => closeContextMenu());
 		act(() => root.unmount());
+	});
+
+	it("paints an item's description as muted caption text with a hover title (9.12.27)", () => {
+		const body = contextMenuConfig.body;
+		const itemRow =
+			body.kind === BodyKind.List ? body.rows.find((r) => r.kind === RowKind.Item) : undefined;
+		const caption = (itemRow as { caption?: (it: ContextMenuItem) => unknown } | undefined)?.caption;
+		const described = caption?.({ id: "a", label: "Reading", description: "Books to finish" }) as
+			| { props?: { title?: string; className?: string; children?: unknown } }
+			| undefined;
+		expect(described?.props?.title).toBe("Books to finish");
+		expect(described?.props?.className).toBe("bs-menu-row__description");
+		expect(caption?.({ id: "b", label: "Archive" })).toBeUndefined();
+		expect(caption?.({ id: "c", label: "C", shortcut: "⌘K", description: "x" })).toBe("⌘K");
 	});
 
 	it("never opens a cursor menu inside the app-header band (S4)", () => {
@@ -662,6 +678,59 @@ describe("menu panel surface (stylesheet invariants)", () => {
 		const menuRule = /\.fm-menu\s*\{[^}]*\}/g;
 		for (const rule of css.match(menuRule) ?? []) {
 			expect(rule).not.toContain("backdrop-filter");
+		}
+	});
+});
+
+/**
+ * F-507: a menu opens FROM every other overlay — the "Links to" / "Two-way
+ * with" selects inside the property form live under the picker-host backdrop,
+ * date pickers open over the cell popover, the column-adder flips up over
+ * View settings. Any SDK layer that out-stacks the menu turns its rows into
+ * dead pixels (clicks land on the host's backdrop, which cancels the form).
+ * So the menu layer is pinned to the top of the app-side stack, and this
+ * invariant fails the moment a new host is declared above it.
+ */
+describe("menu stack (stylesheet invariants)", () => {
+	const css = readFileSync(join(__dirname, "menus.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+	const stackVar = (name: string): number =>
+		Number(new RegExp(`${name}:\\s*(\\d+)`).exec(css)?.[1] ?? Number.NaN);
+	const dimmer = stackVar("--fm-z-dimmer");
+	const menu = stackVar("--fm-z-menu");
+
+	const sdkSrc = join(__dirname, "..");
+	const literalLayers = (): { file: string; z: number }[] => {
+		const out: { file: string; z: number }[] = [];
+		for (const rel of readdirSync(sdkSrc, { recursive: true }) as string[]) {
+			if (!/\.(css|tsx|ts)$/.test(rel) || /\.test\.tsx?$/.test(rel)) continue;
+			if (rel.endsWith("menus.css")) continue;
+			const src = readFileSync(join(sdkSrc, rel), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+			for (const m of src.matchAll(/z-index:\s*(\d+)/g)) {
+				out.push({ file: rel, z: Number(m[1]) });
+			}
+		}
+		return out;
+	};
+
+	it("declares the dimmer and the menu as numeric stack vars, menu above dimmer", () => {
+		expect(Number.isFinite(dimmer)).toBe(true);
+		expect(Number.isFinite(menu)).toBe(true);
+		expect(menu).toBeGreaterThan(dimmer);
+	});
+
+	it("stacks both above every literal z-index the SDK declares (picker hosts included)", () => {
+		const layers = literalLayers();
+		expect(layers.length).toBeGreaterThan(0);
+		for (const layer of layers) {
+			expect(dimmer, `${layer.file} (z ${layer.z}) must stay below the menu dimmer`).toBeGreaterThan(
+				layer.z,
+			);
+		}
+	});
+
+	it("never re-pins .fm-menu / .fm-dimmer with a literal that bypasses the stack vars", () => {
+		for (const rule of css.match(/\.fm-(?:menu|dimmer)\s*\{[^}]*\}/g) ?? []) {
+			expect(rule).not.toMatch(/z-index:\s*\d/);
 		}
 	});
 });

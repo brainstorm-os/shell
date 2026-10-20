@@ -36,6 +36,17 @@ export type EditorI18nKey =
 	| "editor.table.deleteRow"
 	| "editor.table.deleteCol"
 	| "editor.table.deleteTable"
+	| "editor.table.cellBackground"
+	// Inline task (B11.24) — `/task` + the task-mention checkbox.
+	| "editor.block.task"
+	| "editor.block.task.description"
+	| "editor.task.picker.region"
+	| "editor.task.picker.placeholder"
+	| "editor.task.picker.create"
+	| "editor.task.picker.empty"
+	| "editor.task.markDone"
+	| "editor.task.markOpen"
+	| "editor.task.reopenWontDo"
 	// Block selection — aria-live announcements (BlockSelectionPlugin).
 	| "editor.a11y.blocksSelected.one"
 	| "editor.a11y.blocksSelected.other"
@@ -50,6 +61,14 @@ export type EditorI18nKey =
 	| "editor.action.menu.alignSection"
 	| "editor.action.menu.indentSection"
 	| "editor.action.menu.actionsSection"
+	| "editor.action.menu.insertSection"
+	| "editor.action.menu.backgroundSection"
+	// Insert menu (B11.21) — gutter `+`, action-menu rows, Mod+Shift+Enter.
+	| "editor.insert.above"
+	| "editor.insert.below"
+	| "editor.insertMenu.region"
+	| "editor.insertMenu.placeholder"
+	| "editor.insertMenu.empty"
 	// Slash menu (SlashMenuPlugin).
 	| "editor.slashMenu.region"
 	| "editor.slashMenu.empty"
@@ -237,9 +256,21 @@ export type EditorI18nKey =
 	| "editor.rightPanel.tabs"
 	| "editor.rightPanel.properties"
 	| "editor.rightPanel.comments"
+	| "editor.rightPanel.history"
 	// Media block commands (createMediaBlockCommands) + the click-to-edit
 	// inspector (MediaInspectorPlugin). Surfaced when the host enables the
 	// `media` flag on `<FullEditorPlugins>` and wires `uploadFile`.
+	| "editor.block.tabs"
+	| "editor.block.tabs.description"
+	| "editor.tabs.region"
+	| "editor.tabs.defaultTitle"
+	| "editor.tabs.add"
+	| "editor.tabs.menu"
+	| "editor.tabs.rename"
+	| "editor.tabs.renameLabel"
+	| "editor.tabs.moveLeft"
+	| "editor.tabs.moveRight"
+	| "editor.tabs.delete"
 	| "editor.media.image"
 	| "editor.media.image.description"
 	| "editor.media.video"
@@ -248,6 +279,19 @@ export type EditorI18nKey =
 	| "editor.media.audio.description"
 	| "editor.media.file"
 	| "editor.media.file.description"
+	| "editor.media.imageFromVault"
+	| "editor.media.imageFromVault.description"
+	| "editor.media.inlineImage"
+	| "editor.media.inlineImage.description"
+	| "editor.media.fileFromVault"
+	| "editor.media.fileFromVault.description"
+	| "editor.media.vault.region"
+	| "editor.media.vault.placeholder"
+	| "editor.media.vault.placeholderImage"
+	| "editor.media.vault.empty"
+	| "editor.media.vault.emptyImages"
+	| "editor.media.vault.noResults"
+	| "editor.media.resize"
 	| "editor.media.inspector.region"
 	| "editor.media.inspector.altLabel"
 	| "editor.media.inspector.altPlaceholder"
@@ -280,6 +324,16 @@ export const EDITOR_I18N_DEFAULTS: EditorManifest = Object.freeze({
 	"editor.table.deleteRow": "Delete row",
 	"editor.table.deleteCol": "Delete column",
 	"editor.table.deleteTable": "Delete table",
+	"editor.table.cellBackground": "Cell background",
+	"editor.block.task": "Task",
+	"editor.block.task.description": "Create a task linked to this page",
+	"editor.task.picker.region": "Create a task",
+	"editor.task.picker.placeholder": "Name the task…",
+	"editor.task.picker.create": "Create task “{name}”",
+	"editor.task.picker.empty": "Type a name, then press Enter",
+	"editor.task.markDone": "Mark “{name}” done",
+	"editor.task.markOpen": "Mark “{name}” not done",
+	"editor.task.reopenWontDo": "“{name}” won’t be done — reopen",
 	"editor.a11y.blocksSelected.one": "1 block selected",
 	"editor.a11y.blocksSelected.other": "{count} blocks selected",
 	"editor.gutter.addBelow": "Add block below",
@@ -291,6 +345,13 @@ export const EDITOR_I18N_DEFAULTS: EditorManifest = Object.freeze({
 	"editor.action.menu.alignSection": "Align",
 	"editor.action.menu.indentSection": "Indent",
 	"editor.action.menu.actionsSection": "Actions",
+	"editor.action.menu.insertSection": "Insert",
+	"editor.action.menu.backgroundSection": "Background",
+	"editor.insert.above": "Insert above…",
+	"editor.insert.below": "Insert below…",
+	"editor.insertMenu.region": "Insert a block",
+	"editor.insertMenu.placeholder": "Search blocks…",
+	"editor.insertMenu.empty": "No matching blocks",
 	"editor.inline.toolbar.region": "Text formatting",
 	"editor.inline.bold": "Bold",
 	"editor.inline.italic": "Italic",
@@ -454,6 +515,18 @@ export const EDITOR_I18N_DEFAULTS: EditorManifest = Object.freeze({
 	"editor.rightPanel.tabs": "Panel tabs",
 	"editor.rightPanel.properties": "Properties",
 	"editor.rightPanel.comments": "Comments",
+	"editor.rightPanel.history": "History",
+	"editor.block.tabs": "Tabs",
+	"editor.block.tabs.description": "Switch between panes of content",
+	"editor.tabs.region": "Tabs",
+	"editor.tabs.defaultTitle": "Tab {n}",
+	"editor.tabs.add": "Add tab",
+	"editor.tabs.menu": "Tab options",
+	"editor.tabs.rename": "Rename",
+	"editor.tabs.renameLabel": "Tab name",
+	"editor.tabs.moveLeft": "Move left",
+	"editor.tabs.moveRight": "Move right",
+	"editor.tabs.delete": "Delete tab",
 	"editor.media.image": "Image",
 	"editor.media.image.description": "Upload or embed an image",
 	"editor.media.video": "Video",
@@ -462,6 +535,19 @@ export const EDITOR_I18N_DEFAULTS: EditorManifest = Object.freeze({
 	"editor.media.audio.description": "Upload an audio clip",
 	"editor.media.file": "File",
 	"editor.media.file.description": "Attach any file as a download",
+	"editor.media.imageFromVault": "Image from vault",
+	"editor.media.imageFromVault.description": "Reuse an image already in your vault",
+	"editor.media.inlineImage": "Inline image",
+	"editor.media.inlineImage.description": "A small vault image inside a line of text",
+	"editor.media.fileFromVault": "File from vault",
+	"editor.media.fileFromVault.description": "Attach a file already in your vault",
+	"editor.media.vault.region": "Choose from vault",
+	"editor.media.vault.placeholder": "Search vault files…",
+	"editor.media.vault.placeholderImage": "Search vault images…",
+	"editor.media.vault.empty": "No files in your vault yet",
+	"editor.media.vault.emptyImages": "No images in your vault yet",
+	"editor.media.vault.noResults": "No files match “{query}”",
+	"editor.media.resize": "Resize image",
 	"editor.media.inspector.region": "Media settings",
 	"editor.media.inspector.altLabel": "Alt text",
 	"editor.media.inspector.altPlaceholder": "Describe the image",

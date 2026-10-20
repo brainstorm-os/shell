@@ -9,6 +9,7 @@
 import type { List } from "../types/list";
 import { sourceMatches } from "./collections-for-entity";
 import type { InMemoryEntities } from "./in-memory-entities";
+import { isListLocked } from "./list-lock";
 import {
 	AddOutcome,
 	type AddResult,
@@ -41,7 +42,7 @@ export type ToggleMembershipDecision =
 			/** No state change (no-op or guard miss). The caller can skip
 			 *  persistence + render. `reason` is for the host log only. */
 			kind: "skip";
-			reason: "no-op" | "vault-derived" | "list-not-found";
+			reason: "no-op" | "vault-derived" | "list-not-found" | "locked";
 	  };
 
 export type ToggleMembershipInput = {
@@ -68,6 +69,7 @@ export function decideToggleMembership(input: ToggleMembershipInput): ToggleMemb
 	const list = input.lists.find((l) => l.id === input.listId);
 	if (!list) return { kind: "skip", reason: "list-not-found" };
 	if (input.isVaultDerived(list.id)) return { kind: "skip", reason: "vault-derived" };
+	if (isListLocked(list)) return { kind: "skip", reason: "locked" };
 
 	const matchesSource = sourceMatches(input.entityId, list, input.db);
 	const ctx = {

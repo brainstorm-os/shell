@@ -162,6 +162,62 @@
 	background: var(--bg);
 }
 
+/* ── Rich text cell (9.12.26) ──────────────────────────────────────── */
+.bs-cell-richtext {
+	display: block;
+	width: 100%;
+	min-width: 0;
+	min-height: 26px;
+	margin: 0 -6px;
+	padding: var(--space-1);
+	border: 0;
+	border-radius: var(--radius-sm);
+	background: transparent;
+	color: var(--text);
+	font: inherit;
+	font-size: var(--text-size-md);
+	text-align: start;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	cursor: text;
+	transition: background var(--motion-duration-fast, 120ms) ease;
+}
+
+.bs-cell-richtext:not(:disabled):hover {
+	background: var(--hover);
+}
+
+.bs-cell-richtext:disabled {
+	cursor: default;
+}
+
+.bs-cell-richtext-pop {
+	min-height: 120px;
+	padding: var(--space-1);
+}
+
+.bs-cell-richtext-editor {
+	width: 100%;
+	min-width: 0;
+	min-height: 26px;
+	margin: 0 -6px;
+	padding: calc(var(--space-1) - var(--border-width));
+	border: var(--border-width) solid transparent;
+	border-radius: var(--radius-sm);
+	transition: background var(--motion-duration-fast, 120ms) ease;
+}
+
+.bs-cell-richtext-editor:hover {
+	background: var(--hover);
+}
+
+.bs-cell-richtext-editor:focus-within {
+	outline: 2px solid color-mix(in srgb, var(--color-focus-ring) 55%, transparent);
+	outline-offset: -1px;
+	background: var(--bg);
+}
+
 /* ── Boolean (Checkbox) cell ───────────────────────────────────────── */
 .bs-cell-checkbox {
 	display: inline-flex;
@@ -861,6 +917,7 @@
 .bs-cell-pill--empty .bs-cell-pill-text,
 .bs-cell-plain--empty,
 .bs-cell-multiline--empty,
+.bs-cell-richtext--empty,
 .bs-cell-progress--empty .bs-cell-progress-text,
 .bs-cell-rating-empty,
 .bs-cell-tag-empty,

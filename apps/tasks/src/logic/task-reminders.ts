@@ -14,6 +14,7 @@
 
 import type { ReminderSource } from "@brainstorm-os/sdk/reminder-schedule";
 import type { Task } from "../types/task";
+import { isClosed } from "./task-status";
 
 export enum TaskAlertKind {
 	Due = "due",
@@ -56,7 +57,7 @@ export function taskReminderSources(
 ): ReminderSource[] {
 	const out: ReminderSource[] = [];
 	for (const task of tasks) {
-		if (task.completedAt !== null) continue;
+		if (isClosed(task)) continue;
 		const dueStart = task.dueAt !== null ? taskAlertInstant(task.dueAt, alertHour) : null;
 		if (dueStart !== null) {
 			out.push({

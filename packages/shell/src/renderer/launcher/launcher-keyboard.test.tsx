@@ -37,7 +37,11 @@ describe("Launcher — fancy-menus glue", () => {
 		launch = vi.fn<(id: string) => Promise<void>>(() => Promise.resolve());
 		(window as unknown as { brainstorm: unknown }).brainstorm = {
 			apps: { listInstalled: () => Promise.resolve(APPS), launch },
-			search: { query: () => Promise.resolve([]) },
+			search: {
+				query: () => Promise.resolve([]),
+				recents: () => Promise.resolve([]),
+				savedSearches: () => Promise.resolve([]),
+			},
 			intents: { dispatch: vi.fn(() => Promise.resolve({ handled: true })) },
 		};
 		host = document.createElement("div");

@@ -99,3 +99,11 @@
 	outline: 2px solid var(--color-focus-ring);
 	outline-offset: -1px;
 }
+
+.bs-find-bar__input[aria-invalid="true"] {
+	border-color: var(--color-state-error);
+}
+
+.bs-find-bar__count[data-invalid] {
+	color: var(--color-state-error);
+}

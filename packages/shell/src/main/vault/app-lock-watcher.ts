@@ -15,6 +15,23 @@
 
 const DEFAULT_POLL_MS = 15_000;
 
+/** Seconds since the shell last showed a window. Sampled at each poll, so it
+ *  is accurate to the poll interval — fine against minute-scale timeouts. */
+export function createBackgroundedClock(
+	anyWindowVisible: () => boolean,
+	now: () => number = Date.now,
+): () => number {
+	let hiddenSince: number | null = null;
+	return () => {
+		if (anyWindowVisible()) {
+			hiddenSince = null;
+			return 0;
+		}
+		hiddenSince ??= now();
+		return (now() - hiddenSince) / 1000;
+	};
+}
+
 /** Pure idle decision — exposed for direct testing. */
 export function shouldAutoLockOnIdle(idleSeconds: number, autoLockMinutes: number): boolean {
 	return autoLockMinutes > 0 && idleSeconds >= autoLockMinutes * 60;
@@ -28,6 +45,12 @@ export type AppLockWatcherDeps = {
 	 *  in-app activity with no OS input still defers the lock. Optional — omitted
 	 *  ⇒ system-idle only (the pre-activity-tracking behaviour). */
 	getAppIdleSeconds?: () => number;
+	/** Seconds the shell has had NO visible window (closed to the tray, or every
+	 *  window hidden); `0` while anything is shown. Raises the effective idle:
+	 *  input in other apps resets the system idle clock, but nobody can be
+	 *  using a vault they cannot see, so a backgrounded vault still locks after
+	 *  the same timeout. Optional — omitted ⇒ visibility is not considered. */
+	getBackgroundedSeconds?: () => number;
 	/** Current per-vault idle timeout in minutes (`0` = auto-lock off). */
 	getAutoLockMinutes: () => Promise<number>;
 	/** Whether the active vault has a PIN set (no PIN → nothing to lock against). */
@@ -64,7 +87,10 @@ export function createAppLockWatcher(deps: AppLockWatcherDeps): AppLockWatcher {
 		if (minutes <= 0) return;
 		if (!ignoreIdle) {
 			const appIdle = deps.getAppIdleSeconds?.() ?? Number.POSITIVE_INFINITY;
-			const effectiveIdle = Math.min(deps.getIdleSeconds(), appIdle);
+			const effectiveIdle = Math.max(
+				Math.min(deps.getIdleSeconds(), appIdle),
+				deps.getBackgroundedSeconds?.() ?? 0,
+			);
 			if (!shouldAutoLockOnIdle(effectiveIdle, minutes)) return;
 		}
 		if (!(await deps.hasPin())) return;

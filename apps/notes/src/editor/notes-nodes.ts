@@ -8,7 +8,16 @@
  * quietly strip the bookmark. Pin the set in one place.
  */
 
-import { CalloutNode, ColumnNode, ColumnsNode, TitleNode, ToggleNode } from "@brainstorm-os/editor";
+import {
+	CalloutNode,
+	ColumnNode,
+	ColumnsNode,
+	InlineImageNode,
+	TabPaneNode,
+	TabsNode,
+	TitleNode,
+	ToggleNode,
+} from "@brainstorm-os/editor";
 import { CodeNode } from "@lexical/code";
 import { AutoLinkNode, LinkNode } from "@lexical/link";
 import { ListItemNode, ListNode } from "@lexical/list";
@@ -47,6 +56,7 @@ export const NOTES_ADDITIONAL_NODES: ReadonlyArray<Klass<LexicalNode>> = [
 	AutoLinkNode,
 	HorizontalRuleNode,
 	ImageBlockNode,
+	InlineImageNode,
 	VideoBlockNode,
 	PropertyBlockNode,
 	PropertyListBlockNode,
@@ -73,5 +83,7 @@ export const NOTES_ADDITIONAL_NODES: ReadonlyArray<Klass<LexicalNode>> = [
 	InlineTransclusionNode,
 	ColumnsNode,
 	ColumnNode,
+	TabsNode,
+	TabPaneNode,
 	TableOfContentsNode,
 ];

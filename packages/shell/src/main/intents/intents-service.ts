@@ -17,7 +17,7 @@ export type IntentsServiceOptions = {
 };
 
 export function makeIntentsServiceHandler(options: IntentsServiceOptions): ServiceHandler {
-	return async (envelope: Envelope): Promise<unknown> => {
+	return async (envelope: Envelope, source?: unknown): Promise<unknown> => {
 		const bus = await options.getBus();
 		if (!bus) {
 			const err = new Error("intents bus is not available (no active vault session)");
@@ -39,7 +39,7 @@ export function makeIntentsServiceHandler(options: IntentsServiceOptions): Servi
 
 		switch (envelope.method) {
 			case "dispatch":
-				return await bus.dispatch(intent, { app: envelope.app });
+				return await bus.dispatch(intent, callerOf(envelope.app, source));
 			case "suggest":
 				return await bus.suggest(intent);
 			default: {
@@ -49,6 +49,15 @@ export function makeIntentsServiceHandler(options: IntentsServiceOptions): Servi
 			}
 		}
 	};
+}
+
+/** The caller as the bus needs it. The renderer id lets placement modes
+ *  (new tab, open to the side) find the window the open came FROM; it is the
+ *  broker-verified sender, so a renderer can't aim a split at another window. */
+function callerOf(app: string, source: unknown): { app: string; webContentsId?: number } {
+	return typeof source === "number" && Number.isInteger(source) && source >= 0
+		? { app, webContentsId: source }
+		: { app };
 }
 
 /** Validate the `suggestActions({ target, verbs })` argument. Tolerant of

@@ -79,6 +79,10 @@ export interface BpBlockMountProps<TIn = unknown, TOut = unknown> {
 	 *  the seam does NOT re-flush — Block Protocol calls re-check via
 	 *  the broker on every invocation (this list is advisory). */
 	readonly capabilities: readonly string[];
+	/** The entity whose document hosts this embed (9.12.24), handed to the
+	 *  block in its Startup payload so a contextual view can filter relative
+	 *  to "this page". Changing it remounts the seam. */
+	readonly hostEntityId?: string;
 	/** Inbound BP-protocol messages from the block. `Startup` envelopes
 	 *  are NOT forwarded — they only flow host→block. */
 	readonly onMessage?: (payload: TIn) => void;
@@ -139,6 +143,7 @@ export function BpBlockMount<TIn = unknown, TOut = unknown>(
 	const {
 		entityId,
 		capabilities,
+		hostEntityId,
 		onMessage,
 		bp,
 		blockId,
@@ -235,6 +240,7 @@ export function BpBlockMount<TIn = unknown, TOut = unknown>(
 			handle: frame,
 			entityId,
 			capabilities: capsSnapshot,
+			...(hostEntityId !== undefined ? { hostEntityId } : {}),
 			mintChannelId: () => channelId,
 			onMessage: (payload) => {
 				onMessageRef.current?.(payload);
@@ -287,6 +293,7 @@ export function BpBlockMount<TIn = unknown, TOut = unknown>(
 	}, [
 		entityId,
 		capsSnapshot,
+		hostEntityId,
 		blockId,
 		title,
 		IntersectionObserverImpl,

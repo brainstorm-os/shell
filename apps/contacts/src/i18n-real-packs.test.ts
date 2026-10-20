@@ -39,3 +39,27 @@ describe("contacts real overlay packs (12.15)", () => {
 		});
 	}
 });
+
+/** The Move-to-Bin prompt offers "Don't ask again" because the action is
+ *  reversible — so its copy must say the contact can come back from the Bin,
+ *  never that it cannot be undone. Checked on the shipped text per locale. */
+const BIN_IS_REVERSIBLE: Record<string, { claimsIrreversible: RegExp; offersRestore: RegExp }> = {
+	en: { claimsIrreversible: /undone/i, offersRestore: /restore/i },
+	de: { claimsIrreversible: /rückgängig/i, offersRestore: /wiederherg/i },
+	fr: { claimsIrreversible: /annul/i, offersRestore: /restaur/i },
+	it: { claimsIrreversible: /annull/i, offersRestore: /ripristin/i },
+	es: { claimsIrreversible: /deshacer/i, offersRestore: /restaur/i },
+	pt: { claimsIrreversible: /desfe/i, offersRestore: /restaur/i },
+};
+
+describe("contacts move-to-bin prompt copy (6.15)", () => {
+	for (const [locale, rule] of Object.entries(BIN_IS_REVERSIBLE)) {
+		it(`${locale}: says the contact can be restored from the Bin`, async () => {
+			const pack =
+				locale === "en" ? {} : ((await resolveLocalePack(locale, LOCALE_PACK_IMPORTERS)) ?? {});
+			const body = createT(CONTACTS_I18N, pack)("delete.confirm.body", { name: "Ada" });
+			expect(body).not.toMatch(rule.claimsIrreversible);
+			expect(body).toMatch(rule.offersRestore);
+		});
+	}
+});

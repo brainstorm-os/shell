@@ -1,6 +1,7 @@
 import {
 	type AiGenerateRequest,
 	type AiGenerateResult,
+	AiTransformKind,
 	MessageRole,
 } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
@@ -25,6 +26,8 @@ const result: AiGenerateResult = {
 	model: "llama3.2",
 };
 
+const HOLDS_ALL = async () => true;
+
 function fakeProvider(id: string, gen = vi.fn(async () => result)): ModelProvider {
 	return { id, generate: gen };
 }
@@ -34,7 +37,10 @@ describe("makeAiServiceHandler", () => {
 		const reg = new ProviderRegistry();
 		const provider = fakeProvider("ollama");
 		reg.register(provider);
-		const handler = makeAiServiceHandler({ getProvider: (id) => reg.get(id) });
+		const handler = makeAiServiceHandler({
+			appHoldsCapability: HOLDS_ALL,
+			getProvider: (id) => reg.get(id),
+		});
 
 		const out = await handler(
 			baseEnvelope("generate", [{ messages: [{ role: MessageRole.User, content: "Hi" }] }]),
@@ -51,7 +57,10 @@ describe("makeAiServiceHandler", () => {
 			vi.fn(async () => ({ ...result, provider: "cloud" })),
 		);
 		reg.register(cloud);
-		const handler = makeAiServiceHandler({ getProvider: (id) => reg.get(id) });
+		const handler = makeAiServiceHandler({
+			appHoldsCapability: HOLDS_ALL,
+			getProvider: (id) => reg.get(id),
+		});
 
 		const out = (await handler(
 			baseEnvelope("generate", [
@@ -64,7 +73,10 @@ describe("makeAiServiceHandler", () => {
 
 	it("throws Unavailable when no provider is configured", async () => {
 		const reg = new ProviderRegistry();
-		const handler = makeAiServiceHandler({ getProvider: (id) => reg.get(id) });
+		const handler = makeAiServiceHandler({
+			appHoldsCapability: HOLDS_ALL,
+			getProvider: (id) => reg.get(id),
+		});
 		await expect(
 			handler(baseEnvelope("generate", [{ messages: [{ role: MessageRole.User, content: "x" }] }])),
 		).rejects.toMatchObject({ name: "Unavailable" });
@@ -73,7 +85,10 @@ describe("makeAiServiceHandler", () => {
 	it("throws Unavailable when a pinned provider is unknown", async () => {
 		const reg = new ProviderRegistry();
 		reg.register(fakeProvider("ollama"));
-		const handler = makeAiServiceHandler({ getProvider: (id) => reg.get(id) });
+		const handler = makeAiServiceHandler({
+			appHoldsCapability: HOLDS_ALL,
+			getProvider: (id) => reg.get(id),
+		});
 		await expect(
 			handler(
 				baseEnvelope("generate", [
@@ -86,7 +101,10 @@ describe("makeAiServiceHandler", () => {
 	it("rejects an empty / malformed request and unknown methods with Invalid", async () => {
 		const reg = new ProviderRegistry();
 		reg.register(fakeProvider("ollama"));
-		const handler = makeAiServiceHandler({ getProvider: (id) => reg.get(id) });
+		const handler = makeAiServiceHandler({
+			appHoldsCapability: HOLDS_ALL,
+			getProvider: (id) => reg.get(id),
+		});
 
 		await expect(handler(baseEnvelope("generate", [{ messages: [] }]))).rejects.toMatchObject({
 			name: "Invalid",
@@ -103,7 +121,13 @@ describe("ai.transform (11.5)", () => {
 		const reg = new ProviderRegistry();
 		const provider = fakeProvider("ollama", gen);
 		reg.register(provider);
-		return { handler: makeAiServiceHandler({ getProvider: (id) => reg.get(id) }), gen };
+		return {
+			handler: makeAiServiceHandler({
+				appHoldsCapability: HOLDS_ALL,
+				getProvider: (id) => reg.get(id),
+			}),
+			gen,
+		};
 	}
 
 	it("builds a system instruction from the kind + source as the user turn", async () => {
@@ -142,7 +166,10 @@ describe("ai.transform (11.5)", () => {
 
 	it("throws Unavailable when no provider is configured", async () => {
 		const reg = new ProviderRegistry();
-		const handler = makeAiServiceHandler({ getProvider: (id) => reg.get(id) });
+		const handler = makeAiServiceHandler({
+			appHoldsCapability: HOLDS_ALL,
+			getProvider: (id) => reg.get(id),
+		});
 		await expect(
 			handler(baseEnvelope("transform", [{ source: "x", kind: "rewrite" }])),
 		).rejects.toMatchObject({ name: "Unavailable" });
@@ -163,7 +190,7 @@ describe("ai.extract (11.5)", () => {
 				vi.fn(async () => ({ ...result, content })),
 			),
 		);
-		return makeAiServiceHandler({ getProvider: (id) => reg.get(id) });
+		return makeAiServiceHandler({ appHoldsCapability: HOLDS_ALL, getProvider: (id) => reg.get(id) });
 	}
 
 	it("returns the coerced fields with provider/model provenance", async () => {
@@ -204,6 +231,7 @@ describe("ai.extract intoType (11.5)", () => {
 		return {
 			gen,
 			handler: makeAiServiceHandler({
+				appHoldsCapability: HOLDS_ALL,
 				getProvider: (id) => reg.get(id),
 				resolveTypeFields: resolveTypeFields as never,
 			}),
@@ -256,7 +284,10 @@ describe("ai.extract intoType (11.5)", () => {
 	it("fails closed (Unavailable) when no resolver is configured", async () => {
 		const reg = new ProviderRegistry();
 		reg.register(fakeProvider("ollama"));
-		const handler = makeAiServiceHandler({ getProvider: (id) => reg.get(id) });
+		const handler = makeAiServiceHandler({
+			appHoldsCapability: HOLDS_ALL,
+			getProvider: (id) => reg.get(id),
+		});
 		await expect(
 			handler(baseEnvelope("extract", [{ source: "x", intoType: "brainstorm/Person/v1" }])),
 		).rejects.toMatchObject({ name: "Unavailable" });
@@ -275,7 +306,10 @@ describe("ai.cost (11.5)", () => {
 		const reg = new ProviderRegistry();
 		const provider = fakeProvider("ollama");
 		reg.register(provider);
-		const handler = makeAiServiceHandler({ getProvider: (id) => reg.get(id) });
+		const handler = makeAiServiceHandler({
+			appHoldsCapability: HOLDS_ALL,
+			getProvider: (id) => reg.get(id),
+		});
 		const out = (await handler(
 			baseEnvelope("cost", [
 				{ model: "llama3.2", messages: [{ role: MessageRole.User, content: "12345678" }] },
@@ -287,7 +321,10 @@ describe("ai.cost (11.5)", () => {
 
 	it("throws Unavailable when no provider is configured", async () => {
 		const reg = new ProviderRegistry();
-		const handler = makeAiServiceHandler({ getProvider: (id) => reg.get(id) });
+		const handler = makeAiServiceHandler({
+			appHoldsCapability: HOLDS_ALL,
+			getProvider: (id) => reg.get(id),
+		});
 		await expect(
 			handler(baseEnvelope("cost", [{ messages: [{ role: MessageRole.User, content: "x" }] }])),
 		).rejects.toMatchObject({ name: "Unavailable" });
@@ -300,6 +337,7 @@ describe("provenance recording (11.8)", () => {
 		reg.register(fakeProvider("ollama", gen));
 		const onUsage = vi.fn();
 		const handler = makeAiServiceHandler({
+			appHoldsCapability: HOLDS_ALL,
 			getProvider: (id) => reg.get(id),
 			onUsage,
 			now: () => 5000,
@@ -368,6 +406,7 @@ describe("budget gate (14.8)", () => {
 		const gen = vi.fn(async () => result);
 		reg.register(fakeProvider("ollama", gen));
 		const handler = makeAiServiceHandler({
+			appHoldsCapability: HOLDS_ALL,
 			getProvider: (id) => reg.get(id),
 			quota: { checkBudget },
 			onUsage,
@@ -449,5 +488,174 @@ describe("ProviderRegistry", () => {
 		expect(reg.get(undefined)?.id).toBe("b");
 		expect(reg.get("a")?.id).toBe("a");
 		expect(reg.get("missing")).toBeNull();
+	});
+});
+
+describe("Agent-14 — model pass-through, custom endpoints, providers listing", () => {
+	const msg = [{ role: MessageRole.User, content: "Hi" }];
+
+	it("passes a pinned model through to the provider unchanged", async () => {
+		const gen = vi.fn(async () => result);
+		const handler = makeAiServiceHandler({
+			appHoldsCapability: HOLDS_ALL,
+			getProvider: () => fakeProvider("ollama", gen),
+		});
+		await handler(baseEnvelope("generate", [{ messages: msg, model: "openai/gpt-4o:free" }]));
+		const [req] = (gen.mock.calls[0] ?? []) as unknown as [AiGenerateRequest];
+		expect(req.model).toBe("openai/gpt-4o:free");
+	});
+
+	it.each([
+		["empty", ""],
+		["too long", "m".repeat(201)],
+		["newline", "gpt-4o\nX-Injected: 1"],
+		["NUL", "gpt\u0000"],
+		["DEL", "gpt\u007f"],
+		["line separator", "gpt "],
+		["padded", " gpt-4o "],
+		["non-string", 42],
+	])("rejects a %s model id as Invalid on every model-calling verb", async (_label, model) => {
+		const gen = vi.fn(async () => result);
+		const handler = makeAiServiceHandler({
+			appHoldsCapability: HOLDS_ALL,
+			getProvider: () => fakeProvider("ollama", gen),
+		});
+		await expect(handler(baseEnvelope("generate", [{ messages: msg, model }]))).rejects.toMatchObject(
+			{ name: "Invalid" },
+		);
+		await expect(
+			handler(baseEnvelope("transform", [{ source: "x", kind: AiTransformKind.Rewrite, model }])),
+		).rejects.toMatchObject({ name: "Invalid" });
+		await expect(
+			handler(baseEnvelope("extract", [{ source: "x", fields: [{ name: "a" }], model }])),
+		).rejects.toMatchObject({ name: "Invalid" });
+		expect(gen).not.toHaveBeenCalled();
+	});
+
+	it("refuses a pinned custom endpoint unless the envelope carries its ai.provider cap", async () => {
+		const gen = vi.fn(async () => ({ ...result, provider: "custom-0123abcd" }));
+		const reg = new ProviderRegistry();
+		reg.register(fakeProvider("custom-0123abcd", gen));
+		const handler = makeAiServiceHandler({
+			appHoldsCapability: HOLDS_ALL,
+			getProvider: (id) => reg.get(id),
+		});
+		const req = { provider: "custom-0123abcd", messages: msg };
+
+		await expect(handler(baseEnvelope("generate", [req]))).rejects.toMatchObject({
+			name: "Unavailable",
+		});
+		expect(gen).not.toHaveBeenCalled();
+
+		await handler({
+			...baseEnvelope("generate", [req]),
+			caps: ["ai.use", "ai.provider:custom-0123abcd"],
+		});
+		await handler({ ...baseEnvelope("generate", [req]), caps: ["ai.use", "ai.provider:*"] });
+		expect(gen).toHaveBeenCalledTimes(2);
+	});
+
+	it("meters an endpoint that reports no usage by estimate, never as zero tokens", async () => {
+		const onUsage = vi.fn();
+		const handler = makeAiServiceHandler({
+			appHoldsCapability: HOLDS_ALL,
+			getProvider: () =>
+				fakeProvider(
+					"custom-0123abcd",
+					vi.fn(async () => ({ content: "x".repeat(40), provider: "custom-0123abcd", model: "m" })),
+				),
+			onUsage,
+		});
+		await handler({
+			...baseEnvelope("generate", [{ provider: "custom-0123abcd", messages: msg }]),
+			caps: ["ai.use", "ai.provider:custom-0123abcd"],
+		});
+		const row = onUsage.mock.calls[0]?.[0];
+		expect(row.promptTokens).toBeGreaterThan(0);
+		expect(row.completionTokens).toBe(10);
+		expect(row.totalTokens).toBe(row.promptTokens + row.completionTokens);
+	});
+
+	it("lists only the providers the caller's ledger grants, and fails closed without ai.use", async () => {
+		const infos = [
+			{ id: "ollama", label: "Ollama", defaultModel: "llama3.2", models: ["llama3.2"], custom: false },
+			{ id: "custom-0123abcd", label: "Box", defaultModel: "m", models: ["m"], custom: true },
+		];
+		const grants = new Set(["ai.use", "ai.provider:ollama"]);
+		const handler = makeAiServiceHandler({
+			getProvider: () => null,
+			listProviders: () => infos,
+			appHoldsCapability: async (_app, cap) => grants.has(cap),
+		});
+		expect(await handler(baseEnvelope("providers", []))).toEqual([infos[0]]);
+
+		grants.delete("ai.use");
+		await expect(handler(baseEnvelope("providers", []))).rejects.toMatchObject({
+			name: "Unavailable",
+		});
+
+		const noLedger = makeAiServiceHandler({ getProvider: () => null, listProviders: () => infos });
+		await expect(noLedger(baseEnvelope("providers", []))).rejects.toMatchObject({
+			name: "Unavailable",
+		});
+	});
+});
+
+describe("ledger re-check (the envelope's declared caps are not authority)", () => {
+	const msgs = [{ role: MessageRole.User, content: "Hi" }];
+	function setup(grants: string[]) {
+		const reg = new ProviderRegistry();
+		const gen = vi.fn(async () => result);
+		reg.register(fakeProvider("ollama", gen));
+		reg.register(fakeProvider("anthropic", gen));
+		const handler = makeAiServiceHandler({
+			getProvider: (id) => reg.get(id),
+			appHoldsCapability: async (_app, cap) => grants.includes(cap),
+		});
+		return { handler, gen };
+	}
+	const env = (method: string, args: unknown[], caps: string[] = []): Envelope => ({
+		...baseEnvelope(method, args),
+		caps,
+	});
+
+	it("an app with no ai.use grant never reaches a provider, even declaring nothing", async () => {
+		const { handler, gen } = setup([]);
+		for (const [method, arg] of [
+			["generate", { messages: msgs, provider: "anthropic" }],
+			["generate", { messages: msgs }],
+			["transform", { source: "x", kind: AiTransformKind.Rewrite }],
+			["extract", { source: "x", fields: [{ name: "a" }] }],
+			["cost", { messages: msgs }],
+		] as const) {
+			await expect(handler(env(method, [arg]))).rejects.toMatchObject({ name: "Unavailable" });
+		}
+		expect(gen).not.toHaveBeenCalled();
+	});
+
+	it("pinning a cloud provider needs its ai.provider grant in the ledger", async () => {
+		const { handler, gen } = setup(["ai.use"]);
+		await expect(
+			handler(env("generate", [{ messages: msgs, provider: "anthropic" }], ["ai.use"])),
+		).rejects.toMatchObject({ name: "Unavailable" });
+		expect(gen).not.toHaveBeenCalled();
+		await handler(env("generate", [{ messages: msgs }], ["ai.use"]));
+		await handler(env("generate", [{ messages: msgs, provider: "ollama" }], ["ai.use"]));
+		expect(gen).toHaveBeenCalledTimes(2);
+	});
+
+	it("a held ai.provider grant allows the pin", async () => {
+		const { handler, gen } = setup(["ai.use", "ai.provider:anthropic"]);
+		await handler(env("generate", [{ messages: msgs, provider: "anthropic" }]));
+		expect(gen).toHaveBeenCalledTimes(1);
+	});
+
+	it("no ledger wired fails closed", async () => {
+		const reg = new ProviderRegistry();
+		reg.register(fakeProvider("ollama"));
+		const handler = makeAiServiceHandler({ getProvider: (id) => reg.get(id) });
+		await expect(handler(env("generate", [{ messages: msgs }], ["ai.use"]))).rejects.toMatchObject({
+			name: "Unavailable",
+		});
 	});
 });

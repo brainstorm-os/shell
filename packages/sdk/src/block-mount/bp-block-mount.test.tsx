@@ -196,6 +196,27 @@ describe("<BpBlockMount>", () => {
 		expect(env.payload.capabilities).toEqual(["blocks.read", "entities.read:Note"]);
 	});
 
+	it("hands the host entity id to the block in the Startup payload (9.12.24)", async () => {
+		await act(async () => {
+			root.render(
+				<BpBlockMount
+					entityId="ent_list"
+					capabilities={[]}
+					hostEntityId="ent_page"
+					IntersectionObserverImpl={FakeIntersectionObserver as unknown as typeof IntersectionObserver}
+					ResizeObserverImpl={FakeResizeObserver as unknown as typeof ResizeObserver}
+					host={fakeHost()}
+				/>,
+			);
+		});
+		const postSpy = vi.spyOn(getContentWindow(findFrame()), "postMessage");
+		await act(async () => {
+			lastIntersection?.fire([{ isIntersecting: true }]);
+		});
+		const env = postSpy.mock.calls[0]?.[0] as { payload: { hostEntityId?: string } };
+		expect(env.payload.hostEntityId).toBe("ent_page");
+	});
+
 	it("loads the bsblock:// bundle URL when `blockId` is supplied, sharing one channel id", async () => {
 		await act(async () => {
 			root.render(

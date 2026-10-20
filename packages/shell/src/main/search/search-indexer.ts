@@ -240,6 +240,47 @@ export class SearchIndexer {
 		}));
 	}
 
+	/** Index rows for `entityIds`, in the order given — the launcher's
+	 *  recent-objects list (9.22.7). Ids the index doesn't hold (deleted, or a
+	 *  type the indexer skips) are omitted. One query per call; the caller's
+	 *  list is bounded (recents cap at a dozen). */
+	lookup(entityIds: readonly string[]): SearchHit[] {
+		this.assertOpen();
+		if (entityIds.length === 0) return [];
+		const placeholders = entityIds.map(() => "?").join(",");
+		const rows = this.db
+			.prepare(
+				`SELECT f.entity_id AS entity_id, f.type AS type, f.title AS title,
+				        m.owner_app_id AS owner_app_id, m.updated_at AS updated_at
+				 FROM entity_fts AS f
+				 LEFT JOIN entity_fts_meta AS m ON m.entity_id = f.entity_id
+				 WHERE f.entity_id IN (${placeholders})`,
+			)
+			.all(...entityIds) as Array<{
+			entity_id: string;
+			type: string;
+			title: string | null;
+			owner_app_id: string | null;
+			updated_at: number | null;
+		}>;
+		const byId = new Map(rows.map((row) => [row.entity_id, row]));
+		const out: SearchHit[] = [];
+		for (const id of entityIds) {
+			const row = byId.get(id);
+			if (!row) continue;
+			out.push({
+				entityId: row.entity_id,
+				type: row.type,
+				ownerAppId: row.owner_app_id ?? "",
+				title: row.title ?? "",
+				snippet: "",
+				score: 0,
+				updatedAt: row.updated_at ?? 0,
+			});
+		}
+		return out;
+	}
+
 	/** Number of indexed entities. Cheap; useful for tests + diagnostics. */
 	count(): number {
 		this.assertOpen();

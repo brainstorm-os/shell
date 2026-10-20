@@ -22,7 +22,11 @@
  *     `DEMO_TASKS` / `DEMO_PROJECTS`; mutations patch the local snapshot.
  */
 
-import { getEntityTitle, subscribeEntityTitles } from "@brainstorm-os/editor";
+import {
+	RichTextPropertyEditor,
+	getEntityTitle,
+	subscribeEntityTitles,
+} from "@brainstorm-os/editor";
 import { type LiveEntitiesSource, useLiveEntities } from "@brainstorm-os/react-yjs";
 import type { Icon, Intent } from "@brainstorm-os/sdk-types";
 import { IconName, Icon as IconView } from "@brainstorm-os/sdk/icon";
@@ -38,7 +42,7 @@ import {
 } from "@brainstorm-os/sdk/object-menu";
 import { ObjectMenuMoreButton } from "@brainstorm-os/sdk/object-menu";
 import { readPanelOpen, writePanelOpen } from "@brainstorm-os/sdk/panel-state";
-import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { PanelSide, PanelToggleButton, useAutoHidePanel } from "@brainstorm-os/sdk/panel-toggle";
 import { createIconPickerButton, openIconPicker } from "@brainstorm-os/sdk/picker-host";
 import { PopoverBodyPadding, createPopoverElement } from "@brainstorm-os/sdk/popover";
 import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
@@ -86,6 +90,13 @@ import {
 	taskSelectionSize,
 } from "./logic/task-selection";
 import { TASK_SORTS, TaskSort } from "./logic/task-sort";
+import {
+	type CompletionState,
+	completionStateOf,
+	isClosed,
+	nextCompletionState,
+	withCompletionState,
+} from "./logic/task-status";
 import { tasksWithTag } from "./logic/task-tags";
 import {
 	type TaskWriteContext,
@@ -105,6 +116,7 @@ import type { Project } from "./types/project";
 import { TaskSurface, UPCOMING_GROUPINGS, UpcomingGrouping } from "./types/surface";
 import { Priority, type Task, TaskStatus } from "./types/task";
 import { renderBoardView } from "./ui/board-view";
+import { completionMenuItems } from "./ui/completion-menu";
 import { buildComposeForm } from "./ui/compose-view";
 import { bindDelegatedObjectMenu } from "./ui/delegated-object-menu";
 import {
@@ -408,7 +420,7 @@ function computeCounts(tasks: readonly Task[], now: number): Map<string, number>
 	}
 	const perProject = new Map<string, number>();
 	for (const task of tasks) {
-		if (task.completedAt !== null) continue;
+		if (isClosed(task)) continue;
 		if (task.projectId === null) continue;
 		perProject.set(task.projectId, (perProject.get(task.projectId) ?? 0) + 1);
 	}
@@ -685,16 +697,21 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 		[taskWriteCtx],
 	);
 
+	// 9.14.17 — the checkbox is three-state. An explicit pick (menu rows) sets
+	// a state; the checkbox click / Enter / x cycles open → done → won't do →
+	// open. Both resolve against the CURRENT stored row, never the caller's
+	// possibly-stale copy, and ride `patchTask` (which refuses a locked task).
+	const setCompletion = useCallback(
+		(task: Task, state: CompletionState) => {
+			patchTask(task.id, (existing) => withCompletionState(existing, state, nowAnchor()));
+		},
+		[patchTask, nowAnchor],
+	);
 	const onToggleComplete = useCallback(
 		(task: Task) => {
-			patchTask(task.id, (existing) => {
-				const now = nowAnchor();
-				return {
-					...existing,
-					completedAt: existing.completedAt === null ? now : null,
-					updatedAt: now,
-				};
-			});
+			patchTask(task.id, (existing) =>
+				withCompletionState(existing, nextCompletionState(completionStateOf(existing)), nowAnchor()),
+			);
 		},
 		[patchTask, nowAnchor],
 	);
@@ -803,9 +820,7 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 	const openAddDependencyMenu = useCallback(
 		(task: Task, anchor: HTMLElement) => {
 			const rect = anchor.getBoundingClientRect();
-			const candidates = dependencyCandidates(dataRef.current.tasks, task).filter(
-				(c) => c.completedAt === null,
-			);
+			const candidates = dependencyCandidates(dataRef.current.tasks, task).filter((c) => !isClosed(c));
 			const items: AnchoredMenuItem[] =
 				candidates.length === 0
 					? [{ label: t("tasks.dependencies.noCandidates"), disabled: true, onSelect: () => {} }]
@@ -943,7 +958,7 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 			const idx = new Map(orderedIds.map((id, i) => [id, i] as const));
 			for (const task of dataRef.current.tasks) {
 				const next = idx.get(task.id);
-				if (next === undefined || task.completedAt !== null || task.sortIndex === next) continue;
+				if (next === undefined || isClosed(task) || task.sortIndex === next) continue;
 				saveTask({ ...task, sortIndex: next, updatedAt: nowAnchor() });
 			}
 		},
@@ -1136,6 +1151,15 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 			return next;
 		});
 	}, []);
+	const navAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !navOpen });
+	const navAutoHideRef = navAutoHide.panelProps.ref;
+	const setSidebarSlot = useCallback(
+		(el: HTMLDivElement | null) => {
+			sidebarSlotRef.current = el;
+			navAutoHideRef?.(el);
+		},
+		[navAutoHideRef],
+	);
 	const toggleProps = useCallback(() => {
 		setPropsOpen((open) => {
 			const next = !open;
@@ -1237,7 +1261,7 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 
 			const openNames = new Set(
 				dataRef.current.tasks
-					.filter((task) => task.completedAt === null)
+					.filter((task) => !isClosed(task))
 					.map((task) => task.name.trim().toLowerCase()),
 			);
 			const form = buildComposeForm({
@@ -1421,6 +1445,7 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 							icon: IconName.Pencil,
 							run: () => openEditPopover(task),
 						},
+						...completionMenuItems(task, setCompletion),
 					],
 					...(repository ? { onRemove: () => onRemoveTask(task) } : {}),
 				};
@@ -1435,7 +1460,7 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 			}
 			return null;
 		},
-		[repository, openEditPopover, onRemoveTask, onRemoveProject],
+		[repository, openEditPopover, onRemoveTask, onRemoveProject, setCompletion],
 	);
 	// The delegated menu binds ONCE per stable slot (it's idempotent + lives for
 	// the slot's lifetime); route through a ref so the latest resolver / runtime
@@ -1694,7 +1719,7 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 			return host;
 		}
 		if (selection.kind === TaskSurface.Timeline) {
-			const dated = showCompleted ? visible : visible.filter((x) => x.completedAt === null);
+			const dated = showCompleted ? visible : visible.filter((x) => !isClosed(x));
 			host.replaceChildren(
 				renderTimelineView({
 					model: compileGantt(dated, now, tasks),
@@ -1985,10 +2010,13 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 		return taskHeaderMenuContext({
 			task,
 			runtime: objectMenuRuntime,
-			extraItems: buildTaskExportItems({ runtime, entityIds: [task.id], name: task.name }),
+			extraItems: [
+				...completionMenuItems(task, setCompletion),
+				...buildTaskExportItems({ runtime, entityIds: [task.id], name: task.name }),
+			],
 			...(repository ? { onRemove: () => onRemoveTask(task) } : {}),
 		});
-	}, [openTaskRecord, objectMenuRuntime, runtime, repository, onRemoveTask]);
+	}, [openTaskRecord, objectMenuRuntime, runtime, repository, onRemoveTask, setCompletion]);
 
 	const projectHeaderCtx = useCallback((): ObjectMenuContext => {
 		const live = headerProject;
@@ -2157,9 +2185,16 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 				data-detail-open={String(openTaskRecord !== null)}
 				data-data-source={source}
 			>
-				<div id="tasks-sidebar-slot" ref={sidebarSlotRef}>
+				<div
+					{...navAutoHide.panelProps}
+					id="tasks-sidebar-slot"
+					ref={setSidebarSlot}
+					aria-hidden={navAutoHide.visible ? undefined : true}
+					inert={navAutoHide.visible ? undefined : true}
+				>
 					<div ref={sidebarHostRef} style={{ display: "contents" }} />
 				</div>
+				{navAutoHide.edgeProps && <div {...navAutoHide.edgeProps} />}
 				<div
 					className="tasks-resize"
 					id="tasks-resize"
@@ -2199,6 +2234,7 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 				</div>
 				{propertiesSvc && openTaskRecord ? (
 					<PropertiesProvider
+						richTextEditor={RichTextPropertyEditor}
 						runtime={{ services: { properties: propertiesSvc } }}
 						entityTitleSource={entityTitleSource}
 					>

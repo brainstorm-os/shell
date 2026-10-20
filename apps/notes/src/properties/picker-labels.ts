@@ -62,6 +62,7 @@ export function useNotesPickerLabels(): Partial<AddPropertyPickerLabels> {
 				formatUrl: t("notes.inlinePropertyForm.format.url"),
 				formatEmail: t("notes.inlinePropertyForm.format.email"),
 				formatPhone: t("notes.inlinePropertyForm.format.phone"),
+				formatRichText: t("notes.inlinePropertyForm.format.richText"),
 				formatCurrency: t("notes.inlinePropertyForm.format.currency"),
 				formatPercent: t("notes.inlinePropertyForm.format.percent"),
 				formatDuration: t("notes.inlinePropertyForm.format.duration"),

@@ -21,7 +21,10 @@
  * deletes it first.
  */
 
+import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
+import { useLexicalEditable } from "@lexical/react/useLexicalEditable";
 import {
+	$getNodeByKey,
 	type DOMConversionMap,
 	DecoratorNode,
 	type EditorConfig,
@@ -29,13 +32,13 @@ import {
 	type NodeKey,
 	type SerializedLexicalNode,
 } from "lexical";
-import type { JSX } from "react";
+import { type JSX, type PointerEvent as ReactPointerEvent, type RefObject, useRef } from "react";
 import { useEditorT } from "../i18n";
 import { MediaKind, mediaInspectorStore } from "../media-inspector-store";
 import {
 	DEFAULT_MEDIA_ALIGNMENT,
 	DEFAULT_MEDIA_WIDTH_PERCENT,
-	type MediaAlignment,
+	MediaAlignment,
 	clampMediaWidth,
 	isMediaAlignment,
 } from "../media-types";
@@ -215,6 +218,7 @@ function ImageBlockView({
 	widthPercent: number;
 }) {
 	const t = useEditorT();
+	const figureRef = useRef<HTMLElement>(null);
 	function openInspector(currentTarget: HTMLElement) {
 		const figure = currentTarget.closest("figure") ?? currentTarget;
 		const anchor = figure.getBoundingClientRect();
@@ -222,6 +226,7 @@ function ImageBlockView({
 	}
 	return (
 		<figure
+			ref={figureRef}
 			className="notes__image"
 			data-alignment={alignment}
 			style={{ "--notes-media-width": `${widthPercent}%` } as Record<string, string>}
@@ -234,6 +239,9 @@ function ImageBlockView({
 			>
 				<img src={src} alt={alt} draggable={false} />
 			</button>
+			{alignment !== MediaAlignment.Wide && (
+				<ImageResizeHandle nodeKey={nodeKey} figureRef={figureRef} alignment={alignment} />
+			)}
 			{caption && <figcaption className="notes__image-caption">{caption}</figcaption>}
 		</figure>
 	);
@@ -251,4 +259,82 @@ export function $createImageBlockNode(
 
 export function $isImageBlockNode(node: LexicalNode | null | undefined): node is ImageBlockNode {
 	return node instanceof ImageBlockNode;
+}
+
+/** The width (as % of the content column) a drag of `dx` px on the image's
+ *  trailing edge lands on. A centred image grows on both sides, so the edge
+ *  under the pointer moves by half the width change — `dx` counts double. */
+export function resizedWidthPercent(
+	startWidthPx: number,
+	dx: number,
+	containerPx: number,
+	alignment: MediaAlignment,
+	rtl: boolean,
+): number {
+	if (containerPx <= 0) return clampMediaWidth(100);
+	const signed = rtl ? -dx : dx;
+	const grow = alignment === MediaAlignment.Center ? signed * 2 : signed;
+	return clampMediaWidth(((startWidthPx + grow) / containerPx) * 100);
+}
+
+/** Drag handle on a block image's trailing edge (B11.28). Pointer-only by
+ *  design — the inspector's width slider is the keyboard path to the same
+ *  `widthPercent`, so the handle stays out of the tab order. Live feedback
+ *  rides the `--notes-media-width` var; one undo step commits on release. */
+function ImageResizeHandle({
+	nodeKey,
+	figureRef,
+	alignment,
+}: {
+	nodeKey: NodeKey;
+	figureRef: RefObject<HTMLElement | null>;
+	alignment: MediaAlignment;
+}) {
+	const [editor] = useLexicalComposerContext();
+	const editable = useLexicalEditable();
+	const t = useEditorT();
+	if (!editable) return null;
+
+	const onPointerDown = (event: ReactPointerEvent<HTMLSpanElement>): void => {
+		const figure = figureRef.current;
+		const container = figure?.parentElement;
+		if (!figure || !container) return;
+		event.preventDefault();
+		event.stopPropagation();
+		const handle = event.currentTarget;
+		const startX = event.clientX;
+		const startWidth = figure.getBoundingClientRect().width;
+		const containerWidth = container.getBoundingClientRect().width;
+		const rtl = getComputedStyle(figure).direction === "rtl";
+		let latest: number | null = null;
+		handle.setPointerCapture?.(event.pointerId);
+		const onMove = (move: PointerEvent): void => {
+			latest = resizedWidthPercent(startWidth, move.clientX - startX, containerWidth, alignment, rtl);
+			figure.style.setProperty("--notes-media-width", `${latest}%`);
+		};
+		const onUp = (): void => {
+			handle.removeEventListener("pointermove", onMove);
+			handle.removeEventListener("pointerup", onUp);
+			handle.removeEventListener("pointercancel", onUp);
+			if (latest === null) return;
+			const next = latest;
+			editor.update(() => {
+				const node = $getNodeByKey(nodeKey);
+				if ($isImageBlockNode(node)) node.setWidthPercent(next);
+			});
+		};
+		handle.addEventListener("pointermove", onMove);
+		handle.addEventListener("pointerup", onUp);
+		handle.addEventListener("pointercancel", onUp);
+	};
+
+	return (
+		<span
+			className="notes__image-resize"
+			aria-hidden="true"
+			title={t("editor.media.resize")}
+			data-testid="image-resize-handle"
+			onPointerDown={onPointerDown}
+		/>
+	);
 }

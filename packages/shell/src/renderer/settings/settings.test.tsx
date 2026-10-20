@@ -57,6 +57,8 @@ function installBrainstormBridge(): void {
 			onStateChange: () => () => {},
 		},
 		intents: { dispatch: () => Promise.resolve({ handled: true }) },
+		// General also renders the Startup section (7.16 / 7.17).
+		dashboard: { snapshot: () => Promise.resolve(null), on: () => () => {} },
 	};
 }
 

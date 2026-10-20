@@ -99,7 +99,6 @@
   "tasks.header.sidebar.hide": "Ocultar la barra lateral",
   "tasks.header.iconPicker.open": "Cambiar el icono del proyecto",
   "tasks.header.renameProject": "Renombrar proyecto",
-  "tasks.row.toggle.aria": "Alternar completada",
   "tasks.row.icon.aria": "Cambiar icono",
   "tasks.row.due.sr": "Vence el {date}",
   "tasks.row.scheduled.sr": "Programada para el {date}",
@@ -280,5 +279,12 @@
   "tasks.export.cancel": "Cancelar",
   "tasks.export.markdown": "Markdown",
   "tasks.export.csv": "CSV",
-  "tasks.export.json": "JSON"
+  "tasks.export.json": "JSON",
+  "tasks.menu.markDone": "Marcar como hecha",
+  "tasks.menu.markWontDo": "Marcar como no se hará",
+  "tasks.menu.reopen": "Reabrir",
+  "tasks.row.toggle.open": "Marcar «{name}» como hecha",
+  "tasks.row.toggle.done": "«{name}» está hecha: marcar como no se hará",
+  "tasks.row.toggle.wontDo": "«{name}» no se hará: reabrir",
+  "tasks.quickLook.value.wontDo": "No se hará"
 }

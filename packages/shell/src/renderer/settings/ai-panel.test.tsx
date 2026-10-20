@@ -38,6 +38,16 @@ describe("AiPanel", () => {
 		expect(html).toContain("Automatic (local model)");
 	});
 
+	it("Agent-14 — renders the Ollama tile, the custom endpoints section, and both add affordances", () => {
+		const html = renderToStaticMarkup(<AiPanel />);
+		expect(html).toContain('data-testid="ai-provider-ollama"');
+		expect(html).toContain('data-testid="ai-endpoints"');
+		expect(html).toContain('data-testid="ai-endpoint-add"');
+		expect(html).toContain('data-testid="ai-endpoint-add-openrouter"');
+		expect(html).toContain("Custom endpoints");
+		expect(html).toContain("No custom endpoints yet.");
+	});
+
 	it("registers a stable section enum value", () => {
 		expect(SettingsSection.Ai).toBe("ai");
 	});

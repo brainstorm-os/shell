@@ -23,6 +23,7 @@ import { IconName, createIconElement } from "@brainstorm-os/sdk/icon";
 import { openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import { t, tCount } from "../i18n/t";
 import { type GanttModel, type GanttRow, rangeDays } from "../logic/gantt";
+import { isClosed } from "../logic/task-status";
 import { formatMinutes } from "../logic/task-time";
 import type { Task } from "../types/task";
 import { formatDateRelative } from "./format-date";
@@ -341,7 +342,7 @@ function renderBar(
 	if (widthPx < COMPACT_BAR_PX) bar.classList.add("tasks-timeline__bar--compact");
 
 	const task = row.task;
-	const done = task.completedAt !== null;
+	const done = isClosed(task);
 	const overdue = !done && task.dueAt !== null && task.dueAt < props.now;
 	if (done) bar.dataset.state = "done";
 	else if (overdue) bar.dataset.state = "overdue";

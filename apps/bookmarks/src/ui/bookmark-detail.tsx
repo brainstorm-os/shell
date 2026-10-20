@@ -25,6 +25,7 @@ import {
 	EditorCapturePlugin,
 	FULL_EDITOR_NODES,
 	FullEditorPlugins,
+	RichTextPropertyEditor,
 } from "@brainstorm-os/editor";
 import {
 	useUniversalBody,
@@ -386,7 +387,10 @@ export function BookmarkDetail({
 			 *  component); mounted whenever the vault service exists so it can
 			 *  slide in/out, with `open` driving the slide. */}
 			{properties ? (
-				<PropertiesProvider runtime={{ services: { properties } }}>
+				<PropertiesProvider
+					richTextEditor={RichTextPropertyEditor}
+					runtime={{ services: { properties } }}
+				>
 					<BookmarkPropertiesPanel
 						bookmark={bookmark}
 						open={showProperties}

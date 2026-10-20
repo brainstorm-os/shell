@@ -189,6 +189,18 @@ describe("WindowIndex", () => {
 		});
 	});
 
+	it("remembers the OS window's bounds, never a pane's: a split layout leaves them untouched", () => {
+		const controller = fakeController({ bounds: { x: 0, y: 0, width: 1206, height: 700 } });
+		launcher.add(buildEntry("notes", "main", controller));
+		// A split lays the panes out as child views; the window itself does not
+		// move, so the tracker hears nothing and keeps the window's size.
+		launcher.notify();
+		expect(index.list()[0]?.bounds).toEqual({ x: 0, y: 0, width: 1206, height: 700 });
+		controller.mutate({ bounds: { x: 0, y: 0, width: 900, height: 700 } });
+		controller.fire("resize");
+		expect(index.list()[0]?.bounds.width).toBe(900);
+	});
+
 	it("untracks a window when it disappears from the launcher", () => {
 		const controller = fakeController({});
 		launcher.add(buildEntry("notes", "main", controller));

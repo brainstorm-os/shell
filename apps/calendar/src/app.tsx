@@ -19,9 +19,10 @@ import { LiveRegion, announce } from "@brainstorm-os/sdk/a11y";
 import { IconName } from "@brainstorm-os/sdk/icon";
 import { NavButtons, createNavHistory } from "@brainstorm-os/sdk/nav-history";
 import type { ObjectMenuContext } from "@brainstorm-os/sdk/object-menu";
-import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { PanelSide, PanelToggleButton, useAutoHidePanel } from "@brainstorm-os/sdk/panel-toggle";
 import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
 import { useResizable } from "@brainstorm-os/sdk/resizable";
+import { useShortcut } from "@brainstorm-os/sdk/shortcut";
 import {
 	type MouseEvent as ReactMouseEvent,
 	useCallback,
@@ -94,6 +95,9 @@ import { reminderOffsetLabel } from "./ui/reminder-labels";
 
 const REMINDER_TICK_MS = 30_000;
 const SIDEBAR_OPEN_KEY = "calendar:sidebar-open";
+/** Show/hide the sidebar — while auto-hide (7.15) governs a collapsed
+ *  sidebar, the same chord reveals it as an overlay instead of pinning it. */
+const TOGGLE_SIDEBAR_CHORD = "CmdOrCtrl+\\";
 
 /** The owning entity type behind an item's source key — drives the object
  *  menu target. Built-in keys map to their type; a property-derived key
@@ -359,6 +363,13 @@ export function CalendarApp() {
 			return next;
 		});
 	}, []);
+
+	const sidebarAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !sidebarOpen });
+	useShortcut(TOGGLE_SIDEBAR_CHORD, (event) => {
+		event.preventDefault();
+		if (sidebarAutoHide.active) sidebarAutoHide.toggle();
+		else toggleSidebar();
+	});
 
 	// ── Persistence: apply a detail-surface / drag result ──────────────
 	// EVERY `Event/v1` write goes through `logic/event-writes.ts`, where the
@@ -810,9 +821,10 @@ export function CalendarApp() {
 				    end of the close; `inert` drops the sidebar from the tab
 				    order and the a11y tree immediately (F-489). */}
 				<div
+					{...sidebarAutoHide.panelProps}
 					id="calendar-sidebar-slot"
-					aria-hidden={sidebarOpen ? undefined : true}
-					inert={sidebarOpen ? undefined : true}
+					aria-hidden={sidebarAutoHide.visible ? undefined : true}
+					inert={sidebarAutoHide.visible ? undefined : true}
 				>
 					<Sidebar
 						anchor={anchor}
@@ -824,6 +836,7 @@ export function CalendarApp() {
 						onToggleSource={toggleSource}
 					/>
 				</div>
+				{sidebarAutoHide.edgeProps && <div {...sidebarAutoHide.edgeProps} />}
 				<div
 					className="calendar-resize"
 					aria-label={t("calendar.chrome.resizeSidebar")}

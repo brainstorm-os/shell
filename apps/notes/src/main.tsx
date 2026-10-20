@@ -2,11 +2,12 @@ import "@brainstorm-os/sdk/app-theme.css";
 import { initAnalytics } from "@brainstorm-os/sdk/analytics";
 import "@brainstorm-os/sdk/empty-state.css";
 import "@brainstorm-os/sdk/share-dialog.css";
+import "@brainstorm-os/sdk/version-history.css";
 import { mountMenuHost } from "@brainstorm-os/sdk/menus";
 import { mountSpellcheckMenuFromWindow } from "@brainstorm-os/sdk/spellcheck-menu";
 import "@brainstorm-os/editor/editor.css";
 import "@brainstorm-os/editor/editor-theme.css";
-import { setEditorHost, setEntityIndexSource } from "@brainstorm-os/editor";
+import { editorEntitiesHost, setEditorHost, setEntityIndexSource } from "@brainstorm-os/editor";
 import { YDocProvider } from "@brainstorm-os/react-yjs";
 import {
 	BlockRendererRegistryProvider,
@@ -82,6 +83,7 @@ function mountFullApp(mountRoot: HTMLElement): void {
 	const storage = runtime?.services.storage;
 	const blocksSvc = runtime?.services.blocks;
 	const bpSvc = runtime?.services.bp;
+	const notesEntities = editorEntitiesHost(runtime?.services.entities);
 	setEditorHost({
 		...(intents
 			? {
@@ -113,6 +115,9 @@ function mountFullApp(mountRoot: HTMLElement): void {
 				}
 			: {}),
 		...(bpSvc ? { bp: bpSvc } : {}),
+		// `/task` + the task-mention checkbox (B11.24) create / complete tasks
+		// under Notes' existing `entities.write:*` grant.
+		...(notesEntities ? { entities: notesEntities } : {}),
 	});
 
 	const blocksService = runtime?.services.blocks;

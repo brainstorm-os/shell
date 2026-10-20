@@ -85,7 +85,13 @@ export type LiveSyncEngineContext = {
 	 *  open renderers. Implemented by the wiring over the ydoc worker +
 	 *  `deliverDocUpdate`; deliberately NOT the `entities.applyDoc` verb (that
 	 *  would re-enter the emit hook). */
-	applyRemoteUpdate: (entityId: string, type: string, update: Uint8Array) => Promise<void>;
+	applyRemoteUpdate: (
+		entityId: string,
+		type: string,
+		update: Uint8Array,
+		/** 10.16 — the authenticated sender (base64url Ed25519 key). */
+		senderB64Url?: string,
+	) => Promise<void>;
 	/** Presence (Stage 10.6 wiring) — deliver a decrypted remote AWARENESS update
 	 *  (cursors / selection / "who's here") for a tracked entity to the open app
 	 *  renderers, which apply it to their `y-protocols` `Awareness`. Implemented by
@@ -136,6 +142,10 @@ export type LiveSyncEngineContext = {
 	/** Stage 10.7 traffic-tick hooks for the sync-status surface. */
 	onSent?: (frameBytes: number) => void;
 	onReceived?: (frameBytes: number) => void;
+	/** Collab-C7 — a shared entity was edited: by a verified, authorized remote
+	 *  sender (inbound apply) or by this device (local emit). `editorPubB64` is
+	 *  std base64. Optional; absent ⇒ no last-editor bookkeeping. */
+	onEdit?: (entityId: string, editorPubB64: string) => void;
 };
 
 function defaultNonce(): Uint8Array {
@@ -328,6 +338,11 @@ export class LiveSyncEngine {
 	async noteLocalUpdate(entityId: string, update: Uint8Array): Promise<void> {
 		if (this.#disposed) return;
 		if (!this.#tracked.has(entityId)) return;
+		try {
+			this.#ctx.onEdit?.(entityId, bytesToBase64(this.#ctx.devicePub));
+		} catch {
+			// Contained: last-editor bookkeeping never fails an edit.
+		}
 		const relay = this.#ctx.getRelay();
 		if (!relay) return;
 		try {
@@ -434,8 +449,8 @@ export class LiveSyncEngine {
 		const relay = this.#ctx.getRelay();
 		if (!relay) return;
 		try {
-			await receiveAndApply(frame, this.#makeCtx(relay.currentPort()), async (plaintext) => {
-				await this.#ctx.applyRemoteUpdate(entityId, type, plaintext);
+			await receiveAndApply(frame, this.#makeCtx(relay.currentPort()), async (plaintext, sender) => {
+				await this.#ctx.applyRemoteUpdate(entityId, type, plaintext, sender);
 			});
 		} catch (error) {
 			console.warn(`[live-sync] receive failed for ${entityId}: ${(error as Error).message}`);
@@ -539,6 +554,8 @@ export class LiveSyncEngine {
 		if (this.#ctx.authorizeWriter) ctx.authorizeWriter = this.#ctx.authorizeWriter;
 		if (this.#ctx.onSent) ctx.onSent = this.#ctx.onSent;
 		if (this.#ctx.onReceived) ctx.onReceived = this.#ctx.onReceived;
+		const onEdit = this.#ctx.onEdit;
+		if (onEdit) ctx.onApplied = onEdit;
 		return ctx;
 	}
 }

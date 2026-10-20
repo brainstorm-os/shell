@@ -9,11 +9,14 @@
  */
 
 import {
+	CHROME_SPLIT_DRAG,
+	CHROME_SPLIT_STEP,
 	CHROME_TABS_ACTIVATE,
 	CHROME_TABS_CLOSE,
 	CHROME_TABS_NEW,
 	CHROME_TABS_REORDER,
 	CHROME_TABS_REQUEST,
+	SplitStep,
 } from "@brainstorm-os/protocol/chrome-tabs";
 import { ipcMain } from "electron";
 import type { LaunchOrchestrator } from "../apps/launch-orchestrator";
@@ -57,12 +60,25 @@ export function registerChromeTabsHandlers(ctx: ChromeTabsHandlersContext): () =
 	const onRequest = (event: Electron.IpcMainInvokeEvent): void => {
 		resolve(event.sender.id)?.container.publishChromeState();
 	};
+	// Split divider (6.14). The chrome sends only a pointer x or a step; the
+	// container clamps, so a compromised strip can at most move its own
+	// window's divider within the legal range.
+	const onSplitDrag = (event: Electron.IpcMainInvokeEvent, x: unknown): void => {
+		if (typeof x !== "number" || !Number.isFinite(x)) return;
+		resolve(event.sender.id)?.container.dragSplitTo(x);
+	};
+	const onSplitStep = (event: Electron.IpcMainInvokeEvent, step: unknown): void => {
+		if (step !== SplitStep.Left && step !== SplitStep.Right) return;
+		resolve(event.sender.id)?.container.stepSplit(step);
+	};
 
 	ipcMain.handle(CHROME_TABS_ACTIVATE, onActivate);
 	ipcMain.handle(CHROME_TABS_CLOSE, onClose);
 	ipcMain.handle(CHROME_TABS_REORDER, onReorder);
 	ipcMain.handle(CHROME_TABS_NEW, onNew);
 	ipcMain.handle(CHROME_TABS_REQUEST, onRequest);
+	ipcMain.handle(CHROME_SPLIT_DRAG, onSplitDrag);
+	ipcMain.handle(CHROME_SPLIT_STEP, onSplitStep);
 
 	return () => {
 		ipcMain.removeHandler(CHROME_TABS_ACTIVATE);
@@ -70,5 +86,7 @@ export function registerChromeTabsHandlers(ctx: ChromeTabsHandlersContext): () =
 		ipcMain.removeHandler(CHROME_TABS_REORDER);
 		ipcMain.removeHandler(CHROME_TABS_NEW);
 		ipcMain.removeHandler(CHROME_TABS_REQUEST);
+		ipcMain.removeHandler(CHROME_SPLIT_DRAG);
+		ipcMain.removeHandler(CHROME_SPLIT_STEP);
 	};
 }

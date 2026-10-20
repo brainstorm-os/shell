@@ -18,6 +18,7 @@ import {
 	AiContentPartKind,
 	type AiImagePart,
 	type AiProvenance,
+	type AiProviderInfo,
 	AttachmentKind,
 	COLLECTION_TYPE_URL,
 	CONVERSATION_TYPE_URL,
@@ -63,7 +64,7 @@ import {
 	type ObjectMenuRuntime,
 	ObjectMenuTrigger,
 } from "@brainstorm-os/sdk/object-menu";
-import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { PanelSide, PanelToggleButton, useAutoHidePanel } from "@brainstorm-os/sdk/panel-toggle";
 import { friendlyTypeName } from "@brainstorm-os/sdk/system-entities";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { ReactElement } from "react";
@@ -96,6 +97,7 @@ import {
 	estimateTurnTokens,
 	grantCapability,
 	grantsCover,
+	modelForRequest,
 	providerForRequest,
 	resolveProvider,
 } from "./logic/conversation-settings";
@@ -155,6 +157,7 @@ import { buildVaultDataContextBlock } from "./logic/vault-data-context";
 import { buildWorkspaceContextBlock, joinContextBlocks } from "./logic/workspace-context";
 import { MemoryPopover } from "./memory-popover";
 import { ProposalTray } from "./proposal-tray";
+import { RunChangesPanel } from "./run-changes-panel";
 import { getBrainstorm } from "./runtime";
 import { SaveAsAutomationPopover } from "./save-as-automation-popover";
 import { TurnTimeline } from "./turn-timeline";
@@ -460,7 +463,23 @@ export function AgentApp(): ReactElement {
 		() => providerForRequest(resolveProvider(appCaps ?? [], str(activeConv?.properties.provider))),
 		[appCaps, activeConv],
 	);
-	const conversationModel = str(activeConv?.properties.model) || undefined;
+	const conversationModel = modelForRequest(str(activeConv?.properties.model));
+
+	// Agent-14 — the shell's routable providers (incl. user-added custom
+	// endpoints), already filtered to this app's grants. `null` = an older shell
+	// without `ai.providers`; the picker then derives providers from caps.
+	const [aiProviders, setAiProviders] = useState<readonly AiProviderInfo[] | null>(null);
+	useEffect(() => {
+		if (!settingsOpen || !aiSvc?.providers) return;
+		let live = true;
+		aiSvc
+			.providers()
+			.then((list) => live && setAiProviders(list))
+			.catch(() => live && setAiProviders(null));
+		return () => {
+			live = false;
+		};
+	}, [aiSvc, settingsOpen]);
 
 	// The conversation's token budget + spend so far (Agent-5).
 	const tokenBudget = activeConv ? posNum(activeConv.properties.tokenBudget) : undefined;
@@ -525,6 +544,7 @@ export function AgentApp(): ReactElement {
 			return next;
 		});
 	}, []);
+	const sidebarAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !sidebarOpen });
 	// The composer is a CompactEditor (rich draft) — the latest payload rides in
 	// a ref (reading it doesn't need a render); `draftEmpty` drives the Send
 	// button's enabled state.
@@ -1598,7 +1618,13 @@ export function AgentApp(): ReactElement {
 			</header>
 
 			<div className="agent__body" data-sidebar-open={String(sidebarOpen)}>
-				<aside className="agent__sidebar" id="agent-sidebar">
+				<aside
+					{...sidebarAutoHide.panelProps}
+					className="agent__sidebar"
+					id="agent-sidebar"
+					aria-hidden={sidebarAutoHide.visible ? undefined : true}
+					inert={sidebarAutoHide.visible ? undefined : true}
+				>
 					<nav className="agent__convs">
 						{conversations.length === 0 ? (
 							<EmptyState icon={IconName.Chat} title={t("sidebar.empty")} tone={EmptyStateTone.Compact} />
@@ -1616,6 +1642,7 @@ export function AgentApp(): ReactElement {
 						)}
 					</nav>
 				</aside>
+				{sidebarAutoHide.edgeProps && <div {...sidebarAutoHide.edgeProps} />}
 
 				<section className="agent__main">
 					<div className="agent__transcript" data-testid="agent-transcript">
@@ -1808,6 +1835,12 @@ export function AgentApp(): ReactElement {
 							</div>
 						</section>
 					) : null}
+					<RunChangesPanel
+						trace={agentTraceSvc}
+						conversationId={activeId}
+						refreshKey={createdObjects.map((obj) => obj.id).join(",")}
+						onOpenEntity={openCitation}
+					/>
 					{insertNotice ? (
 						<div className="agent__error-row">
 							<div className="agent__notice" role="status" data-testid="agent-insert-notice">
@@ -1889,6 +1922,7 @@ export function AgentApp(): ReactElement {
 			{settingsOpen && activeConv ? (
 				<ConversationSettingsPopover
 					appCaps={appCaps ?? []}
+					providers={aiProviders}
 					settings={{
 						grants: conversationGrants,
 						provider: str(activeConv.properties.provider) || undefined,
@@ -1898,7 +1932,8 @@ export function AgentApp(): ReactElement {
 					}}
 					onClose={() => setSettingsOpen(false)}
 					onGrantsChange={(grants) => persistConversation({ toolGrants: grants })}
-					onProviderChange={(provider) => persistConversation({ provider: provider ?? "" })}
+					onProviderChange={(provider) => persistConversation({ provider: provider ?? "", model: "" })}
+					onModelChange={(model) => persistConversation({ model: model ?? "" })}
 					onBudgetChange={(budget) => persistConversation({ tokenBudget: budget ?? 0 })}
 				/>
 			) : null}

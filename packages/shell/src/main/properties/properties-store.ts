@@ -200,7 +200,7 @@ export class PropertiesStore {
 
 	private readProperties(): Record<string, PropertyDef> {
 		const map = this.doc.getMap<string>("properties");
-		const out: Record<string, PropertyDef> = {};
+		const out: Record<string, PropertyDef> = Object.create(null);
 		for (const [key, raw] of map.entries()) {
 			const def = decodeProperty(raw);
 			if (def && def.key === key) out[key] = def;
@@ -210,7 +210,7 @@ export class PropertiesStore {
 
 	private readDictionaries(): Record<string, Dictionary> {
 		const map = this.doc.getMap<string>("dictionaries");
-		const out: Record<string, Dictionary> = {};
+		const out: Record<string, Dictionary> = Object.create(null);
 		for (const [id, raw] of map.entries()) {
 			const dict = decodeDictionary(raw);
 			if (dict && dict.id === id) out[id] = dict;

@@ -35,7 +35,7 @@ import "@brainstorm-os/editor/editor.css";
 import "@brainstorm-os/sdk/virtual-list.css";
 import "@brainstorm-os/sdk/property-ui/dictionary-editor.css";
 import "@brainstorm-os/sdk/count-badge.css";
-import { EntityCommentsPanel } from "@brainstorm-os/editor";
+import { EntityCommentsPanel, RichTextPropertyEditor } from "@brainstorm-os/editor";
 import { inheritedPropertyDefs, openEntity, quickLookEntity } from "@brainstorm-os/sdk";
 import {
 	COLLECTION_TYPE_URL,
@@ -43,6 +43,7 @@ import {
 	type Dictionary,
 	type Entity,
 	type EntityQuery,
+	type FileImportResult,
 	GENERIC_OBJECT_TYPE,
 	type Icon,
 	type ObjectDragPayload,
@@ -53,8 +54,10 @@ import {
 	type SourceQueryResult,
 	ValueType,
 	type VaultEntity,
+	coerceScalarValue,
 	decideRowCreate,
 	isMultiValued,
+	predicateReferencesHost,
 } from "@brainstorm-os/sdk-types";
 import { type LiveRegionHandle, attachLiveRegion } from "@brainstorm-os/sdk/a11y";
 import { createCountBadge } from "@brainstorm-os/sdk/count-badge";
@@ -76,17 +79,20 @@ import {
 	openAnchoredMenu,
 	openObjectMenu,
 } from "@brainstorm-os/sdk/object-menu";
+import { bindOsFileDrop, importOsFilesAsEntities } from "@brainstorm-os/sdk/os-file-drop";
 import {
 	PanelSide,
 	type PanelToggleButtonHandle,
 	createPanelToggleButton,
 } from "@brainstorm-os/sdk/panel-toggle";
 import { createAddIconGlyph } from "@brainstorm-os/sdk/picker-host";
+import { getWidgetLaunch } from "@brainstorm-os/sdk/widget";
 import "@brainstorm-os/sdk/presence-stack.css";
 import { renderPresenceHeader } from "@brainstorm-os/sdk/presence-stack";
 import { type EntityTitleSource, PropertiesProvider } from "@brainstorm-os/sdk/property-ui";
+import { formatScalar } from "@brainstorm-os/sdk/property-ui/pure";
 import { applyPersistedPanelWidth, attachResizable } from "@brainstorm-os/sdk/resizable";
-import { attachShortcut } from "@brainstorm-os/sdk/shortcut";
+import { attachShortcut, isEditableElement } from "@brainstorm-os/sdk/shortcut";
 import { mountSpellcheckMenuFromWindow } from "@brainstorm-os/sdk/spellcheck-menu";
 import {
 	CreateOptionKind,
@@ -99,6 +105,44 @@ import {
 	objectToTemplateProperties,
 } from "@brainstorm-os/sdk/templates";
 import { type VirtualListHandle, createVirtualList } from "@brainstorm-os/sdk/virtual-list";
+import {
+	type CollapseAllAction,
+	boardVisibleOrder,
+	buildSwimlanes,
+	cellMovePatch,
+	collapseAllPatch,
+	groupWireKey,
+	toggleCollapsed,
+} from "./logic/board-groups";
+import {
+	type BulkUndo,
+	BulkUndoKind,
+	isBulkUndoLive,
+	planBulkAddToList,
+	planBulkSet,
+	planBulkSetRevert,
+	revertBulkAdd,
+} from "./logic/bulk-edit";
+import { canChangeType, planTypeChange, typeChangePatches } from "./logic/change-type";
+import { buildChartModel } from "./logic/chart-data";
+import { patchColumn, propertyColumns } from "./logic/column-layout";
+import { type CompiledView, flattenFilter } from "./logic/compile-view";
+import { effectiveColumnDef } from "./logic/effective-def";
+import { acceptsFileDrop, membersWithDroppedFiles } from "./logic/file-drop";
+import {
+	OBJECT_NAV_SHORTCUTS,
+	type ObjectNavContext,
+	ObjectNavDirection,
+	ObjectOpenMode,
+	objectNavPosition,
+	stepObjectNav,
+} from "./logic/object-nav";
+import { propertyKindIconFor } from "./logic/property-kind-icon";
+import { ViewPinAvailability, canPinToDashboard, viewPinAvailability } from "./logic/view-pin";
+import { ChartView } from "./react/chart-view";
+import { ChartWidget, type ChartWidgetRuntime } from "./react/chart-widget";
+import { installFirstMediaTransport } from "./react/use-first-media";
+import { openChangeTypeModal } from "./ui/change-type-modal";
 
 applyPersistedPanelWidth({
 	storageKey: "database:sidebar-width",
@@ -156,7 +200,7 @@ import { TYPE_LABELS } from "./demo/dataset";
 import { type TranslationKey, plural, t } from "./i18n";
 import { onTranslatorChange, startLocaleSync } from "./i18n-boot";
 import { PERSON_TYPE } from "./logic/contact-import";
-import { commitCsvImport, csvToEntityImport } from "./logic/csv-import";
+import { commitCsvImport, csvToEntityImport, propertyDefsForCsvImport } from "./logic/csv-import";
 import { registerBuiltInImportMappers } from "./logic/import-registry";
 import { ListExportFormat, type ListExportOptions } from "./logic/list-export";
 import { runListExport } from "./ui/export-flow";
@@ -180,7 +224,12 @@ import { subscribe as subscribePerf, time } from "@brainstorm-os/sdk/perf";
 import { type ReactElement, createElement } from "react";
 import { type Backlink, backlinksFor } from "./logic/backlinks";
 import { pickerCandidatesForEntity, sourceMatches } from "./logic/collections-for-entity";
-import { appendColumnForProperty, findReusablePropertyDef } from "./logic/column-adder";
+import {
+	type PropertyReuseDecision,
+	PropertyReuseKind,
+	appendColumnForProperty,
+	resolvePropertyReuse,
+} from "./logic/column-adder";
 import {
 	compileViewCached,
 	filterEntitiesCached,
@@ -196,18 +245,21 @@ import {
 	type FilterCompareTo,
 	type FilterDraft,
 	FilterOp,
+	FilterRefKind,
 	type FilterRule,
 	countDraftRules,
 	describeGroup,
 	describeRule,
 	draftToFilterNode,
 	filterNodeToDraft,
+	opAcceptsHostRef,
 	opAcceptsRef,
 	opIsList,
 	opLabel,
 	opNeedsValue,
 } from "./logic/filter-builder";
 import { type EntityRow, type InMemoryEntities, emptyEntities } from "./logic/in-memory-entities";
+import { pairableInverseCandidates } from "./logic/inverse-candidates";
 import {
 	createList,
 	createView,
@@ -217,10 +269,15 @@ import {
 	duplicateView,
 	renameList as renameListLogic,
 	resolveListView,
+	seedColumnsForNewView,
+	setListDescription as setListDescriptionLogic,
 	setListIcon as setListIconLogic,
 } from "./logic/list-crud";
+import { isListLocked, withLiveListLocks } from "./logic/list-lock";
 import { deriveListMode } from "./logic/list-mode";
 import {
+	DeleteListOutcome,
+	SaveListOutcome,
 	deleteUserList,
 	loadUserLists,
 	planListReconcile,
@@ -287,7 +344,14 @@ import { InspectorProperties } from "./react/inspector-properties";
 // React component of the same name. Keep the component name parity in
 // the `react/` directory and disambiguate here.
 import { ListView as ListViewComponent } from "./react/list-view";
-import { StageEmpty, mountInspectorProps, renderEmpty, renderViewBodyReact } from "./react/mount";
+import {
+	type SelectionProps,
+	StageEmpty,
+	mountInspectorProps,
+	mountReactRoot,
+	renderEmpty,
+	renderViewBodyReact,
+} from "./react/mount";
 import { TimelineView } from "./react/timeline-view";
 import { entityIcon, entityTitle, formatDate, formatDateTime, typeLabel } from "./render/cells";
 import { IconKind } from "./types/icon";
@@ -297,6 +361,7 @@ import { ListMode, type ListSource, ListSourceKind } from "./types/list-source";
 import type {
 	BoardLayoutOptions,
 	CalendarLayoutOptions,
+	ChartLayoutOptions,
 	ColumnSpec,
 	GalleryLayoutOptions,
 	GridLayoutOptions,
@@ -450,27 +515,10 @@ function propertyDisplayName(propertyId: string): string {
  *  off the catalog `valueType` + `format`. Built-ins with no def fall back by
  *  key (`__title__`/name → text, the `*At` timestamps → date). */
 function propertyKindIcon(propertyId: string): IconName {
-	if (propertyId === "__title__") return IconName.KindText;
-	const def = cachedVaultProperties.find((d) => d.key === propertyId);
-	if (!def) return /at$/i.test(propertyId) ? IconName.KindDate : IconName.KindText;
-	if (def.vocabulary?.dictionaryId) {
-		return isMultiValued(def.count) ? IconName.KindMultiSelect : IconName.KindSelect;
-	}
-	switch (def.valueType) {
-		case ValueType.Number:
-			return IconName.KindNumber;
-		case ValueType.Boolean:
-			return IconName.KindBoolean;
-		case ValueType.Date:
-			return IconName.KindDate;
-		case ValueType.EntityRef:
-			return IconName.KindLink;
-		default:
-			if (def.format === PropertyFormat.Email) return IconName.KindEmail;
-			if (def.format === PropertyFormat.Url) return IconName.KindUrl;
-			if (def.format === PropertyFormat.Phone) return IconName.KindPhone;
-			return IconName.KindText;
-	}
+	return propertyKindIconFor(
+		propertyId,
+		cachedVaultProperties.find((d) => d.key === propertyId),
+	);
 }
 
 /** Vault dictionaries (vocabulary option sets), keyed by dictionary id —
@@ -501,6 +549,15 @@ function selectLabelForValue(propertyId: string, value: string): string {
 /** The human label for a rule's value in the filter chip / menu: a relative-
  *  date rule shows its range name ("Last 7 days"), a vocabulary value its
  *  option label, everything else the raw value. */
+function describeFilterRule(rule: FilterRule): string {
+	return describeRule(
+		rule,
+		colLabel(rule.propertyId),
+		ruleValueLabel(rule),
+		undefined,
+		t("brainstorm.database.filter.thisObject"),
+	);
+}
 function ruleValueLabel(rule: FilterRule): string {
 	return rule.op === FilterOp.RelativeDate
 		? relativeRangeLabel(rule.value)
@@ -557,8 +614,26 @@ function bootApp(): void {
 	// Stand up the fancy-menus runtime so object / context menus open through
 	// the shared bridge (Stage 8.8).
 	mountMenuHost();
+	// Widget-mode (9.12.30): the dashboard launched this bundle as the Chart
+	// widget — mount the compact chart instead of the full app.
+	const widgetLaunch = getWidgetLaunch();
+	if (widgetLaunch) {
+		const host = document.createElement("div");
+		host.className = "dbv-chart-widget-host";
+		document.body.replaceChildren(host);
+		mountReactRoot(
+			host,
+			createElement(ChartWidget, {
+				launch: widgetLaunch,
+				runtime: getRuntime() as unknown as ChartWidgetRuntime | null,
+			}),
+		);
+		return;
+	}
 	// B11.16c — spellcheck suggestion menu for editable text cells.
 	mountSpellcheckMenuFromWindow();
+	const bodyDocs = getRuntime()?.services?.entities;
+	installFirstMediaTransport(bodyDocs && hasBodyDocTransport(bodyDocs) ? bodyDocs : null);
 	// Surface over-budget renders to the runtime error log. The doc-13
 	// keystroke→paint budget is 16ms; the noise floor for a *warning* sits
 	// at 50ms (three frames at 60fps — comfortably past first-paint /
@@ -862,6 +937,11 @@ function buildListNavRow(state: AppState, list: List): HTMLButtonElement {
 	name.className = "db-sidebar__list-name";
 	name.textContent = list.name;
 	item.appendChild(name);
+	const description = list.description.trim();
+	if (description) {
+		item.dataset.bsTooltip = description;
+		item.setAttribute("aria-description", description);
+	}
 
 	item.appendChild(createCountBadge(memberCount(list, state)));
 
@@ -925,7 +1005,7 @@ function renderViewTabs(state: AppState): void {
 		});
 		tab.addEventListener("contextmenu", (event) => {
 			event.preventDefault();
-			openViewContextMenu(state, view, { x: event.clientX, y: event.clientY });
+			void openViewContextMenu(state, view, { x: event.clientX, y: event.clientY });
 		});
 		bindViewTabDrag(state, tab, view.id);
 		root.appendChild(tab);
@@ -1008,6 +1088,8 @@ function viewKindIcon(kind: ListViewKind): DatabaseIcon {
 			return DatabaseIcon.Calendar;
 		case ListViewKind.Timeline:
 			return DatabaseIcon.Timeline;
+		case ListViewKind.Chart:
+			return DatabaseIcon.Chart;
 	}
 }
 
@@ -1043,7 +1125,7 @@ function renderStageHeader(state: AppState): void {
 		// dedicated edit mode. Skip the rewrite while it's focused so a
 		// re-render mid-edit can't clobber the caret / in-progress text.
 		titleEl.textContent = list.name;
-		titleEl.contentEditable = "plaintext-only";
+		titleEl.contentEditable = isListLocked(list) ? "false" : "plaintext-only";
 		titleEl.spellcheck = false;
 		titleEl.onkeydown = (event) => {
 			if (event.key === "Enter") {
@@ -1082,7 +1164,7 @@ function renderStageHeader(state: AppState): void {
 	const headerName = document.getElementById("active-list-name");
 	if (headerName) headerName.textContent = list.name;
 	const descEl = document.getElementById("stage-description");
-	if (descEl) descEl.textContent = list.description;
+	if (descEl) bindListDescription(state, descEl, list);
 	const countEl = document.getElementById("stage-count");
 	if (countEl) countEl.textContent = String(memberCount(list, state));
 
@@ -1092,6 +1174,44 @@ function renderStageHeader(state: AppState): void {
 		badge.textContent = badgeLabel(mode);
 		badge.dataset.mode = mode;
 	}
+}
+
+/** The List description under the stage title (9.12.27): the paragraph IS
+ *  the edit field — click in and type, like the title. Enter (or blur)
+ *  commits, Escape reverts. Only entity-backed Lists are editable; a
+ *  vault-derived type list is regenerated every load, so an edit there would
+ *  silently vanish. Skips the rewrite while focused so a re-render can't
+ *  clobber an edit in progress. */
+function bindListDescription(state: AppState, el: HTMLElement, list: List): void {
+	if (el === document.activeElement) return;
+	const editable = !isVaultDerivedListId(list.id) && !isListLocked(list);
+	el.textContent = list.description;
+	el.contentEditable = editable ? "plaintext-only" : "false";
+	el.dataset.placeholder = editable ? t("brainstorm.database.stage.descriptionPlaceholder") : "";
+	if (editable) el.setAttribute("aria-label", t("brainstorm.database.stage.descriptionAria"));
+	else el.removeAttribute("aria-label");
+	el.dataset.listId = list.id;
+	el.onblur = () => {
+		const id = el.dataset.listId;
+		const current = state.lists.find((l) => l.id === id);
+		if (!current) return;
+		const next = (el.textContent ?? "").trim();
+		if (next !== current.description) commitListDescription(state, current.id, next);
+		else el.textContent = current.description;
+	};
+	if (el.dataset.shortcutsBound === "1") return;
+	el.dataset.shortcutsBound = "1";
+	attachShortcut(el, "Enter", () => el.blur(), { allowWhileSuppressed: true });
+	attachShortcut(
+		el,
+		"Escape",
+		() => {
+			const current = state.lists.find((l) => l.id === el.dataset.listId);
+			el.textContent = current?.description ?? "";
+			el.blur();
+		},
+		{ allowWhileSuppressed: true },
+	);
 }
 
 function badgeLabel(mode: ListMode): string {
@@ -1126,6 +1246,43 @@ function emptyStateContent(state: AppState): { title: string; body: string } {
  *  Calendar, a group for Board). When that property is unset the per-kind
  *  switch breaks without a body — surface a guiding empty-state instead of a
  *  blank stage so the user knows why it's empty and how to fix it. */
+/** The Chart view body (9.12.30) — shared by the stage and nothing else; the
+ *  widget builds its own model from the same `buildChartModel`. */
+function chartElement(state: AppState, view: ListView, compiledView: CompiledView): ReactElement {
+	const layout = view.layoutOptions as ChartLayoutOptions;
+	const model = buildChartModel(
+		compiledView,
+		layout.chartType,
+		layout.aggregation,
+		layout.valueProperty,
+		{
+			empty: t("brainstorm.database.chart.noValue"),
+			other: t("brainstorm.database.chart.other"),
+			all: t("brainstorm.database.board.allLane"),
+		},
+	);
+	return createElement(ChartView, {
+		model,
+		chartType: layout.chartType,
+		valueName: layout.valueProperty ? propertyDisplayName(layout.valueProperty) : null,
+		groupName: view.groupBy ? propertyDisplayName(view.groupBy.propertyId) : null,
+		valueDef: layout.valueProperty
+			? (cachedVaultProperties.find((d) => d.key === layout.valueProperty) ?? null)
+			: null,
+		showTable: layout.showTable === true,
+		onToggleTable: (showTable: boolean) => {
+			updateViewLayout(state, view.id, { ...layout, showTable });
+			renderActiveView(state);
+			schedulePersist(state);
+		},
+	});
+}
+
+function viewReferencesHost(view: ListView): boolean {
+	const flat = flattenFilter(view.filters);
+	return flat !== null && predicateReferencesHost(flat);
+}
+
 function grouplessViewEmptyState(kind: ListViewKind): { title: string; body: string } {
 	if (kind === ListViewKind.Calendar) {
 		return {
@@ -1170,24 +1327,26 @@ function renderActiveViewInner(state: AppState): void {
 	body.className = "db-stage__body";
 	body.dataset.viewKind = view.kind;
 
+	// A contextual view ("author is this page", 9.12.24) has no host when it
+	// is opened here directly, so it matches nothing — say why instead of
+	// painting a bare empty grid.
+	if (compiledView.rows.length === 0 && viewReferencesHost(view)) {
+		renderViewBodyReact(body, {
+			selection: null,
+			element: createElement(StageEmpty, {
+				title: t("brainstorm.database.empty.hostOnly.title"),
+				body: t("brainstorm.database.empty.hostOnly.body"),
+			}),
+		});
+		return;
+	}
+
 	const handleSelect = (entity: EntityRow, modifiers: SelectionModifiers) =>
 		onSelectEntity(state, entity, modifiers);
 	const handleOpen = (entity: EntityRow) => onOpenEntity(state, entity);
 	const handleOpenInspector = (entity: EntityRow) => onOpenInspector(state, entity);
 
-	const selectionCount = state.selection.selectedIds.size;
-	const selection =
-		selectionCount > 1
-			? {
-					count: selectionCount,
-					clearLabel: "Clear",
-					onClear: () => {
-						state.selection = clearSelection();
-						renderActiveView(state);
-						renderInspector(state);
-					},
-				}
-			: null;
+	const selection = selectionBarProps(state);
 
 	// Every active view kind is React now (some still delegate their body
 	// painting to imperative renderers from `render/` via `<DomPaint>`,
@@ -1222,22 +1381,14 @@ function renderActiveViewInner(state: AppState): void {
 					schedulePersist(state);
 				},
 				onResizeColumn: (propertyId, width) => {
-					updateViewColumns(
-						state,
-						view.id,
-						view.columns.map((c) => (c.propertyId === propertyId ? { ...c, width } : c)),
-					);
+					updateViewColumns(state, view.id, patchColumn(view.columns, propertyId, { width }));
 					renderActiveView(state);
 					schedulePersist(state);
 				},
 				onReorderRows: (ids) => updateViewManualOrder(state, view.id, ids),
 				onEdit: editProperty,
 				onSetColumnAggregation: (propertyId, aggregation) => {
-					updateViewColumns(
-						state,
-						view.id,
-						view.columns.map((c) => (c.propertyId === propertyId ? { ...c, aggregation } : c)),
-					);
+					updateViewColumns(state, view.id, patchColumn(view.columns, propertyId, { aggregation }));
 					renderActiveView(state);
 					schedulePersist(state);
 				},
@@ -1247,7 +1398,7 @@ function renderActiveViewInner(state: AppState): void {
 		case ListViewKind.List: {
 			reactBody = createElement(ListViewComponent, {
 				compiled: compiledView,
-				columns: view.columns,
+				columns: propertyColumns(view.columns),
 				allRows: state.db.entities,
 				layout: view.layoutOptions as ListLayoutOptions,
 				selectedIds: state.selection.selectedIds,
@@ -1260,7 +1411,7 @@ function renderActiveViewInner(state: AppState): void {
 		case ListViewKind.Gallery: {
 			reactBody = createElement(GalleryView, {
 				compiled: compiledView,
-				columns: view.columns,
+				columns: propertyColumns(view.columns),
 				allRows: state.db.entities,
 				layout: view.layoutOptions as GalleryLayoutOptions,
 				coverProperty: view.coverProperty,
@@ -1275,12 +1426,34 @@ function renderActiveViewInner(state: AppState): void {
 		case ListViewKind.Board: {
 			if (!view.groupBy) break;
 			const groupBy = view.groupBy;
+			const boardLayout = view.layoutOptions as BoardLayoutOptions;
+			const swimlaneBy = boardLayout.swimlaneBy ?? null;
 			reactBody = createElement(BoardView, {
 				compiled: compiledView,
-				columns: view.columns,
+				columns: propertyColumns(view.columns),
 				allRows: state.db.entities,
-				layout: view.layoutOptions as BoardLayoutOptions,
+				layout: boardLayout,
 				groupBy,
+				...(swimlaneBy
+					? {
+							lanes: buildSwimlanes(
+								compiledView.rows,
+								swimlaneBy,
+								groupLabelResolver(state),
+								groupOrderResolver(state),
+							),
+							onMoveToCell: (entity: EntityRow, key: string | null, laneKey: string | null) =>
+								onMoveToCell(state, view, entity, key, laneKey),
+						}
+					: {}),
+				onToggleGroupCollapsed: (key: string) =>
+					patchBoardLayout(state, view, {
+						collapsedGroups: toggleCollapsed(boardLayout.collapsedGroups, key),
+					}),
+				onToggleLaneCollapsed: (key: string) =>
+					patchBoardLayout(state, view, {
+						collapsedLanes: toggleCollapsed(boardLayout.collapsedLanes, key),
+					}),
 				subtitleProperty: view.cardSubtitleProperty,
 				selectedIds: state.selection.selectedIds,
 				onSelect: handleSelect,
@@ -1330,6 +1503,10 @@ function renderActiveViewInner(state: AppState): void {
 			});
 			break;
 		}
+		case ListViewKind.Chart: {
+			reactBody = chartElement(state, view, compiledView);
+			break;
+		}
 		case ListViewKind.Timeline: {
 			reactBody = createElement(TimelineView, {
 				compiled: compiledView,
@@ -1374,6 +1551,7 @@ function withProperties(state: AppState, element: ReactElement): ReactElement {
 	return createElement(PropertiesProvider, {
 		runtime: { services: { properties } },
 		entityTitleSource: getTitleSource(state),
+		richTextEditor: RichTextPropertyEditor,
 		// biome-ignore lint/correctness/noChildrenProp: app.ts is .ts (no JSX); the createElement overload for a component with a required `children` prop only type-checks when `children` is in the props object, not the variadic 3rd arg.
 		children: element,
 	});
@@ -1443,6 +1621,7 @@ function inspectorLockButton(state: AppState): LockButtonHandle | null {
 }
 
 function renderInspector(state: AppState): void {
+	renderInspectorNav(state);
 	const body = document.getElementById("inspector-body");
 	const title = document.getElementById("inspector-title");
 	if (!body || !title) return;
@@ -1820,10 +1999,27 @@ function openAddToCollectionMenu(
 		point,
 		candidates.map((list) => ({
 			label: list.name,
+			...(list.description.trim() ? { description: list.description.trim() } : {}),
 			onSelect: () => toggleEntityInList(state, list.id, entity, true),
 		})),
 		{ menuLabel: t("brainstorm.database.menu.addToCollectionRegion") },
 	);
+}
+
+/** The refusal every membership writer shows for a locked List (9.16.14). */
+function flashListLocked(listId: string, state: AppState): void {
+	const name = state.lists.find((l) => l.id === listId)?.name ?? "";
+	flashStatus(t("brainstorm.database.status.listLocked", { name }), "warn");
+}
+
+/** The lock as it stands NOW, by id — `state.lists` is refreshed by
+ *  `withLiveListLocks` on every vault rebuild, so a writer that awaited
+ *  (entity creates, body copies) re-reads this right before it commits
+ *  members, instead of trusting the List it captured before the await. A
+ *  List gone meanwhile refuses too: there is nothing to pin into. */
+function liveListLocked(state: AppState, listId: string): boolean {
+	const live = state.lists.find((l) => l.id === listId);
+	return live === undefined || isListLocked(live);
 }
 
 /** Commit a single add/remove against a List's `members` overrides.
@@ -1844,7 +2040,10 @@ function toggleEntityInList(
 		db: state.db,
 		isVaultDerived: isVaultDerivedListId,
 	});
-	if (decision.kind === "skip") return;
+	if (decision.kind === "skip") {
+		if (decision.reason === "locked") flashListLocked(listId, state);
+		return;
+	}
 
 	const { next, verb } = decision;
 	state.lists = state.lists.map((l) => (l.id === listId ? next : l));
@@ -1902,6 +2101,86 @@ function onSelectEntity(state: AppState, entity: EntityRow, modifiers: Selection
  *  "Open" affordance in the title cell (F-023). Selects the row and opens the
  *  right panel, but unlike `onOpenEntity` does NOT dispatch a cross-app open
  *  intent: this is the in-Database "peek", not "open it in its own app". */
+/** The live walk (9.12.34) — which object was opened from which view, and
+ *  how, so prev / next re-show the neighbour the same way. */
+let objectNav: ObjectNavContext | null = null;
+
+function beginObjectNav(state: AppState, entity: EntityRow, mode: ObjectOpenMode): void {
+	const view = activeView(state);
+	objectNav = view ? { viewId: view.id, entityId: entity.id, mode } : null;
+}
+
+/** The walk context for the single selected object — the recorded one when
+ *  it still points at the selection, else an inspector walk from it. */
+function currentObjectNav(state: AppState): ObjectNavContext | null {
+	const view = activeView(state);
+	const entity = singleSelectedEntity(state);
+	if (!view || !entity) return null;
+	if (objectNav && objectNav.entityId === entity.id && objectNav.viewId === view.id)
+		return objectNav;
+	return { viewId: view.id, entityId: entity.id, mode: ObjectOpenMode.Inspector };
+}
+
+function stepObject(state: AppState, direction: ObjectNavDirection): void {
+	const context = currentObjectNav(state);
+	if (!context) return;
+	const ids = orderedVisibleIds(state);
+	const next = stepObjectNav(context, ids, direction);
+	if (!next) return;
+	const entity = state.db.entities.find((e) => e.id === next.entityId);
+	if (!entity) return;
+	objectNav = next;
+	state.selection = applyClick(state.selection, entity.id, { shiftKey: false, metaKey: false }, ids);
+	if (next.mode === ObjectOpenMode.QuickLook) void dispatchQuickLook(entity);
+	if (next.mode === ObjectOpenMode.Open) void dispatchOpenIntent(entity);
+	renderInspector(state);
+	repaintSelection(state);
+	document
+		.querySelector<HTMLElement>(`#stage-body [data-entity-id="${CSS.escape(entity.id)}"]`)
+		?.scrollIntoView?.({ block: "nearest" });
+}
+
+/** Prev / next + "3 of 24" in the inspector header; empty unless exactly one
+ *  object is selected in a view. */
+function renderInspectorNav(state: AppState): void {
+	const slot = document.getElementById("inspector-nav-slot");
+	if (!slot) return;
+	slot.replaceChildren();
+	const context = currentObjectNav(state);
+	const position = context ? objectNavPosition(context, orderedVisibleIds(state)) : null;
+	if (!position || position.total < 2) return;
+	const button = (direction: ObjectNavDirection, enabled: boolean): HTMLButtonElement => {
+		const btn = document.createElement("button");
+		btn.type = "button";
+		btn.className = "db-inspector__nav-btn";
+		btn.dataset.testid =
+			direction === ObjectNavDirection.Next ? "db-inspector-next" : "db-inspector-prev";
+		const label = t(
+			direction === ObjectNavDirection.Next
+				? "brainstorm.database.inspector.nextObject"
+				: "brainstorm.database.inspector.previousObject",
+		);
+		btn.setAttribute("aria-label", label);
+		btn.dataset.bsTooltip = label;
+		btn.setAttribute("aria-keyshortcuts", OBJECT_NAV_SHORTCUTS[direction]);
+		btn.disabled = !enabled;
+		setSharedIcon(btn, direction === ObjectNavDirection.Next ? IconName.CaretDown : IconName.CaretUp);
+		btn.addEventListener("click", () => stepObject(state, direction));
+		return btn;
+	};
+	const count = document.createElement("span");
+	count.className = "db-inspector__nav-count";
+	count.textContent = t("brainstorm.database.inspector.position", {
+		index: position.index + 1,
+		total: position.total,
+	});
+	slot.append(
+		button(ObjectNavDirection.Previous, position.hasPrev),
+		count,
+		button(ObjectNavDirection.Next, position.hasNext),
+	);
+}
+
 function onOpenInspector(state: AppState, entity: EntityRow): void {
 	state.selection = applyClick(
 		state.selection,
@@ -1926,6 +2205,21 @@ function orderedVisibleIds(state: AppState): string[] {
 		groupLabelResolver(state),
 		groupOrderResolver(state),
 	);
+	if (view.kind === ListViewKind.Board && view.groupBy) {
+		const layout = view.layoutOptions as BoardLayoutOptions;
+		const groups = compiledView.groups.length
+			? compiledView.groups
+			: [{ key: null, label: "", rows: compiledView.rows }];
+		const lanes = layout.swimlaneBy
+			? buildSwimlanes(
+					compiledView.rows,
+					layout.swimlaneBy,
+					groupLabelResolver(state),
+					groupOrderResolver(state),
+				)
+			: null;
+		return boardVisibleOrder(groups, lanes, layout, view.groupBy.propertyId);
+	}
 	if (compiledView.groups.length === 0) return compiledView.rows.map((e) => e.id);
 	const out: string[] = [];
 	for (const group of compiledView.groups) {
@@ -1945,39 +2239,256 @@ function repaintSelection(state: AppState): void {
 	}
 }
 
+/** The selection bar is part of the React view body; a selection change
+ *  re-renders it (with its bulk actions) through the active-view render. */
 function updateSelectionBar(state: AppState): void {
-	const body = document.getElementById("stage-body");
-	if (!body) return;
-	let bar = body.querySelector<HTMLElement>(".db-selection-bar");
+	renderActiveView(state);
+}
+
+/** The pending one-step undo for the last bulk edit (9.12.32). Cleared by the
+ *  undo itself or by the next bulk edit, and stale after `BULK_UNDO_TTL_MS`. */
+let lastBulkUndo: BulkUndo | null = null;
+
+function liveBulkUndo(): BulkUndo | null {
+	if (!isBulkUndoLive(lastBulkUndo)) lastBulkUndo = null;
+	return lastBulkUndo;
+}
+
+function selectionBarProps(state: AppState): SelectionProps | null {
 	const count = state.selection.selectedIds.size;
+	const undoAction = liveBulkUndo()
+		? [
+				{
+					id: "undo",
+					label: t("brainstorm.database.bulk.undo"),
+					onClick: () => void undoBulkEdit(state),
+				},
+			]
+		: [];
 	if (count <= 1) {
-		bar?.remove();
-		return;
+		return undoAction.length > 0
+			? {
+					count,
+					countLabel: "",
+					clearLabel: t("brainstorm.database.selection.clear"),
+					onClear: () => {
+						lastBulkUndo = null;
+						renderActiveView(state);
+					},
+					actions: undoAction,
+				}
+			: null;
 	}
-	if (!bar) {
-		bar = document.createElement("div");
-		bar.className = "db-selection-bar";
-		const text = document.createElement("span");
-		text.className = "db-selection-bar__count";
-		bar.appendChild(text);
-		const clear = document.createElement("button");
-		clear.type = "button";
-		clear.className = "bs-btn bs-btn--secondary bs-btn--sm db-selection-bar__clear";
-		clear.textContent = t("brainstorm.database.selection.clear");
-		clear.addEventListener("click", () => {
+	return {
+		count,
+		countLabel: t("brainstorm.database.selection.count", { count }),
+		clearLabel: t("brainstorm.database.selection.clear"),
+		onClear: () => {
 			state.selection = clearSelection();
 			renderActiveView(state);
 			renderInspector(state);
-		});
-		bar.appendChild(clear);
-		body.prepend(bar);
+		},
+		actions: [
+			{
+				id: "set-property",
+				label: t("brainstorm.database.bulk.setProperty"),
+				opensMenu: true,
+				onClick: (anchor) => openBulkSetPropertyMenu(state, anchor),
+			},
+			{
+				id: "add-to-collection",
+				label: t("brainstorm.database.menu.addToCollection"),
+				opensMenu: true,
+				onClick: (anchor) => openBulkAddToCollectionMenu(state, anchor),
+			},
+			...undoAction,
+		],
+	};
+}
+
+function anchorBelow(anchor: HTMLElement): { x: number; y: number } {
+	const r = anchor.getBoundingClientRect();
+	return { x: r.left, y: r.bottom + 4 };
+}
+
+/** Step 1 of "Set property…": which property. Computed (rollup / formula)
+ *  columns are derived, never written. */
+function openBulkSetPropertyMenu(state: AppState, anchor: HTMLElement): void {
+	const view = activeView(state);
+	if (!view) return;
+	const cols = propertyColumns(view.columns).filter(
+		(c) => !c.rollup && !c.formula && c.propertyId !== "title" && c.propertyId !== "name",
+	);
+	openAnchoredMenu(
+		anchorBelow(anchor),
+		cols.map((c) => ({
+			label: propertyDisplayName(c.propertyId),
+			icon: propertyKindIcon(c.propertyId),
+			onSelect: () => openBulkValuePicker(state, anchor, c.propertyId),
+		})),
+		{ menuLabel: t("brainstorm.database.bulk.setProperty"), anchor },
+	);
+}
+
+/** Step 2: the value. A Select offers its options, a boolean Yes / No, every
+ *  other type a typed text prompt coerced to the column's value type. */
+function openBulkValuePicker(state: AppState, anchor: HTMLElement, propertyId: string): void {
+	const name = propertyDisplayName(propertyId);
+	const apply = (value: unknown): void => void applyBulkSet(state, propertyId, value);
+	const options = selectOptionsFor(propertyId);
+	const clearItem = {
+		label: t("brainstorm.database.bulk.clearValue"),
+		onSelect: () => apply(null),
+	};
+	if (options) {
+		openAnchoredMenu(
+			anchorBelow(anchor),
+			[
+				...options.map((o) => ({ label: o.label, onSelect: () => apply(o.id) })),
+				{ divider: true },
+				clearItem,
+			],
+			{ menuLabel: t("brainstorm.database.bulk.setTo", { name }), anchor },
+		);
+		return;
 	}
-	const text = bar.querySelector<HTMLElement>(".db-selection-bar__count");
-	if (text) text.textContent = t("brainstorm.database.selection.count", { count });
+	const valueType =
+		cachedVaultProperties.find((d) => d.key === propertyId)?.valueType ??
+		effectiveColumnDef(propertyId, state.db.entities)?.valueType ??
+		ValueType.Text;
+	if (valueType === ValueType.Boolean) {
+		openAnchoredMenu(
+			anchorBelow(anchor),
+			[
+				{ label: t("brainstorm.database.bulk.yes"), onSelect: () => apply(true) },
+				{ label: t("brainstorm.database.bulk.no"), onSelect: () => apply(false) },
+			],
+			{ menuLabel: t("brainstorm.database.bulk.setTo", { name }), anchor },
+		);
+		return;
+	}
+	promptInline(
+		anchor,
+		"",
+		(raw) => {
+			const value = coerceScalarValue(raw, valueType);
+			if (value === undefined && raw.trim() !== "") {
+				flashStatus(t("brainstorm.database.bulk.invalidValue", { name }), "warn");
+				return;
+			}
+			apply(value ?? null);
+		},
+		{ title: t("brainstorm.database.bulk.setTo", { name }) },
+	);
+}
+
+function lockedSuffix(lockedSkipped: number): string {
+	return lockedSkipped > 0
+		? ` ${plural(lockedSkipped, "brainstorm.database.bulk.lockedSkipped.one", "brainstorm.database.bulk.lockedSkipped.other", { count: lockedSkipped })}`
+		: "";
+}
+
+async function applyBulkSet(state: AppState, propertyId: string, value: unknown): Promise<void> {
+	const plan = planBulkSet(state.db.entities, state.selection.selectedIds, propertyId, value);
+	if (plan.apply.length === 0) {
+		flashStatus(
+			t("brainstorm.database.bulk.nothingChanged") + lockedSuffix(plan.lockedSkipped),
+			plan.lockedSkipped > 0 ? "warn" : "ready",
+		);
+		return;
+	}
+	lastBulkUndo = plan.undo;
+	await persistEntityPatches(state, plan.apply);
+	flashStatus(
+		plural(
+			plan.apply.length,
+			"brainstorm.database.bulk.updated.one",
+			"brainstorm.database.bulk.updated.other",
+			{
+				count: plan.apply.length,
+				name: propertyDisplayName(propertyId),
+			},
+		) + lockedSuffix(plan.lockedSkipped),
+		"ready",
+	);
+}
+
+function openBulkAddToCollectionMenu(state: AppState, anchor: HTMLElement): void {
+	const candidates = state.lists.filter((l) => !isVaultDerivedListId(l.id) && !isListLocked(l));
+	if (candidates.length === 0) {
+		flashStatus(t("brainstorm.database.status.noCollectionsToAdd"), "warn");
+		return;
+	}
+	openAnchoredMenu(
+		anchorBelow(anchor),
+		candidates.map((list) => ({
+			label: list.name,
+			...(list.description.trim() ? { description: list.description.trim() } : {}),
+			onSelect: () => applyBulkAddToList(state, list.id),
+		})),
+		{ menuLabel: t("brainstorm.database.menu.addToCollectionRegion"), anchor },
+	);
+}
+
+function applyBulkAddToList(state: AppState, listId: string): void {
+	const list = state.lists.find((l) => l.id === listId);
+	if (!list) return;
+	const plan = planBulkAddToList(list, state.db.entities, state.selection.selectedIds, state.db);
+	if (plan.listLocked) {
+		flashListLocked(list.id, state);
+		return;
+	}
+	if (plan.added > 0) {
+		lastBulkUndo = plan.undo;
+		state.lists = state.lists.map((l) => (l.id === listId ? plan.next : l));
+		schedulePersist(state);
+	}
+	renderActiveView(state);
+	renderInspector(state);
+	const capacity =
+		plan.overCapacity > 0
+			? ` ${t("brainstorm.database.bulk.overCapacity", { count: plan.overCapacity })}`
+			: "";
+	flashStatus(
+		plural(plan.added, "brainstorm.database.bulk.added.one", "brainstorm.database.bulk.added.other", {
+			count: plan.added,
+			name: list.name,
+		}) +
+			lockedSuffix(plan.lockedSkipped) +
+			capacity,
+		plan.lockedSkipped > 0 || plan.overCapacity > 0 ? "warn" : "ready",
+	);
+}
+
+/** Revert the last bulk edit as one step. */
+async function undoBulkEdit(state: AppState): Promise<void> {
+	const undo = liveBulkUndo();
+	if (!undo) return;
+	lastBulkUndo = null;
+	if (undo.kind === BulkUndoKind.SetProperty) {
+		const revert = planBulkSetRevert(undo, state.db.entities);
+		if (revert.apply.length > 0) await persistEntityPatches(state, revert.apply);
+		flashStatus(
+			t("brainstorm.database.bulk.undone") + lockedSuffix(revert.lockedSkipped),
+			revert.lockedSkipped > 0 ? "warn" : "ready",
+		);
+		return;
+	}
+	const target = state.lists.find((l) => l.id === undo.listId);
+	if (target && isListLocked(target)) {
+		flashListLocked(target.id, state);
+		return;
+	}
+	state.lists = state.lists.map((l) => (l.id === undo.listId ? revertBulkAdd(l, undo) : l));
+	schedulePersist(state);
+	renderActiveView(state);
+	renderInspector(state);
+	flashStatus(t("brainstorm.database.bulk.undone"), "ready");
 }
 
 function onOpenEntity(state: AppState, entity: EntityRow): void {
 	void dispatchOpenIntent(entity);
+	beginObjectNav(state, entity, ObjectOpenMode.Open);
 	state.selection = applyClick(
 		state.selection,
 		entity.id,
@@ -2242,6 +2753,8 @@ function bindHeaderObjectMenu(state: AppState): void {
 			return {
 				target: { entityId: list.id, entityType: COLLECTION_TYPE_URL, label: list.name },
 				runtime,
+				locked: isListLocked(list),
+				labels: { lockedHint: t("brainstorm.database.list.menu.lockedHint") },
 				...(canDelete ? { onRemove: () => deleteListAndCleanup(state, list) } : {}),
 				...(extraItems.length > 0 ? { extraItems } : {}),
 			};
@@ -2301,7 +2814,7 @@ function buildHeaderExtraItems(
 		);
 		// Every exportable column (any visibility); the default selection is the
 		// columns currently visible in the view.
-		const exportableColumns = view.columns.filter(
+		const exportableColumns = propertyColumns(view.columns).filter(
 			(c) => c.propertyId !== "title" && c.propertyId !== "name",
 		);
 		const columnChoices = exportableColumns.map((c) => ({
@@ -2522,9 +3035,7 @@ function onMoveToGroup(
 	groupKey: string | null,
 ): void {
 	if (!view.groupBy || isRecordLocked(entity)) return;
-	mutateEntityProperty(state, entity.id, view.groupBy.propertyId, groupKey ?? "");
-	renderActiveView(state);
-	renderInspector(state);
+	void persistEntityPatch(state, entity, { [view.groupBy.propertyId]: groupKey ?? "" });
 	flashStatus(
 		groupKey === null
 			? t("brainstorm.database.status.clearedGroup")
@@ -2551,27 +3062,40 @@ async function onDropObjectToGroup(
 		return;
 	}
 	const list = activeList(state);
+	// The drop both re-groups the objects AND pins them into the collection;
+	// a locked collection takes neither half (9.16.14).
+	if (list && isListLocked(list)) {
+		flashListLocked(list.id, state);
+		return;
+	}
 	const groupValue = groupKey ?? "";
 	const now = Date.now();
-	let members = list?.members;
-	let added = 0;
+	const added: string[] = [];
 	for (const item of payload.items) {
 		try {
 			await update(item.entityId, { [propertyId]: groupValue });
 		} catch {
 			continue; // a write the target can't make (fail-closed cap) — skip it
 		}
-		if (members)
-			members = addToList(members, item.entityId, { matchesSource: false, by: "user", now }).members;
-		added += 1;
+		added.push(item.entityId);
 	}
-	if (added === 0) return;
-	if (list && members) {
-		const committed = members;
-		state.lists = state.lists.map((l) =>
-			l.id === list.id ? { ...l, members: committed, updatedAt: now } : l,
-		);
-		schedulePersist(state);
+	if (added.length === 0) return;
+	if (list) {
+		// Re-grouped already; the pin half is re-gated against the live lock,
+		// since the updates above awaited.
+		if (liveListLocked(state, list.id)) {
+			flashListLocked(list.id, state);
+		} else {
+			state.lists = state.lists.map((l) => {
+				if (l.id !== list.id) return l;
+				let members = l.members;
+				for (const entityId of added) {
+					members = addToList(members, entityId, { matchesSource: false, by: "user", now }).members;
+				}
+				return { ...l, members, updatedAt: now };
+			});
+			schedulePersist(state);
+		}
 	}
 	await loadVaultEntities(state);
 	renderActiveView(state);
@@ -2591,9 +3115,7 @@ function onMoveToDay(state: AppState, view: ListView, entity: EntityRow, dayStar
 	// never moved — i.e. drag looked broken.
 	const dateProp = (view.layoutOptions as CalendarLayoutOptions)?.primaryDateProperty;
 	if (!dateProp || isRecordLocked(entity)) return;
-	mutateEntityProperty(state, entity.id, dateProp, dayStart);
-	renderActiveView(state);
-	renderInspector(state);
+	void persistEntityPatch(state, entity, { [dateProp]: dayStart });
 	flashStatus(t("brainstorm.database.status.movedToDate", { date: formatDate(dayStart) }), "ready");
 }
 
@@ -2609,12 +3131,10 @@ function onTimelineMove(
 ): void {
 	const layout = view.layoutOptions as TimelineLayoutOptions;
 	if (!layout?.primaryDateProperty || isRecordLocked(entity)) return;
-	mutateEntityProperty(state, entity.id, layout.primaryDateProperty, newStartMs);
-	if (newEndMs !== null && layout.endDateProperty) {
-		mutateEntityProperty(state, entity.id, layout.endDateProperty, newEndMs);
-	}
-	renderActiveView(state);
-	renderInspector(state);
+	void persistEntityPatch(state, entity, {
+		[layout.primaryDateProperty]: newStartMs,
+		...(newEndMs !== null && layout.endDateProperty ? { [layout.endDateProperty]: newEndMs } : {}),
+	});
 	flashStatus(`Moved to ${formatDate(newStartMs)}`, "ready");
 }
 
@@ -2628,9 +3148,7 @@ function onTimelineResize(
 ): void {
 	const layout = view.layoutOptions as TimelineLayoutOptions;
 	if (!layout?.endDateProperty || isRecordLocked(entity)) return;
-	mutateEntityProperty(state, entity.id, layout.endDateProperty, newEndMs);
-	renderActiveView(state);
-	renderInspector(state);
+	void persistEntityPatch(state, entity, { [layout.endDateProperty]: newEndMs });
 	flashStatus(`Resized to end ${formatDate(newEndMs)}`, "ready");
 }
 
@@ -2645,13 +3163,55 @@ function updateCalendarRange(state: AppState, view: ListView, range: CalendarRan
 }
 
 function reorderBoardColumns(state: AppState, view: ListView, orderedKeys: string[]): void {
-	const next: BoardLayoutOptions = {
-		...(view.layoutOptions as BoardLayoutOptions),
-		groupOrder: orderedKeys,
-	};
+	patchBoardLayout(state, view, { groupOrder: orderedKeys });
+}
+
+function patchBoardLayout(
+	state: AppState,
+	view: ListView,
+	patch: Partial<BoardLayoutOptions>,
+): void {
+	const next: BoardLayoutOptions = { ...(view.layoutOptions as BoardLayoutOptions), ...patch };
 	updateViewLayout(state, view.id, next);
 	renderActiveView(state);
 	schedulePersist(state);
+}
+
+/** A card dropped into a swimlane cell (9.12.28): the column AND the lane
+ *  property land in one entity write. */
+function onMoveToCell(
+	state: AppState,
+	view: ListView,
+	entity: EntityRow,
+	groupKey: string | null,
+	laneKey: string | null,
+): void {
+	if (!view.groupBy || isRecordLocked(entity)) return;
+	const swimlaneBy = (view.layoutOptions as BoardLayoutOptions).swimlaneBy;
+	const patch = cellMovePatch(entity, view.groupBy.propertyId, groupKey, swimlaneBy, laneKey);
+	if (Object.keys(patch).length === 0) return;
+	void persistEntityPatch(state, entity, patch);
+	flashStatus(t("brainstorm.database.status.movedCard"), "ready");
+}
+
+/** "Collapse all" / "Expand all" on a board: every lane on a laned board,
+ *  every column otherwise. */
+function boardCollapseAll(state: AppState, view: ListView, action: CollapseAllAction): void {
+	const layout = view.layoutOptions as BoardLayoutOptions;
+	const compiled = compileActive(state);
+	if (!compiled) return;
+	const compiledView = compileViewCached(
+		view,
+		compiled.entities,
+		groupLabelResolver(state),
+		groupOrderResolver(state),
+	);
+	const keys = (
+		layout.swimlaneBy
+			? buildSwimlanes(compiledView.rows, layout.swimlaneBy, groupLabelResolver(state))
+			: compiledView.groups
+	).map((g) => groupWireKey(g.key));
+	patchBoardLayout(state, view, collapseAllPatch(layout, keys, action));
 }
 
 /** Apply one pure `ViewConfigChange` to the live view by id and store the
@@ -2762,7 +3322,7 @@ function openFilterMenu(state: AppState, anchor: HTMLElement): void {
 	// value / change condition / remove) — one consistent gesture across the
 	// manager and the pills bar, instead of "click here = silently delete".
 	const items: MenuItem[] = draft.rules.map((rule, i) => ({
-		label: describeRule(rule, colLabel(rule.propertyId), ruleValueLabel(rule)),
+		label: describeFilterRule(rule),
 		icon: propertyKindIcon(rule.propertyId),
 		onClick: () => openFilterRulePillMenu(state, anchor, view.id, draft, i),
 	}));
@@ -2856,7 +3416,7 @@ function openFilterGroupMenu(
 	};
 
 	const items: MenuItem[] = group.rules.map((rule, i) => ({
-		label: describeRule(rule, colLabel(rule.propertyId), ruleValueLabel(rule)),
+		label: describeFilterRule(rule),
 		icon: IconName.Close,
 		onClick: () => replaceGroup({ ...group, rules: group.rules.filter((_, j) => j !== i) }),
 	}));
@@ -2911,7 +3471,7 @@ function openFilterPropertyMenu(
 	openSubmenuNextFrame(() =>
 		openContextMenu(
 			{ x: r.left, y: r.bottom + 4 },
-			v.columns
+			propertyColumns(v.columns)
 				.filter((c) => c.visible !== false)
 				.map((c) => ({
 					label: colLabel(c.propertyId),
@@ -2937,6 +3497,7 @@ function openFilterOperatorMenu(
 	// of every other property's operator menu.
 	const def = cachedVaultProperties.find((d) => d.key === propertyId);
 	const isDateProperty = def ? def.valueType === ValueType.Date : /at$/i.test(propertyId);
+	const isRefProperty = def ? def.valueType === ValueType.EntityRef : /ids?$/i.test(propertyId);
 	const operators = FILTER_OPERATORS.filter((o) => o.op !== FilterOp.RelativeDate || isDateProperty);
 	openSubmenuNextFrame(() =>
 		openContextMenu(
@@ -2987,23 +3548,40 @@ function openFilterOperatorMenu(
 					// option id (so is/contains matches the stored id), instead of
 					// free-texting a label that never matches (F-027).
 					// Comparison op → offer a literal, the clock (now), or another
-					// property as the right-hand side (9.12.21 cross-property).
-					if (opAcceptsRef(o.op)) {
-						const cols = (state.views.find((x) => x.id === viewId)?.columns ?? []).filter(
-							(c) => c.visible !== false && c.propertyId !== propertyId,
-						);
+					// property as the right-hand side (9.12.21 cross-property). A
+					// relation also offers "this object" — the page an embedded view
+					// sits in (9.12.24 contextual views).
+					const hostRef = isRefProperty && opAcceptsHostRef(o.op);
+					if (opAcceptsRef(o.op) || hostRef) {
+						const cols = opAcceptsRef(o.op)
+							? propertyColumns(state.views.find((x) => x.id === viewId)?.columns ?? []).filter(
+									(c) => c.visible !== false && c.propertyId !== propertyId,
+								)
+							: [];
 						const refItems: MenuItem[] = [
 							{
 								label: t("brainstorm.database.filter.dateValuePlaceholder"),
 								onClick: () => promptInline(anchor, "", (v) => append(v.trim())),
 							},
-							{
-								label: t("brainstorm.database.filter.dateNow"),
-								onClick: () => append("", { kind: "now" }),
-							},
+							...(hostRef
+								? [
+										{
+											label: t("brainstorm.database.filter.thisObject"),
+											onClick: () => append("", { kind: FilterRefKind.Host }),
+										},
+									]
+								: []),
+							...(opAcceptsRef(o.op)
+								? [
+										{
+											label: t("brainstorm.database.filter.dateNow"),
+											onClick: () => append("", { kind: FilterRefKind.Now }),
+										},
+									]
+								: []),
 							...cols.map((c) => ({
 								label: `property: ${colLabel(c.propertyId)}`,
-								onClick: () => append("", { kind: "prop", propertyId: c.propertyId }),
+								onClick: () => append("", { kind: FilterRefKind.Prop, propertyId: c.propertyId }),
 							})),
 						];
 						openSubmenuNextFrame(() => openContextMenu({ x: r.left, y: r.bottom + 4 }, refItems, anchor));
@@ -3130,6 +3708,12 @@ async function createEntityInActiveList(state: AppState): Promise<void> {
 		return;
 	}
 	const plan = decideRowCreate(list);
+	// A manual collection pins the new row into its members — refused when
+	// locked, before an orphan row is ever created (9.16.14).
+	if (plan.addToMembers && isListLocked(list)) {
+		flashListLocked(list.id, state);
+		return;
+	}
 
 	// Offer applicable object templates through the shared create-flow picker.
 	// A query failure or a shell without `entities.query` falls back to blank.
@@ -3177,6 +3761,12 @@ async function performRowCreate(
 	option: CreateTemplateOption,
 ): Promise<void> {
 	if (rowCreateInFlight) return;
+	// A manual collection pins the new row into its members — refused when
+	// locked, before an orphan row is ever created (9.16.14).
+	if (plan.addToMembers && isListLocked(list)) {
+		flashListLocked(list.id, state);
+		return;
+	}
 	const entities = getRuntime()?.services?.entities;
 	if (!entities?.create) {
 		flashStatus(t("brainstorm.database.status.createNeedsEntities"), "warn");
@@ -3199,18 +3789,28 @@ async function performRowCreate(
 			await copyEntityBody(entities, option.template.id, entity.id);
 		}
 		// A manual / custom collection has no type source to pick the row up, so
-		// pin the new generic Object into the collection's manual members.
+		// pin the new generic Object into the collection's manual members — unless
+		// the List locked while the create awaited: the row then stays unpinned
+		// rather than written into a read-only collection.
 		if (plan.addToMembers && entity?.id) {
-			const { members } = addToList(list.members, entity.id, {
-				matchesSource: false,
-				by: "user",
-				now,
-			});
-			state.lists = state.lists.map((l) => (l.id === list.id ? { ...l, members, updatedAt: now } : l));
-			// Sync the membership into the overlay BEFORE the rebuild below, else
-			// `applyVaultSnapshot` re-layers the pre-add collection and the new
-			// row drops out of the manual members (same seam as F-010).
-			schedulePersist(state);
+			if (liveListLocked(state, list.id)) {
+				flashListLocked(list.id, state);
+			} else {
+				const entityId = entity.id;
+				state.lists = state.lists.map((l) =>
+					l.id === list.id
+						? {
+								...l,
+								members: addToList(l.members, entityId, { matchesSource: false, by: "user", now }).members,
+								updatedAt: now,
+							}
+						: l,
+				);
+				// Sync the membership into the overlay BEFORE the rebuild below, else
+				// `applyVaultSnapshot` re-layers the pre-add collection and the new
+				// row drops out of the manual members (same seam as F-010).
+				schedulePersist(state);
+			}
 		}
 		// Hand focus off to the new row once the grid paints it: typing names
 		// the row, Enter commits — the Notion/Anytype create pattern.
@@ -3263,7 +3863,7 @@ function openSortMenu(state: AppState, anchor: HTMLElement): void {
 	const view = activeView(state);
 	if (!view) return;
 	const current = view.sorts[0] ?? null;
-	const cols = view.columns.filter((c) => c.visible !== false);
+	const cols = propertyColumns(view.columns).filter((c) => c.visible !== false);
 	const r = anchor.getBoundingClientRect();
 	const items: MenuItem[] = cols.map((c) => {
 		const isActive = current?.propertyId === c.propertyId;
@@ -3386,7 +3986,7 @@ function buildFilterRulePill(
 	return createPill({
 		variant: "filter",
 		icon: DatabaseIcon.Filter,
-		text: describeRule(rule, colLabel(rule.propertyId), ruleValueLabel(rule)),
+		text: describeFilterRule(rule),
 		title: t("brainstorm.database.filter.editRule"),
 		onClick: (anchor) => openFilterRulePillMenu(state, anchor, viewId, draft, index),
 		onRemove: remove,
@@ -3635,6 +4235,36 @@ function mutateEntityProperty(
  *  service is still capability-gated there). */
 export function isRecordLocked(entity: EntityRow): boolean {
 	return isEntityLocked(entity);
+}
+
+/** The batch twin of `persistEntityPatch`: every patch merges in memory and
+ *  the stage paints ONCE, then each write goes to the entities service. */
+async function persistEntityPatches(
+	state: AppState,
+	patches: ReadonlyArray<{ id: string; patch: Record<string, unknown> }>,
+): Promise<void> {
+	for (const { id, patch } of patches) {
+		for (const [k, v] of Object.entries(patch)) mutateEntityProperty(state, id, k, v);
+	}
+	renderActiveView(state);
+	renderInspector(state);
+	const update = getRuntime()?.services?.entities?.update;
+	if (!update) {
+		flashStatus(t("brainstorm.database.status.savedLocally"), "warn");
+		return;
+	}
+	let failed = 0;
+	let lastMessage = "";
+	for (const { id, patch } of patches) {
+		try {
+			await update(id, patch);
+		} catch (error) {
+			failed += 1;
+			lastMessage = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+		}
+	}
+	if (failed > 0)
+		flashStatus(t("brainstorm.database.status.saveFailed", { message: lastMessage }), "warn");
 }
 
 /** Write `patch` into an entity's `properties`: optimistic in-memory
@@ -3927,6 +4557,13 @@ async function importCsvAsCollection(state: AppState): Promise<void> {
 		flashStatus(t("brainstorm.database.status.importFailed", { message }), "warn");
 		return;
 	}
+	// Every imported column lands in the catalog (F-511): without a def the
+	// column has no "Change type" and can't carry a number unit. The first
+	// failed write already warned; stop rather than toast once per column.
+	for (const def of propertyDefsForCsvImport(imported, cachedVaultProperties)) {
+		if (!(await persistNewPropertyDef(def, null))) break;
+	}
+	await loadVaultProperties(state);
 	const baseName =
 		handle.displayName.replace(/\.csv$/i, "").trim() ||
 		t("brainstorm.database.import.csv.defaultName");
@@ -4036,6 +4673,8 @@ function updateListSource(state: AppState, listId: string, types: ReadonlyArray<
 }
 
 function createNewViewAndSelect(state: AppState, listId: string): void {
+	const siblings = viewsForList(state, listId);
+	const afterId = state.active.listId === listId ? state.active.viewId : null;
 	const view = createView({
 		// A new view is a Grid until retyped — name it after its kind with a
 		// collision counter ("Grid", "Grid 2", …), not the anonymous "New
@@ -4043,11 +4682,11 @@ function createNewViewAndSelect(state: AppState, listId: string): void {
 		// it on the spot (the same flow as "Blank collection" / "New folder")
 		// — F-038 / F-208.
 		listId,
-		name: defaultViewName(ListViewKind.Grid, viewsForList(state, listId)),
-		existingViewsForList: viewsForList(state, listId),
+		name: defaultViewName(ListViewKind.Grid, siblings),
+		existingViewsForList: siblings,
+		columns: seedColumnsForNewView(siblings, afterId),
 	});
 	state.views.push(view);
-	const afterId = state.active.listId === listId ? state.active.viewId : null;
 	state.lists = state.lists.map((l) => (l.id === listId ? insertViewAfter(l, view.id, afterId) : l));
 	state.active = { listId, viewId: view.id };
 	state.selection = clearSelection();
@@ -4083,10 +4722,16 @@ function openListContextMenu(
 	labelEl: HTMLElement,
 	point: { x: number; y: number },
 ): void {
+	const locked = isListLocked(list);
+	const lockedRow = locked
+		? { disabled: true, hint: t("brainstorm.database.list.menu.lockedHint") }
+		: {};
+	const last = state.lists.length <= 1;
 	openContextMenu(point, [
 		{
 			label: t("brainstorm.database.list.menu.rename"),
 			icon: IconName.Pencil,
+			...lockedRow,
 			onClick: () =>
 				beginInlineRename(labelEl, list.name, (next) => commitListRename(state, list.id, next)),
 		},
@@ -4099,19 +4744,58 @@ function openListContextMenu(
 			label: t("brainstorm.database.list.menu.delete"),
 			icon: IconName.Trash,
 			destructive: true,
-			disabled: state.lists.length <= 1,
-			...(state.lists.length <= 1 ? { hint: t("brainstorm.database.list.menu.delete.lastHint") } : {}),
+			disabled: last || locked,
+			...(last ? { hint: t("brainstorm.database.list.menu.delete.lastHint") } : lockedRow),
 			onClick: () => deleteListAndCleanup(state, list),
 		},
 	]);
 }
 
-function openViewContextMenu(
+async function openViewContextMenu(
 	state: AppState,
 	view: ListView,
 	point: { x: number; y: number },
-): void {
+): Promise<void> {
 	const siblings = viewsForList(state, view.listId);
+	const runtime = getRuntime();
+	const dashboard = runtime?.services?.dashboard;
+	const availability = viewPinAvailability(
+		view.id,
+		isVaultDerivedViewId,
+		canPinToDashboard(runtime?.capabilities, Boolean(dashboard)),
+	);
+	const pinned =
+		availability === ViewPinAvailability.Pinnable && dashboard
+			? await dashboard.isPinned({ entityId: view.id }).catch(() => false)
+			: false;
+	const pinItems: MenuItem[] =
+		availability === ViewPinAvailability.Unsupported
+			? []
+			: [
+					{
+						label: pinned
+							? t("brainstorm.database.view.menu.unpin")
+							: t("brainstorm.database.view.menu.pin"),
+						icon: pinned ? IconName.PinSlash : IconName.Pin,
+						disabled: availability === ViewPinAvailability.NotAnObject,
+						...(availability === ViewPinAvailability.NotAnObject
+							? { hint: t("brainstorm.database.view.menu.pin.vaultHint") }
+							: {}),
+						onClick: () => {
+							if (!dashboard) return;
+							const op = pinned ? dashboard.unpin : dashboard.pin;
+							void op({ entityId: view.id }).then((ok) => {
+								if (ok)
+									flashStatus(
+										pinned
+											? t("brainstorm.database.view.unpinned", { name: view.name })
+											: t("brainstorm.database.view.pinned", { name: view.name }),
+										"ready",
+									);
+							});
+						},
+					},
+				];
 	openContextMenu(point, [
 		{
 			label: t("brainstorm.database.view.menu.rename"),
@@ -4123,6 +4807,7 @@ function openViewContextMenu(
 			icon: IconName.Copy,
 			onClick: () => duplicateViewAndSelect(state, view),
 		},
+		...pinItems,
 		{
 			label: t("brainstorm.database.view.menu.delete"),
 			icon: IconName.Trash,
@@ -4134,10 +4819,36 @@ function openViewContextMenu(
 	]);
 }
 
+/* A locked List refuses rename / description / icon / delete (9.16.14): the
+ * pure CRUD already returns the List untouched, this is where the user hears
+ * why. `saveUserList` re-reads the lock again at the commit. */
+
 function commitListRename(state: AppState, listId: string, name: string): void {
 	const list = state.lists.find((l) => l.id === listId);
 	if (!list) return;
+	if (isListLocked(list)) {
+		flashListLocked(listId, state);
+		renderListNav(state);
+		renderStageHeader(state);
+		return;
+	}
 	const next = renameListLogic(list, name);
+	if (next === list) return;
+	state.lists = state.lists.map((l) => (l.id === listId ? next : l));
+	renderListNav(state);
+	renderStageHeader(state);
+	schedulePersist(state);
+}
+
+function commitListDescription(state: AppState, listId: string, description: string): void {
+	const list = state.lists.find((l) => l.id === listId);
+	if (!list) return;
+	if (isListLocked(list)) {
+		flashListLocked(listId, state);
+		renderStageHeader(state);
+		return;
+	}
+	const next = setListDescriptionLogic(list, description);
 	if (next === list) return;
 	state.lists = state.lists.map((l) => (l.id === listId ? next : l));
 	renderListNav(state);
@@ -4148,6 +4859,10 @@ function commitListRename(state: AppState, listId: string, name: string): void {
 function commitListIcon(state: AppState, listId: string, icon: Icon | null): void {
 	const list = state.lists.find((l) => l.id === listId);
 	if (!list) return;
+	if (isListLocked(list)) {
+		flashListLocked(listId, state);
+		return;
+	}
 	const next = setListIconLogic(list, icon);
 	if (next === list) return;
 	state.lists = state.lists.map((l) => (l.id === listId ? next : l));
@@ -4205,6 +4920,11 @@ function duplicateViewAndSelect(state: AppState, source: ListView): void {
 
 function deleteListAndCleanup(state: AppState, list: List): void {
 	if (state.lists.length <= 1) return;
+	// The menu captured `list` when it opened; the lock is read live.
+	if (liveListLocked(state, list.id)) {
+		flashListLocked(list.id, state);
+		return;
+	}
 	const result = deleteListLogic(state.lists, state.views, list.id);
 	state.lists = result.lists;
 	state.views = result.views;
@@ -4351,6 +5071,25 @@ function openViewSettingsForActive(state: AppState, anchor: HTMLElement): void {
 	openViewSettings(anchor, {
 		view,
 		availableProperties: [...propKeys],
+		columnType: {
+			infoFor: (propertyId) => {
+				const def = cachedVaultProperties.find((d) => d.key === propertyId);
+				if (!def) return null;
+				return {
+					valueType: def.valueType,
+					convertible: canChangeType(def),
+					plainNumber: def.valueType === ValueType.Number && def.format === undefined,
+					...(def.unit ? { unit: def.unit } : {}),
+				};
+			},
+			onChangeType: (propertyId, to) => void changePropertyType(state, propertyId, to),
+			onEditUnit: (propertyId, unitAnchor) => editPropertyUnit(state, propertyId, unitAnchor),
+		},
+		numericProperties: [...propKeys].filter(
+			(k) =>
+				(cachedVaultProperties.find((d) => d.key === k)?.valueType ??
+					effectiveColumnDef(k, compiled?.entities ?? [])?.valueType) === ValueType.Number,
+		),
 		vaultProperties: cachedVaultProperties,
 		availableTypes: availableVaultTypes(state),
 		listSourceTypes,
@@ -4390,6 +5129,14 @@ function openViewSettingsForActive(state: AppState, anchor: HTMLElement): void {
 		...(list && deriveListMode(list) !== ListMode.Query
 			? { onCreateCollectionProperty: () => openCollectionPropertyConstructor(state, list) }
 			: {}),
+		...(view.kind === ListViewKind.Board
+			? {
+					onCollapseAll: (action: CollapseAllAction) => {
+						boardCollapseAll(state, view, action);
+						openViewSettingsForActive(state, anchor);
+					},
+				}
+			: {}),
 		onChange: (patch) => {
 			if (patch.name) commitViewRename(state, view.id, patch.name);
 			if (patch.kind) {
@@ -4422,9 +5169,86 @@ function openViewSettingsForActive(state: AppState, anchor: HTMLElement): void {
 	});
 }
 
+/** OS files dropped on the stage (9.8.17): import each as a File/v1 object
+ *  and add it to the active collection. */
+function bindFileDrop(state: AppState, body: HTMLElement): void {
+	bindOsFileDrop(body, {
+		enabled: () => {
+			const services = getRuntime()?.services;
+			const list = activeList(state);
+			return (
+				Boolean(services?.files?.import && services.entities) &&
+				acceptsFileDrop(list, list ? isVaultDerivedListId(list.id) : false)
+			);
+		},
+		onFiles: (files) => {
+			void importDroppedFiles(state, files).catch((error: unknown) => {
+				console.warn("[database] file drop failed:", error);
+			});
+		},
+	});
+}
+
+async function importDroppedFiles(state: AppState, files: File[]): Promise<void> {
+	const services = getRuntime()?.services;
+	const importer = services?.files?.import;
+	const entities = services?.entities;
+	const list = activeList(state);
+	if (!importer || !entities || !list) return;
+	const filesService = services?.files;
+	if (!filesService) return;
+	let failed = 0;
+	const created = await importOsFilesAsEntities(
+		files,
+		{
+			files: { import: (input) => importer.call(filesService, input) },
+			entities: { create: (type, properties) => entities.create(type, properties) },
+		},
+		{
+			onError: () => {
+				failed += 1;
+			},
+		},
+	);
+	// Re-read the list: membership may have changed while files uploaded, and
+	// writing members derived from the pre-import copy would drop that change.
+	const current = state.lists.find((l) => l.id === list.id) ?? list;
+	const { members, overCapacity } = membersWithDroppedFiles(
+		current,
+		isVaultDerivedListId(current.id),
+		created.map((c) => c.id),
+	);
+	if (members) {
+		state.lists = state.lists.map((l) =>
+			l.id === current.id ? { ...l, members, updatedAt: Date.now() } : l,
+		);
+		schedulePersist(state);
+	}
+	await loadVaultEntities(state);
+	renderActiveView(state);
+	renderListNav(state);
+	flashStatus(
+		plural(
+			created.length,
+			"brainstorm.database.status.filesAdded.one",
+			"brainstorm.database.status.filesAdded.other",
+			{
+				count: created.length,
+				name: list.name,
+			},
+		) +
+			(failed > 0 ? ` ${t("brainstorm.database.status.filesFailed", { count: failed })}` : "") +
+			(overCapacity > 0
+				? ` ${t("brainstorm.database.bulk.overCapacity", { count: overCapacity })}`
+				: ""),
+		failed > 0 || overCapacity > 0 ? "warn" : "ready",
+	);
+}
+
 function bindStageKeyboard(state: AppState): void {
 	const body = document.getElementById("stage-body");
 	if (!body) return;
+	bindFileDrop(state, body);
 	// Bound through the SDK shortcut layer (the imperative twin of `useShortcut`),
 	// matching `bindViewTabKeyboard` below — raw `keydown`/`e.key` comparisons are
 	// a PR-blocker. The single-key chords (Escape / Space) auto-suppress while a
@@ -4440,9 +5264,38 @@ function bindStageKeyboard(state: AppState): void {
 		renderInspector(state);
 	});
 	attachShortcut(body, "Mod+A", () => selectAllVisible(state));
+	for (const direction of [ObjectNavDirection.Previous, ObjectNavDirection.Next]) {
+		attachShortcut(
+			window,
+			OBJECT_NAV_SHORTCUTS[direction],
+			(event) => {
+				if (isEditableElement(event.target) || !currentObjectNav(state)) return;
+				event.preventDefault();
+				event.stopPropagation();
+				stepObject(state, direction);
+			},
+			{ preventDefault: false },
+		);
+	}
+	// One-step undo of the last bulk edit (9.12.32). A modifier chord, so it
+	// would also fire inside a cell editor — there the native text undo wins.
+	attachShortcut(
+		body,
+		"Mod+Z",
+		(event) => {
+			if (!liveBulkUndo() || isEditableElement(event.target)) return;
+			event.preventDefault();
+			event.stopPropagation();
+			void undoBulkEdit(state);
+		},
+		{ preventDefault: false },
+	);
 	attachShortcut(body, "Space", () => {
 		const entity = singleSelectedEntity(state);
-		if (entity) void dispatchQuickLook(entity);
+		if (!entity) return;
+		void dispatchQuickLook(entity);
+		beginObjectNav(state, entity, ObjectOpenMode.QuickLook);
+		renderInspectorNav(state);
 	});
 	// DND-6 — keyboard entry to the row object menu (the twin surface for
 	// Add-to-collection / Move-to-column): Shift+F10 (the platform context-menu
@@ -4475,6 +5328,16 @@ function bindViewTabKeyboard(state: AppState): void {
 	// Keyboard reorder — the accessible twin of the tab drag (KBN). Mod+Shift
 	// steps the focused tab toward the arrow; focus follows the moved tab so a
 	// run of steps keeps working without re-grabbing.
+	// Shift+F10 — the keyboard twin of the tab right-click menu (rename /
+	// duplicate / pin / delete), at the focused tab.
+	attachShortcut(root, "Shift+F10", (event) => {
+		const tab =
+			event.target instanceof Element ? event.target.closest<HTMLElement>("[data-view-id]") : null;
+		const view = state.views.find((v) => v.id === tab?.dataset.viewId);
+		if (!tab || !view) return;
+		const rect = tab.getBoundingClientRect();
+		void openViewContextMenu(state, view, { x: rect.left, y: rect.bottom + 4 });
+	});
 	attachShortcut(root, "Mod+Shift+ArrowLeft", (event) => moveFocusedViewTab(state, event, -1));
 	attachShortcut(root, "Mod+Shift+ArrowRight", (event) => moveFocusedViewTab(state, event, 1));
 }
@@ -4683,6 +5546,8 @@ type BrainstormRuntime = {
 				readonly multi?: boolean;
 			}): Promise<readonly { readonly handleId: string; readonly displayName: string }[]>;
 			read(handle: { readonly handleId: string; readonly displayName: string }): Promise<Uint8Array>;
+			/** Store dropped OS bytes as a vault asset (9.8.17; `files.read`). */
+			import?(input: { name: string; bytes: Uint8Array | ArrayBuffer }): Promise<FileImportResult>;
 			/** Save half (granted by `files.write`) — drives the 9.12.19
 			 *  list-export flow. Absent on older shells → Export… no-shows. */
 			requestSave(opts?: {
@@ -4821,6 +5686,7 @@ function inlinePropertyFormLabels() {
 		formatUrl: t("brainstorm.database.property.form.formatUrl"),
 		formatEmail: t("brainstorm.database.property.form.formatEmail"),
 		formatPhone: t("brainstorm.database.property.form.formatPhone"),
+		formatRichText: t("brainstorm.database.property.form.formatRichText"),
 		formatCurrency: t("brainstorm.database.property.form.formatCurrency"),
 		formatPercent: t("brainstorm.database.property.form.formatPercent"),
 		formatDuration: t("brainstorm.database.property.form.formatDuration"),
@@ -4830,28 +5696,54 @@ function inlinePropertyFormLabels() {
 		optionsHint: t("brainstorm.database.property.form.optionsHint"),
 		relationTargetLabel: t("brainstorm.database.property.form.relationTargetLabel"),
 		relationTargetAny: t("brainstorm.database.property.form.relationTargetAny"),
+		inverseLabel: t("brainstorm.database.property.form.inverseLabel"),
+		inverseNone: t("brainstorm.database.property.form.inverseNone"),
+		inverseSelf: t("brainstorm.database.property.form.inverseSelf"),
+		inverseNew: t("brainstorm.database.property.form.inverseNew"),
+		inverseNewNameLabel: t("brainstorm.database.property.form.inverseNewNameLabel"),
 	};
+}
+
+/** Existing relations a new Relation can pair with (two-way, 9.12.25). */
+function inverseCandidates(): { key: string; label: string }[] {
+	return pairableInverseCandidates(cachedVaultProperties).map((d) => ({
+		key: d.key,
+		label: d.name?.trim() ? d.name : humanize(d.key),
+	}));
 }
 
 function openColumnPropertyConstructor(state: AppState, view: ListView, _seedName: string): void {
 	openInlinePropertyForm({
 		labels: inlinePropertyFormLabels(),
 		relationTargetTypes: relationTargetTypesFromEntities(state.db.entities),
-		onCommit: async ({ def, dictionary }) => {
+		inverseCandidates: inverseCandidates(),
+		onCommit: async ({ def, dictionary, partner }) => {
 			// Reuse an existing catalog def with the same name + type instead of
 			// minting a duplicate (F-034): re-adding "Deal size · Number" should
 			// land the column on the property that already exists, not a fourth
 			// identical def. Same name + type IS the same property (Notion/
-			// Anytype rule); attach its column and skip the persist entirely.
-			const reusable = findReusablePropertyDef(cachedVaultProperties, def.name ?? "", def.valueType);
-			if (reusable) {
-				updateViewColumns(state, view.id, appendColumnForProperty(view.columns, reusable.key));
+			// Anytype rule) — unless the draft carries relation settings the
+			// existing def lacks (F-508): those are adopted onto it, or, when it
+			// is already paired elsewhere, the draft stays a distinct def.
+			const decision = resolvePropertyReuse(cachedVaultProperties, {
+				def,
+				...(partner ? { partner } : {}),
+			});
+			if (decision.kind === PropertyReuseKind.Reuse) {
+				updateViewColumns(state, view.id, appendColumnForProperty(view.columns, decision.def.key));
 				renderActiveView(state);
 				schedulePersist(state);
 				flashStatus(
-					t("brainstorm.database.status.propertyReused", { name: reusable.name || reusable.key }),
+					t("brainstorm.database.status.propertyReused", { name: propertyLabel(decision.def) }),
 					"ready",
 				);
+				return;
+			}
+			if (decision.kind === PropertyReuseKind.Adopt) {
+				if (!(await adoptRelationSettings(state, decision.def, decision.partner))) return;
+				updateViewColumns(state, view.id, appendColumnForProperty(view.columns, decision.def.key));
+				renderActiveView(state);
+				schedulePersist(state);
 				return;
 			}
 			// Bail before touching the view if the def never reached the vault
@@ -4859,16 +5751,14 @@ function openColumnPropertyConstructor(state: AppState, view: ListView, _seedNam
 			// resolves (blank cells) and we'd flash a contradictory success
 			// on top of the persist warning.
 			if (!(await persistNewPropertyDef(def, dictionary))) return;
+			if (partner) await persistNewPropertyDef(partner, null);
 			// Cache + resolvers refresh against the new catalog; the next
 			// view-settings render uses them.
 			await loadVaultProperties(state);
 			updateViewColumns(state, view.id, [...view.columns, { propertyId: def.key, visible: true }]);
 			renderActiveView(state);
 			schedulePersist(state);
-			flashStatus(
-				t("brainstorm.database.status.propertyAdded", { name: def.name || def.key }),
-				"ready",
-			);
+			flashStatus(propertyCreatedStatus(def, decision), "ready");
 		},
 	});
 }
@@ -4884,28 +5774,153 @@ function openCollectionPropertyConstructor(state: AppState, list: List): void {
 			region: t("brainstorm.database.property.form.collectionRegion"),
 		},
 		relationTargetTypes: relationTargetTypesFromEntities(state.db.entities),
-		onCommit: async ({ def, dictionary }) => {
+		inverseCandidates: inverseCandidates(),
+		onCommit: async ({ def, dictionary, partner }) => {
 			// Same name + type already exists → reuse, never mint a twin that
-			// silently splits values across two defs (F-419 / F-034).
-			const reusable = findReusablePropertyDef(cachedVaultProperties, def.name ?? "", def.valueType);
-			if (reusable) {
+			// silently splits values across two defs (F-419 / F-034). Relation
+			// settings the draft adds are adopted onto the existing def, and a
+			// conflicting pairing keeps the draft distinct (F-508).
+			const decision = resolvePropertyReuse(cachedVaultProperties, {
+				def,
+				...(partner ? { partner } : {}),
+			});
+			if (decision.kind === PropertyReuseKind.Reuse) {
 				flashStatus(
-					t("brainstorm.database.status.propertyExists", { name: reusable.name || reusable.key }),
+					t("brainstorm.database.status.propertyExists", { name: propertyLabel(decision.def) }),
 					"ready",
 				);
 				return;
 			}
+			if (decision.kind === PropertyReuseKind.Adopt) {
+				if (!(await adoptRelationSettings(state, decision.def, decision.partner))) return;
+				renderActiveView(state);
+				schedulePersist(state);
+				return;
+			}
 			const scoped: PropertyDef = { ...def, scope: { kind: "list", target: list.id } };
 			if (!(await persistNewPropertyDef(scoped, dictionary))) return;
+			if (partner) await persistNewPropertyDef(partner, null);
 			await loadVaultProperties(state);
 			renderActiveView(state);
 			schedulePersist(state);
 			flashStatus(
-				t("brainstorm.database.status.propertyAddedToCollection", { name: scoped.name || scoped.key }),
+				decision.kind === PropertyReuseKind.Distinct
+					? propertyCreatedStatus(scoped, decision)
+					: t("brainstorm.database.status.propertyAddedToCollection", { name: propertyLabel(scoped) }),
 				"ready",
 			);
 		},
 	});
+}
+
+function propertyLabel(def: PropertyDef): string {
+	return def.name || def.key;
+}
+
+/** Write the draft's relation settings onto the existing catalog def (F-508
+ *  Adopt) and refresh the cache; the toast names what happened so the user
+ *  knows their target / pairing landed on the property that already existed. */
+async function adoptRelationSettings(
+	state: AppState,
+	def: PropertyDef,
+	partner: PropertyDef | undefined,
+): Promise<boolean> {
+	if (!(await persistNewPropertyDef(def, null))) return false;
+	if (partner) await persistNewPropertyDef(partner, null);
+	await loadVaultProperties(state);
+	flashStatus(
+		t("brainstorm.database.status.propertyAdopted", { name: propertyLabel(def) }),
+		"ready",
+	);
+	return true;
+}
+
+/** The toast for a freshly-minted def: plain "added", or — when a same-name
+ *  relation exists but is paired elsewhere (F-508 Distinct) — why this one
+ *  is a separate property rather than a reuse. */
+function propertyCreatedStatus(def: PropertyDef, decision: PropertyReuseDecision): string {
+	if (decision.kind === PropertyReuseKind.Distinct) {
+		return t("brainstorm.database.status.propertyDistinct", {
+			name: propertyLabel(def),
+			other: propertyDisplayName(decision.pairedWith),
+		});
+	}
+	return t("brainstorm.database.status.propertyAdded", { name: propertyLabel(def) });
+}
+
+/** Change a property's type (9.12.33): preview every bound value's
+ *  conversion (and the rows that would lose data), then — on confirm — write
+ *  the new def and the converted values. Locked records keep their value. */
+async function changePropertyType(
+	state: AppState,
+	propertyId: string,
+	to: ValueType,
+): Promise<void> {
+	const def = cachedVaultProperties.find((d) => d.key === propertyId);
+	if (!canChangeType(def)) return;
+	closeViewSettings();
+	const plan = planTypeChange(state.db.entities, def, to);
+	const confirmed = await openChangeTypeModal({
+		plan,
+		propertyName: propertyDisplayName(propertyId),
+		typeLabel: valueTypeName(to),
+		titleOf: (id) => {
+			const row = state.db.entities.find((e) => e.id === id);
+			return row ? entityTitle(row) : id;
+		},
+		display: (value) =>
+			value === null || value === undefined || value === ""
+				? "—"
+				: formatScalar(def, value) || String(value),
+	});
+	if (!confirmed) return;
+	if (!(await persistNewPropertyDef(plan.nextDef, null))) return;
+	await persistEntityPatches(state, typeChangePatches(plan));
+	await loadVaultProperties(state);
+	renderActiveView(state);
+	flashStatus(
+		t("brainstorm.database.changeType.done", {
+			name: propertyDisplayName(propertyId),
+			type: valueTypeName(to),
+		}),
+		plan.lost > 0 || plan.locked > 0 ? "warn" : "ready",
+	);
+}
+
+function valueTypeName(vt: ValueType): string {
+	switch (vt) {
+		case ValueType.Number:
+			return t("brainstorm.database.property.form.kindNumber");
+		case ValueType.Boolean:
+			return t("brainstorm.database.property.form.kindBoolean");
+		case ValueType.Date:
+			return t("brainstorm.database.property.form.kindDate");
+		default:
+			return t("brainstorm.database.property.form.kindText");
+	}
+}
+
+/** Set / clear a plain number's free-text unit suffix (9.12.33). */
+function editPropertyUnit(state: AppState, propertyId: string, anchor: HTMLElement): void {
+	const def = cachedVaultProperties.find((d) => d.key === propertyId);
+	if (!def || def.valueType !== ValueType.Number) return;
+	promptInline(
+		anchor,
+		def.unit ?? "",
+		(raw) => {
+			const unit = raw.trim().slice(0, 16);
+			const { unit: _prior, ...rest } = def;
+			void persistNewPropertyDef(unit ? { ...rest, unit } : rest, null).then(async (ok) => {
+				if (!ok) return;
+				await loadVaultProperties(state);
+				renderActiveView(state);
+			});
+		},
+		{
+			title: t("brainstorm.database.settings.column.unit"),
+			placeholder: t("brainstorm.database.settings.column.unitPlaceholder"),
+		},
+	);
 }
 
 /** Returns `true` only when the def actually reached the vault catalog,
@@ -5009,10 +6024,12 @@ async function loadVaultEntities(state: AppState): Promise<void> {
 function applyVaultSnapshot(state: AppState, snapshot: VaultSnapshot): void {
 	const built = buildVaultLists(snapshot);
 	state.db = built.db;
-	state.lists = [
-		...built.lists,
-		...persistedUserDeltas.lists.filter((l) => !isVaultDerivedListId(l.id)),
-	];
+	// The lock can flip from another surface while Database is open — re-read
+	// it from the live List rows on every rebuild (9.16.14).
+	state.lists = withLiveListLocks(
+		[...built.lists, ...persistedUserDeltas.lists.filter((l) => !isVaultDerivedListId(l.id))],
+		built.db.entities,
+	);
 	state.views = [
 		// Re-attach the user's saved per-view config onto the freshly
 		// regenerated vault views (stable ids), so sort/filter/columns/
@@ -5191,16 +6208,52 @@ async function reconcileUserLists(state: AppState): Promise<void> {
 	const plan = planListReconcile(current, reconciledListSnapshot);
 	try {
 		for (const id of plan.toDelete) {
-			await deleteUserList(entities, id);
+			const result = await deleteUserList(entities, id);
+			if (result.outcome === DeleteListOutcome.RefusedLocked) {
+				revertRefusedListWrite(state, id, result.persisted);
+				continue;
+			}
 			reconciledListSnapshot.delete(id);
 		}
 		for (const list of plan.toSave) {
-			await saveUserList(entities, list);
+			const result = await saveUserList(entities, list);
+			if (result.outcome === SaveListOutcome.RefusedLocked) {
+				revertRefusedListWrite(state, list.id, result.persisted);
+				continue;
+			}
 			reconciledListSnapshot.set(list.id, serializeListForReconcile(list));
 		}
 	} catch (error) {
 		console.warn("[database] reconcile user lists failed:", error);
 	}
+}
+
+/** A List write refused at the commit because the row locked between the
+ *  writer's check and the debounced reconcile (9.16.14): drop the stale local
+ *  List for the persisted row (re-adding it when the refused write was a
+ *  delete), so the UI stops showing a change that never landed, and say so.
+ *  A refused delete's views were already reconciled away; the List comes
+ *  back on its fallback Grid. */
+function revertRefusedListWrite(state: AppState, listId: string, persisted: List | null): void {
+	console.warn(`[database] write to locked List ${listId} refused at commit`);
+	if (persisted) {
+		const present = state.lists.some((l) => l.id === listId);
+		state.lists = present
+			? state.lists.map((l) => (l.id === listId ? persisted : l))
+			: [...state.lists, persisted];
+		if (!present) {
+			state.views.push(...synthesizeFallbackViews(state.lists, state.views, state.db.entities));
+		}
+		reconciledListSnapshot.set(listId, serializeListForReconcile(persisted));
+		resetCompileCache();
+		renderListNav(state);
+		renderViewTabs(state);
+		renderStageHeader(state);
+		renderActiveView(state);
+		renderInspector(state);
+		schedulePersist(state);
+	}
+	flashListLocked(listId, state);
 }
 
 /** Reconcile the user-created views into `entities.db` (9.12.8): the
@@ -5307,9 +6360,12 @@ async function loadPersistedState(state: AppState): Promise<void> {
 						for (const l of kvLists) {
 							if (reconciledListSnapshot.has(l.id)) continue;
 							try {
-								await saveUserList(entities, l);
-								userLists.push(l);
-								reconciledListSnapshot.set(l.id, serializeListForReconcile(l));
+								const result = await saveUserList(entities, l);
+								// A locked row keeps what it has; the kv copy is the stale one.
+								const kept = result.outcome === SaveListOutcome.RefusedLocked ? result.persisted : l;
+								if (!kept) continue;
+								userLists.push(kept);
+								reconciledListSnapshot.set(kept.id, serializeListForReconcile(kept));
 							} catch (error) {
 								console.warn("[database] migrate kv list failed:", error);
 							}

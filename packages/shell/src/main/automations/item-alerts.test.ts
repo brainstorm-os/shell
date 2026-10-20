@@ -88,6 +88,18 @@ describe("taskAlertRegistrations", () => {
 		expect(alerts.map((a) => a.notification.title)).toEqual(["Task live"]);
 	});
 
+	it("skips won't-do tasks (cancelled status, no completion stamp)", () => {
+		const future = NOW + 60_000;
+		const alerts = taskAlertRegistrations(
+			[
+				taskRow("wont", { dueAt: future, completedAt: null, statusKey: "cancelled" }),
+				taskRow("busy", { dueAt: future, completedAt: null, statusKey: "in-progress" }),
+			],
+			NOW,
+		);
+		expect(alerts.map((a) => a.notification.title)).toEqual(["Task busy"]);
+	});
+
 	it("degrades malformed rows instead of throwing", () => {
 		const alerts = taskAlertRegistrations(
 			[

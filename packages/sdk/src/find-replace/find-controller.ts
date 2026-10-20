@@ -20,6 +20,12 @@
  */
 
 import { registerShortcutSuppression } from "../shortcut/suppression";
+import {
+	type FindBudget,
+	type FindPatternError,
+	compileFindQuery,
+	createFindBudget,
+} from "./find-pattern";
 
 /** Discriminator for the controller lifecycle — enum, not bare literals
  *  (no-string-discriminator convention). */
@@ -32,14 +38,16 @@ export enum FindStatus {
 	Matches = "matches",
 	/** Open, term present, search produced 0 matches. */
 	NoMatches = "no-matches",
+	/** Open, regex term that is invalid or refused as unsafe (B11.27). */
+	InvalidPattern = "invalid-pattern",
 }
 
 export type FindOptions = {
 	caseSensitive: boolean;
 	wholeWord: boolean;
-	/** v1 ships the toggle; regex matching itself is OQ-FR-1 (v2). The
-	 *  controller carries the flag so the UI + persistence are stable;
-	 *  providers may treat it as literal until OQ-FR-1 lands. */
+	/** Treat the term as a JavaScript regular expression (B11.27, OQ-FR-1).
+	 *  The controller validates it (`compileFindQuery`) before any provider
+	 *  runs; replacements expand `$&` / `$1…` / `$<name>`. */
 	regex: boolean;
 	/** Restrict matches to the provider's current selection range. */
 	inSelection: boolean;
@@ -57,7 +65,13 @@ export const DEFAULT_FIND_OPTIONS: FindOptions = Object.freeze({
  *  term, so providers return `null` and the bar opens with the prior term. */
 export const FIND_SEED_MAX_LEN = 200;
 
-export type FindQuery = { term: string; options: FindOptions };
+export type FindQuery = {
+	term: string;
+	options: FindOptions;
+	/** Per-search match/step/time budget (B11.27). A provider that matches
+	 *  through `findRanges` charges it; `exhausted` marks a truncated result. */
+	budget?: FindBudget;
+};
 
 /**
  * An opaque, model-addressed match handle. The controller never inspects
@@ -102,6 +116,10 @@ export type FindControllerState = {
 	 *  `activeIndex + 1` of `matchCount`. */
 	readonly activeIndex: number;
 	readonly status: FindStatus;
+	/** Why a regex term can't run, when `status` is `InvalidPattern`. */
+	readonly patternError: FindPatternError | null;
+	/** The search stopped at its budget — more matches may exist. */
+	readonly truncated: boolean;
 };
 
 export type FindPersist = {
@@ -167,9 +185,15 @@ function resolveStorage(opts: CreateFindControllerOptions): FindStorage | null {
 	return memoryStorage();
 }
 
-function statusFor(open: boolean, term: string, count: number): FindStatus {
+function statusFor(
+	open: boolean,
+	term: string,
+	count: number,
+	patternError: FindPatternError | null,
+): FindStatus {
 	if (!open) return FindStatus.Idle;
 	if (term.length === 0) return FindStatus.Empty;
+	if (patternError !== null) return FindStatus.InvalidPattern;
 	return count > 0 ? FindStatus.Matches : FindStatus.NoMatches;
 }
 
@@ -192,6 +216,8 @@ export function createFindController(
 	let options: FindOptions = { ...DEFAULT_FIND_OPTIONS };
 	let matches: Match[] = [];
 	let activeIndex = -1;
+	let patternError: FindPatternError | null = null;
+	let truncated = false;
 	const listeners = new Set<() => void>();
 
 	// Convention: an open find bar hijacks single-key chords app-wide
@@ -224,7 +250,9 @@ export function createFindController(
 		options,
 		matchCount: matches.length,
 		activeIndex,
-		status: statusFor(open, term, matches.length),
+		status: statusFor(open, term, matches.length, patternError),
+		patternError,
+		truncated,
 	});
 
 	// Stable snapshot — `getState()` must return the SAME reference until
@@ -248,13 +276,32 @@ export function createFindController(
 		}
 	};
 
+	const searchNow = (): Match[] => {
+		patternError = null;
+		truncated = false;
+		if (term.length === 0) return [];
+		if (options.regex) {
+			const compiled = compileFindQuery({ term, options });
+			if (!compiled.ok) {
+				patternError = compiled.error;
+				return [];
+			}
+		}
+		const budget = createFindBudget();
+		const found = provider.search({ term, options, budget });
+		truncated = budget.exhausted;
+		return found;
+	};
+
 	const runSearch = (): void => {
 		if (!open || term.length === 0) {
 			matches = [];
 			activeIndex = -1;
+			patternError = null;
+			truncated = false;
 			return;
 		}
-		matches = provider.search({ term, options });
+		matches = searchNow();
 		activeIndex = matches.length > 0 ? 0 : -1;
 	};
 
@@ -344,15 +391,15 @@ export function createFindController(
 			// ordinal so the user marches forward deterministically (doc 59
 			// "active match sticky across edits"). Clamp to the new count.
 			const prev = activeIndex;
-			matches = term.length > 0 ? provider.search({ term, options }) : [];
+			matches = searchNow();
 			activeIndex = matches.length === 0 ? -1 : Math.min(prev, matches.length - 1);
 			if (activeIndex >= 0) reveal();
 			emit();
 		},
 		replaceAll(replacement) {
-			if (term.length === 0) return 0;
+			if (term.length === 0 || patternError !== null) return 0;
 			const n = provider.replaceAll({ term, options }, replacement);
-			matches = provider.search({ term, options });
+			matches = searchNow();
 			activeIndex = matches.length > 0 ? 0 : -1;
 			emit();
 			return n;

@@ -20,6 +20,7 @@
 
 import { FIND_SEED_MAX_LEN } from "./find-controller";
 import type { FindQuery, ModelRange, TextSearchProvider } from "./find-controller";
+import { compileFindQuery, createFindBudget, findRanges } from "./find-pattern";
 
 export type DomMatch = { start: number; end: number };
 
@@ -31,10 +32,6 @@ export interface DomTextSearchProvider extends TextSearchProvider {
 
 const HIT_ATTR = "data-bs-find";
 
-function escapeRegExp(s: string): string {
-	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 /** `scrollIntoView` is a non-essential visual side effect and throws
  *  "Not implemented" under jsdom — never let it break reveal. */
 function safeScrollIntoView(el: Element | null | undefined): void {
@@ -43,16 +40,6 @@ function safeScrollIntoView(el: Element | null | undefined): void {
 	} catch {
 		/* headless / unsupported — reveal correctness is the wrap/selection */
 	}
-}
-
-/** Literal matcher (regex itself is OQ-FR-1/v2 — the flag is honoured as
- *  literal here, exactly as the controller contract permits). */
-function buildMatcher(query: FindQuery): RegExp | null {
-	const { term, options } = query;
-	if (term.length === 0) return null;
-	let src = escapeRegExp(term);
-	if (options.wholeWord) src = `\\b${src}\\b`;
-	return new RegExp(src, options.caseSensitive ? "g" : "gi");
 }
 
 type Segment = { node: Text; start: number };
@@ -134,15 +121,10 @@ export function createDomTextSearchProvider(
 
 		search(query: FindQuery): DomMatch[] {
 			const root = getRoot();
-			const re = root ? buildMatcher(query) : null;
-			if (!root || !re) return [];
+			if (!root || query.term.length === 0) return [];
 			const { text } = collect(root);
-			const matches: DomMatch[] = [];
-			for (let m = re.exec(text); m; m = re.exec(text)) {
-				matches.push({ start: m.index, end: m.index + m[0].length });
-				if (m[0].length === 0) re.lastIndex++; // guard zero-width
-			}
-			return matches;
+			const ranges = findRanges(text, compileFindQuery(query), query.budget ?? createFindBudget());
+			return ranges.map(({ start, end }) => ({ start, end }));
 		},
 
 		revealMatch(match: unknown): void {

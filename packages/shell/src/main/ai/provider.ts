@@ -32,17 +32,18 @@ export class AiServiceError extends Error {
 
 /** Build the `AiGenerateResult["usage"]` block from whatever token counts a
  *  provider reported — shared so every provider maps usage identically.
- *  Returns `undefined` when neither count is known (the field is then omitted). */
+ *  Returns `undefined` when the counts cannot be trusted, so the broker
+ *  estimates instead: a user-added endpoint is arbitrary code and may report
+ *  zero, negative or partial usage to dodge its per-app budget. Every call
+ *  that reaches here produced a completion, so both counts are > 0. */
 export function buildUsage(
 	promptTokens?: number,
 	completionTokens?: number,
-): { promptTokens?: number; completionTokens?: number; totalTokens?: number } | undefined {
-	if (promptTokens === undefined && completionTokens === undefined) return undefined;
-	return {
-		...(promptTokens !== undefined ? { promptTokens } : {}),
-		...(completionTokens !== undefined ? { completionTokens } : {}),
-		...(promptTokens !== undefined && completionTokens !== undefined
-			? { totalTokens: promptTokens + completionTokens }
-			: {}),
-	};
+): { promptTokens: number; completionTokens: number; totalTokens: number } | undefined {
+	if (!isPositiveCount(promptTokens) || !isPositiveCount(completionTokens)) return undefined;
+	return { promptTokens, completionTokens, totalTokens: promptTokens + completionTokens };
+}
+
+function isPositiveCount(n: unknown): n is number {
+	return typeof n === "number" && Number.isSafeInteger(n) && n > 0;
 }

@@ -28,7 +28,7 @@ import {
 	awarenessToPeers,
 	buildLocalPresence,
 } from "./presence-awareness";
-import type { PresencePeer } from "./presence-stack";
+import type { PresenceActivity, PresencePeer } from "./presence-stack";
 
 /** The presence slice of the sandbox runtime (`window.brainstorm`) — the calls
  *  (`services.presence`) + the peer push (`presence.onPeers`). */
@@ -112,7 +112,8 @@ export function presenceAwarenessFor(entityId: string, type: string): LocalAware
 }
 
 /**
- * Live remote peers on `entityId`, and publish `self` as this device's presence.
+ * Live remote peers on `entityId`, and publish `self` as this device's presence
+ * (plus an optional ephemeral `activity`, e.g. typing — Chats-4).
  * `null` entityId (nothing open) ⇒ an inert local channel (no peers). Pass a
  * STABLE `self` (memoize it) — its fields drive the publish effect.
  */
@@ -120,7 +121,9 @@ export function usePresence(
 	entityId: string | null,
 	type: string,
 	self: PresenceSelf | null,
+	options: { activity?: PresenceActivity | null } = {},
 ): PresencePeer[] {
+	const activity = options.activity ?? null;
 	const awareness = useMemo<LocalAwareness>(
 		() => (entityId ? presenceAwarenessFor(entityId, type) : createLocalAwareness()),
 		[entityId, type],
@@ -133,11 +136,16 @@ export function usePresence(
 
 	// Publish (or clear) this device's presence. `self` must be a stable ref
 	// (`useSelf` returns one) so a re-render with the same identity doesn't churn.
+	// `activity` re-publishes only on a transition, so a caller that holds it
+	// steady while the user keeps typing sends nothing extra.
 	useEffect(() => {
 		if (self)
-			awareness.setLocalStateField(PRESENCE_STATE_KEY, buildLocalPresence(self, awareness.clientID));
+			awareness.setLocalStateField(
+				PRESENCE_STATE_KEY,
+				buildLocalPresence(self, awareness.clientID, activity),
+			);
 		else awareness.setLocalState(null);
-	}, [awareness, self]);
+	}, [awareness, self, activity]);
 
 	return useMemo(() => awarenessToPeers(live.states, live.clientID), [live.states, live.clientID]);
 }

@@ -81,3 +81,31 @@ describe("WhiteboardApp chrome (React)", () => {
 		expect(handle.container.querySelector(".whiteboard__search .bs-searchbar")).not.toBeNull();
 	});
 });
+
+describe("WhiteboardApp — auto-hide sidebar (7.15)", () => {
+	afterEach(() => {
+		document.documentElement.removeAttribute("data-bs-autohide-sidebars");
+		localStorage.removeItem("whiteboard.navOpen");
+	});
+
+	it("without the preference, a collapsed board list leaves the tab order", async () => {
+		localStorage.setItem("whiteboard.navOpen", "false");
+		handle = await renderInto(<WhiteboardApp />);
+		await flush();
+		const nav = handle.container.querySelector(".whiteboard__nav");
+		expect(nav?.hasAttribute("inert")).toBe(true);
+		expect(nav?.hasAttribute("data-bs-autohide")).toBe(false);
+		expect(handle.container.querySelector(".bs-autohide-edge")).toBeNull();
+	});
+
+	it("with the preference on, a collapsed board list becomes a hidden overlay with an edge hot-zone", async () => {
+		document.documentElement.setAttribute("data-bs-autohide-sidebars", "on");
+		localStorage.setItem("whiteboard.navOpen", "false");
+		handle = await renderInto(<WhiteboardApp />);
+		await flush();
+		const nav = handle.container.querySelector(".whiteboard__nav");
+		expect(nav?.getAttribute("data-bs-autohide")).toBe("hidden");
+		expect(nav?.hasAttribute("inert")).toBe(true);
+		expect(handle.container.querySelector(".bs-autohide-edge")).not.toBeNull();
+	});
+});

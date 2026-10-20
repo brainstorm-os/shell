@@ -34,7 +34,7 @@ export function maskAppWindowsForLock(
 	for (const { container } of launcher?.allContainers() ?? []) {
 		const base = container.baseWindow;
 		if (base.isDestroyed()) continue;
-		for (const tab of container.tabs()) {
+		for (const tab of container.panes()) {
 			tab.view.webContents.send(APP_LOCK_CHANGED_CHANNEL, { locked });
 		}
 		if (locked) base.hide();

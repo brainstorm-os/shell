@@ -1,5 +1,6 @@
+import { createT, resolveLocalePack } from "@brainstorm-os/sdk/i18n";
 import { describe, expect, it } from "vitest";
-import { CODE_EDITOR_MESSAGES, plural, t } from "./i18n";
+import { CODE_EDITOR_MESSAGES, LOCALE_PACK_IMPORTERS, plural, t } from "./i18n";
 
 describe("code-editor i18n", () => {
 	it("returns the English default for a known key", () => {
@@ -37,4 +38,28 @@ describe("code-editor i18n", () => {
 		expect(t("menuOpen")).toBe("Open");
 		expect(t("menuOpen")).not.toBe(t("appTitle"));
 	});
+});
+
+/** The Move-to-Bin prompt offers "Don't ask again" because the action is
+ *  reversible — so its copy must say the file can come back from the Bin,
+ *  never that it cannot be undone. Checked on the shipped text per locale. */
+const BIN_IS_REVERSIBLE: Record<string, { claimsIrreversible: RegExp; offersRestore: RegExp }> = {
+	en: { claimsIrreversible: /undone/i, offersRestore: /restore/i },
+	de: { claimsIrreversible: /rückgängig/i, offersRestore: /wiederherg/i },
+	fr: { claimsIrreversible: /annul/i, offersRestore: /restaur/i },
+	it: { claimsIrreversible: /annull/i, offersRestore: /ripristin/i },
+	es: { claimsIrreversible: /deshacer/i, offersRestore: /restaur/i },
+	pt: { claimsIrreversible: /desfe/i, offersRestore: /restaur/i },
+};
+
+describe("code-editor move-to-bin prompt copy (6.15)", () => {
+	for (const [locale, rule] of Object.entries(BIN_IS_REVERSIBLE)) {
+		it(`${locale}: says the file can be restored from the Bin`, async () => {
+			const pack =
+				locale === "en" ? {} : ((await resolveLocalePack(locale, LOCALE_PACK_IMPORTERS)) ?? {});
+			const body = createT(CODE_EDITOR_MESSAGES, pack)("deleteBody", { name: "fib.py" });
+			expect(body).not.toMatch(rule.claimsIrreversible);
+			expect(body).toMatch(rule.offersRestore);
+		});
+	}
 });

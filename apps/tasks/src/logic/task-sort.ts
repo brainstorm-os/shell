@@ -13,6 +13,7 @@
  */
 
 import { PRIORITIES, type Priority, type Task } from "../types/task";
+import { closedAt, isClosed } from "./task-status";
 
 export enum TaskSort {
 	/** Keep the surface's built-in order (honours manual `sortIndex`). */
@@ -42,10 +43,10 @@ export const PRIORITY_RANK: Record<Priority, number> = Object.fromEntries(
 /** Open-before-done ordering, done by completedAt desc. Returns `null` when
  *  both tasks are open so the caller's key comparator decides their order. */
 function doneLast(a: Task, b: Task): number | null {
-	const aDone = a.completedAt !== null;
-	const bDone = b.completedAt !== null;
+	const aDone = isClosed(a);
+	const bDone = isClosed(b);
 	if (aDone !== bDone) return aDone ? 1 : -1;
-	if (aDone && bDone) return (b.completedAt ?? 0) - (a.completedAt ?? 0);
+	if (aDone && bDone) return closedAt(b) - closedAt(a);
 	return null;
 }
 

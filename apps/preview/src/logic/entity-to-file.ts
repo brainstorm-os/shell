@@ -30,6 +30,11 @@ import type { PreviewFile } from "../demo/dataset";
  *  typed and the only fields that matter are these. */
 export type ResolvableEntity = {
 	id?: unknown;
+	/** The envelope's own modification time. A `File/v1` row from Files
+	 *  carries recency HERE, not in `properties` — reading only the property
+	 *  showed "Modified —" for every freshly imported file while Files said
+	 *  "Today". */
+	updatedAt?: unknown;
 	properties?: Record<string, unknown> | null;
 };
 
@@ -91,7 +96,7 @@ export function entityToPreviewFile(
 
 	const name = readString(props.name) ?? id;
 	const sizeBytes = readNumberOrNull(props.size);
-	const modifiedAt = readNumberOrNull(props.updatedAt);
+	const modifiedAt = readNumberOrNull(entity.updatedAt) ?? readNumberOrNull(props.updatedAt);
 
 	return {
 		id,

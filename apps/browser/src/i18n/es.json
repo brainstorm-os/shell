@@ -77,5 +77,12 @@
   "reader.aria": "Vista de lectura",
   "reader.loading": "Preparando la vista de lectura…",
   "reader.empty": "Esta página no tiene un artículo legible.",
-  "reader.truncated": "El artículo se ha acortado: abre la página original para ver el resto."
+  "reader.truncated": "El artículo se ha acortado: abre la página original para ver el resto.",
+  "download.saving": "Guardando en la bóveda…",
+  "download.saved": "Guardado en la bóveda",
+  "download.dismiss": "Descartar",
+  "download.failed.generic": "La descarga falló",
+  "download.failed.tooLarge": "Archivo demasiado grande para guardarlo",
+  "download.failed.empty": "Nada que guardar",
+  "download.failed.interrupted": "Descarga interrumpida"
 }

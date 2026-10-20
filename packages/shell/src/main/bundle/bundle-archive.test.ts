@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { packBundle, preferredCompression, unpackBundle } from "./bundle-archive";
+import { packBundle, packBundleAsync, preferredCompression, unpackBundle } from "./bundle-archive";
 import { BundleCompression } from "./bundle-format";
 import { packTar, unpackTar } from "./bundle-tar";
 
@@ -86,5 +86,33 @@ describe("bundle-archive", () => {
 
 	it("rejects a buffer with a bad magic", () => {
 		expect(() => unpackBundle(new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]))).toThrow(/bad magic/);
+	});
+});
+
+describe("packBundleAsync (IE-14)", () => {
+	const files = new Map([
+		["manifest.json", enc('{"v":1}')],
+		["ydoc/a.bin", new Uint8Array(512 * 1024).map((_, i) => (i * 31) % 251)],
+	]);
+
+	it("writes the exact bytes the sync packer does, for every algorithm", async () => {
+		for (const algo of [BundleCompression.None, BundleCompression.Gzip, preferredCompression()]) {
+			expect(Buffer.from(await packBundleAsync(files, algo))).toEqual(
+				Buffer.from(packBundle(files, algo)),
+			);
+		}
+		expect(
+			dec(unpackBundle(await packBundleAsync(files)).get("manifest.json") ?? new Uint8Array()),
+		).toBe('{"v":1}');
+	});
+
+	it("compresses off the main thread: the event loop keeps turning meanwhile", async () => {
+		let turned = false;
+		setImmediate(() => {
+			turned = true;
+		});
+		const pending = packBundleAsync(files, BundleCompression.Gzip);
+		await pending;
+		expect(turned).toBe(true);
 	});
 });

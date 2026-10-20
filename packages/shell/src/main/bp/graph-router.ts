@@ -141,6 +141,24 @@ export function makeBpGraphRouter(deps: BpGraphRouterDeps): BpModuleHandler {
 			caps: [],
 		});
 
+	// N embedded blocks on one page each run the same scan on load; identical
+	// in-flight queries from the same app share one entities call. Keyed by
+	// app so a coalesced result never crosses a capability boundary; dropped
+	// on settle, so this is dedupe, never a cache.
+	const inFlightQueries = new Map<string, Promise<Entity[]>>();
+	const coalescedQuery = (app: string, query: EntityQuery): Promise<Entity[]> => {
+		const key = `${app}\u0000${query.type ?? ""}`;
+		const existing = inFlightQueries.get(key);
+		if (existing) return existing;
+		const pending = (async () => (await callEntities(app, "query", { query })) as Entity[])();
+		inFlightQueries.set(key, pending);
+		const clear = () => {
+			if (inFlightQueries.get(key) === pending) inFlightQueries.delete(key);
+		};
+		pending.then(clear, clear);
+		return pending;
+	};
+
 	return async (request, context) => {
 		const data = (request as { data?: unknown }).data;
 		const app = context.app;
@@ -247,7 +265,7 @@ export function makeBpGraphRouter(deps: BpGraphRouterDeps): BpModuleHandler {
 				// (BP nests boolean ops differently). 9.3.3.4 work; flag in
 				// OQ-BP-4.
 				try {
-					const rows = (await callEntities(app, "query", { query })) as Entity[];
+					const rows = await coalescedQuery(app, query);
 					return {
 						data: {
 							results: toBpSubgraph(rows),

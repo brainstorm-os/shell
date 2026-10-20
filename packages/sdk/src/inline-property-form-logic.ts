@@ -60,10 +60,13 @@ export enum InlineTextFormat {
 	Url = "url",
 	Email = "email",
 	Phone = "phone",
+	/** Formatted text (bold / links / lists) — the RichText preset (9.12.26). */
+	RichText = "rich-text",
 }
 
 export const INLINE_TEXT_FORMAT_ORDER: readonly InlineTextFormat[] = Object.freeze([
 	InlineTextFormat.Plain,
+	InlineTextFormat.RichText,
 	InlineTextFormat.Url,
 	InlineTextFormat.Email,
 	InlineTextFormat.Phone,
@@ -123,6 +126,8 @@ export function resolveInlinePreset(
 				return PropertyKindPreset.Email;
 			case InlineTextFormat.Phone:
 				return PropertyKindPreset.Phone;
+			case InlineTextFormat.RichText:
+				return PropertyKindPreset.RichText;
 			default:
 				return PropertyKindPreset.Text;
 		}
@@ -240,10 +245,33 @@ export type InlinePropertyFormInput = {
 	/** Arithmetic expression for a Formula property (`{qty} * {rate}`). Required
 	 *  + must compile; only consulted when `primary === Formula`. */
 	formulaExpression?: string;
+	/** Two-way pairing for a Relation (9.12.25): none, the relation itself, an
+	 *  existing relation, or a new partner. Only consulted for Relation. */
+	inverse?: InverseChoice;
 };
+
+export enum InverseChoiceKind {
+	None = "none",
+	Self = "self",
+	Existing = "existing",
+	New = "new",
+}
+
+export type InverseChoice =
+	| { kind: InverseChoiceKind.None }
+	| { kind: InverseChoiceKind.Self }
+	| { kind: InverseChoiceKind.Existing; key: string }
+	| { kind: InverseChoiceKind.New; name: string };
+
+/** An existing relation the new one can pair with. */
+export type InverseCandidate = { key: string; label: string };
 
 export type InlinePropertyDraft = {
 	def: PropertyDef;
+	/** A freshly minted far-end relation when the user chose "New paired
+	 *  property"; it declares `inverseOf` back to `def` (the pairing is
+	 *  symmetric, so one declaration suffices). Commit it after `def`. */
+	partner?: PropertyDef;
 	/** When the picked preset is `Select` / `MultiSelect`, an empty
 	 *  dictionary is minted alongside the def — its id matches the
 	 *  def's `vocabulary.dictionaryId`. Callers must commit the
@@ -329,7 +357,24 @@ export function draftInlineProperty(input: InlinePropertyFormInput): InlinePrope
 		def = { ...def, formula: expression };
 	}
 
+	let partner: PropertyDef | undefined;
+	if (input.primary === InlinePrimaryKind.Relation && input.inverse) {
+		const inverse = input.inverse;
+		if (inverse.kind === InverseChoiceKind.Self) def = { ...def, inverseOf: def.key };
+		if (inverse.kind === InverseChoiceKind.Existing) def = { ...def, inverseOf: inverse.key };
+		if (inverse.kind === InverseChoiceKind.New) {
+			const partnerName = inverse.name.trim();
+			if (partnerName.length === 0) return { ok: false, errors: ["paired property needs a name"] };
+			partner = {
+				...defForPreset(PropertyKindPreset.Link, { key: newPropertyKey(), name: partnerName }),
+				inverseOf: def.key,
+			};
+			const partnerCheck = validatePropertyDef(partner);
+			if (!partnerCheck.ok) return { ok: false, errors: partnerCheck.errors };
+		}
+	}
+
 	const check = validatePropertyDef(def);
 	if (!check.ok) return { ok: false, errors: check.errors };
-	return { ok: true, value: { def, dictionary } };
+	return { ok: true, value: { def, dictionary, ...(partner ? { partner } : {}) } };
 }

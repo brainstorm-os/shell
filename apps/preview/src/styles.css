@@ -59,6 +59,7 @@ button {
 	grid-template-columns: auto minmax(0, 1fr);
 	grid-template-rows: 1fr;
 	overflow: hidden;
+	position: relative; /* anchor for the auto-hide sidebar overlay (7.15) */
 }
 
 /* Main column: the stage/inspector body over the filmstrip — the original
@@ -90,7 +91,7 @@ button {
 	overflow: hidden;
 }
 
-.preview--sidebar-collapsed .preview__sidebar {
+.preview--sidebar-collapsed .preview__sidebar:not([data-bs-autohide]) {
 	display: none;
 }
 
@@ -365,6 +366,71 @@ button {
 	box-shadow: none;
 	border-inline-start-color: transparent;
 	visibility: hidden;
+}
+
+/* Context sections under the property rows (9.20.15): backlinks, then the
+ * Move-to-Bin action. Each is its own hairline-separated block in the panel's
+ * scrolling body. */
+.preview-context {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+	padding-block: var(--space-3);
+	border-top: var(--border-width) solid var(--border);
+	flex-shrink: 0;
+}
+
+.preview-context__heading {
+	margin: 0;
+	color: var(--text-dim);
+	font-size: var(--text-size-sm);
+	font-weight: var(--text-weight-medium);
+}
+
+.preview-context__list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-0_5);
+}
+
+.preview-context__link {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	width: 100%;
+	padding: var(--space-1) var(--space-2);
+	border: 0;
+	border-radius: var(--radius-md);
+	background: transparent;
+	color: var(--text);
+	font: inherit;
+	text-align: start;
+	cursor: pointer;
+}
+
+.preview-context__link:hover,
+.preview-context__link:focus-visible {
+	background: var(--hover);
+}
+
+.preview-context__link-title {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.preview-context__link-glyph {
+	flex-shrink: 0;
+	color: var(--text-dim);
+}
+
+.preview-context__bin {
+	align-self: flex-start;
 }
 
 /* ── Filmstrip ──────────────────────────────────────────────────────── */

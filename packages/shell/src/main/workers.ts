@@ -7,8 +7,10 @@ import {
 	type ExtractionWorkerHandle,
 	createExtractionWorkerHandle,
 } from "./extraction/extraction-worker-handle";
+import { gateYDocService } from "./ipc/ydoc-service-gate";
 import { type ResilientWorker, createResilientWorker } from "./resilient-worker";
 import { BrokerContext } from "./runtime/broker-context";
+import { getActiveVaultSession } from "./vault/session";
 
 type WorkerName = "storage" | "ydoc" | "extraction" | "mailbox";
 
@@ -58,7 +60,8 @@ export type WorkersHandle = {
 	 *  caller can re-bind the active vault (`setVault`) to the fresh process —
 	 *  without it a respawned storage worker has no vault and every call fails
 	 *  "database connection is not open". The ydoc worker takes `vaultPath`
-	 *  per-call, so it self-heals and needs no hook. */
+	 *  per-call (pinned to the active vault by its gate), so it self-heals and
+	 *  needs no hook. */
 	setStorageRespawnHook: (cb: () => void) => void;
 	dispose: () => void;
 };
@@ -186,7 +189,13 @@ export function startWorkers(mainDir: string): WorkersHandle {
 	// CURRENT bridge — so a respawn transparently re-points broker dispatch
 	// at the fresh process with no re-registration.
 	broker.registerService("storage", makeBridgeHandler(storage));
-	broker.registerService("ydoc", makeBridgeHandler(ydoc));
+	// Shell-internal only (SH-ydoc-gate): the worker authorises nothing and
+	// takes `vaultPath` per call, so apps are refused and the path is pinned
+	// to the active vault.
+	broker.registerService(
+		"ydoc",
+		gateYDocService(makeBridgeHandler(ydoc), () => getActiveVaultSession()?.vaultPath ?? null),
+	);
 	// The MailTransport worker (Mailbox-2). Its methods are `_shell`-gated in
 	// the worker, so a renderer cannot reach the driver RPC; the main-process
 	// MailSyncEngine drives it.

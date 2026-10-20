@@ -43,8 +43,24 @@
 	--fm-surface-shadow: var(--shadow-lg);
 
 	/* ─── Stack ───────────────────────────────────────────────────────── */
-	--fm-z-dimmer: var(--z-popover, 50);
-	--fm-z-menu: var(--z-command-palette, 70);
+	/* The menu layer is the TOP of the app-side stack, above every host a
+	 * menu can be opened from. The ordering, bottom → top:
+	 *   page chrome / sticky rows (≤ 30) · anchored popovers + cell pickers
+	 *   (50–240) · full-screen picker hosts (icon-picker 1000, picker-host
+	 *   9000) · the menu dimmer (9100) · the menu panel (9101).
+	 * Menus live ABOVE the picker hosts, not below them (the pre-F-507
+	 * ordering), because a menu is opened FROM those hosts: the "Links to" /
+	 * "Two-way with" selects sit inside the property form under the
+	 * picker-host backdrop, and a menu that loses that contest paints under
+	 * the form — every click lands on the backdrop and cancels it. The dimmer
+	 * rides just under the panel so an outside click dismisses the menu
+	 * instead of reaching the host's own backdrop. Literal numbers, not the
+	 * `--z-*` tokens: the token scale tops out at 80 while the picker hosts
+	 * sit at 1000/9000, so a token-based value can never clear them.
+	 * `menus.test.tsx` fails the build if any SDK layer is declared above
+	 * the dimmer. */
+	--fm-z-dimmer: 9100;
+	--fm-z-menu: 9101;
 
 	/* ─── Accent / state ──────────────────────────────────────────────── */
 	--fm-accent: var(--color-accent-default);
@@ -92,15 +108,15 @@
 
 /* Aerial frosted glass behind the menu shell — mirrors `.glass--strong`
    used by the shared Popover so menus sit in the same visual family. */
+/* Pinned here as well as in the runtime sheet so the stack holds whichever
+ * order the two stylesheets load in (the runtime's own `:root` block sets
+ * 1000/1001, which would put the menu under the 9000 picker host). */
+.fm-dimmer {
+	z-index: var(--fm-z-dimmer);
+}
+
 .fm-menu {
-	/* A menu is a transient top-most action layer: it must stack ABOVE any
-	 * surface it can be opened from, including dialog/popover overlays
-	 * (`.db-popover` is z-index 101, the legacy object-menu 102). The
-	 * fancy-menus runtime leaves z-index `auto`, so a menu that overlaps its
-	 * own host popover (e.g. the column-adder flipping up over View settings)
-	 * loses the stacking contest and its rows can't be clicked. Pin it above
-	 * those overlays but below the full-screen pickers (icon-picker 1000). */
-	z-index: 130;
+	z-index: var(--fm-z-menu);
 	/* No `backdrop-filter`. The panel fill above is opaque, so a blur of what is
 	 * behind it composites a layer nobody can see — and `backdrop-filter`
 	 * promotes the element and re-blurs on paint, which is exactly the cost that
@@ -114,7 +130,7 @@
  * `-webkit-app-region: drag` strip. A drag region is only carved out by a
  * descendant/overlapping element that declares `no-drag`; the runtime sets
  * neither on its overlays, so even though the dimmer stacks above the header
- * (z 50 > the header's auto stacking context), the OS-level drag region keeps
+ * (any positive z beats the header's auto stacking context), the OS-level drag region keeps
  * swallowing the pointerdown — the outside-click that should dismiss the menu
  * never reaches the dimmer, and clicking the header does nothing (seen first
  * on Whiteboard, but every app shares the draggable header). Mark both
@@ -508,4 +524,18 @@ button.fm-row {
 	flex: 0 0 auto;
 	inline-size: 14px;
 	block-size: 14px;
+}
+
+/* A row's secondary text (ContextMenuItem.description), in the caption slot:
+ * muted and truncated so a long description never widens the menu or breaks
+ * the fixed row height. */
+.bs-menu-row__description {
+	display: inline-block;
+	max-width: 180px;
+	vertical-align: bottom;
+	overflow: hidden;
+	color: var(--text-faint);
+	font-size: var(--text-size-xs);
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }

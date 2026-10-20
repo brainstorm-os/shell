@@ -56,6 +56,7 @@ import {
 	BLOCK_FRAME_DEFAULT_MAX_PAYLOAD_BYTES,
 	BlockFrameDropReason,
 	BlockFramePhase,
+	sanitizeHostEntityId,
 } from "./block-frame-constants";
 
 /**
@@ -114,6 +115,12 @@ export interface BlockFrameEnvelope<T = unknown> {
  */
 export interface BlockFrameStartupPayload {
 	readonly capabilities: readonly string[];
+	/** The entity whose document embeds this block (9.12.24) — e.g. the Note
+	 *  a Database view was dropped into, so a contextual filter can say "rows
+	 *  related to this page". Distinct from the envelope `entityId` (the
+	 *  embedded entity the block renders). Absent when the host has no
+	 *  document context. Validated with `sanitizeHostEntityId` on both ends. */
+	readonly hostEntityId?: string;
 }
 
 export interface CreateBlockFrameTransportOptions<TIn = unknown, TOut = unknown> {
@@ -140,6 +147,10 @@ export interface CreateBlockFrameTransportOptions<TIn = unknown, TOut = unknown>
 	 *  `"entities.read:Note"`). Carried in the startup envelope. The
 	 *  transport does NOT enforce — broker does. */
 	readonly capabilities: readonly string[];
+	/** The embedding document's entity id, carried in the Startup payload
+	 *  (see {@link BlockFrameStartupPayload.hostEntityId}). Dropped unless it
+	 *  passes `sanitizeHostEntityId`. */
+	readonly hostEntityId?: string;
 	/** Callback fired for every well-formed inbound `Message` envelope.
 	 *  `Startup` envelopes (which only flow Host→Block) are NOT forwarded
 	 *  to `onMessage`. */
@@ -306,6 +317,7 @@ export function createBlockFrameTransport<TIn = unknown, TOut = unknown>(
 	const host = opts.host ?? globalThis.window;
 	const channelId = (opts.mintChannelId ?? defaultMintChannelId)();
 	const frozenCapabilities = Object.freeze([...capabilities]) as readonly string[];
+	const hostEntityId = sanitizeHostEntityId(opts.hostEntityId);
 	const maxPayloadBytes =
 		opts.maxPayloadBytes && opts.maxPayloadBytes > 0
 			? opts.maxPayloadBytes
@@ -364,7 +376,9 @@ export function createBlockFrameTransport<TIn = unknown, TOut = unknown>(
 		const env = buildEnvelope<BlockFrameStartupPayload>(
 			BlockFrameMessageKind.Startup,
 			BlockFrameMessageDirection.HostToBlock,
-			{ capabilities: frozenCapabilities },
+			hostEntityId === null
+				? { capabilities: frozenCapabilities }
+				: { capabilities: frozenCapabilities, hostEntityId },
 		);
 		// Startup envelopes carry only the capability list, which the
 		// host minted — they are bounded by construction and not gated

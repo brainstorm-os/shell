@@ -23,6 +23,7 @@ import {
 	type CommentsFocusRequest,
 	CommentsProvider,
 	CommentsRightPanel,
+	RichTextPropertyEditor,
 	type RightPanelTab,
 } from "@brainstorm-os/editor";
 import type { CommentAnchor, CommentDef, RosterService } from "@brainstorm-os/sdk-types";
@@ -127,7 +128,9 @@ export function JournalPropertiesIsland({
 	const tabbed = Boolean(adapter && noteId && opts.getActiveTab && opts.onTabChange);
 	const inner = <JournalPropertiesShell opts={opts} hideHeader={tabbed} />;
 	const properties = propertiesRuntime ? (
-		<PropertiesProvider runtime={propertiesRuntime}>{inner}</PropertiesProvider>
+		<PropertiesProvider richTextEditor={RichTextPropertyEditor} runtime={propertiesRuntime}>
+			{inner}
+		</PropertiesProvider>
 	) : (
 		inner
 	);

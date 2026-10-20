@@ -31,7 +31,14 @@ import {
 import type { JSX } from "react";
 import { useSyncExternalStore } from "react";
 import { EntityIcon } from "../entity-icon";
-import { entityIconsSnapshot, getEntityIcon, subscribeEntityIcons } from "../plugins/entity-index";
+import {
+	entityIconsSnapshot,
+	getEntityIcon,
+	getEntityTitle,
+	subscribeEntityIcons,
+} from "../plugins/entity-index";
+import { TaskCheckbox } from "../task-checkbox";
+import { TASK_ENTITY_TYPE } from "../task-entity";
 
 export const MENTION_NODE_TYPE = "mention";
 
@@ -146,16 +153,28 @@ function MentionView({
 	entityType: string;
 	label: string;
 }) {
-	const displayLabel = label.trim().length > 0 ? label : entityId;
 	// Re-render when the vault-entities snapshot changes so a chip whose
 	// entity loads / is renamed / re-iconed after mount picks up the icon.
 	useSyncExternalStore(subscribeEntityIcons, entityIconsSnapshot);
 	const icon = getEntityIcon(entityId);
+	// A task chip (B11.24) follows the task's live name — it's renamed in the
+	// Tasks app far more often than a mentioned page is.
+	const isTask = entityType === TASK_ENTITY_TYPE;
+	const stored = label.trim().length > 0 ? label : entityId;
+	const displayLabel = isTask ? (getEntityTitle(entityId) ?? stored) : stored;
 	return (
-		<span className="notes__mention-chip" data-entity-id={entityId} data-entity-type={entityType}>
-			<span className="notes__mention-at" aria-hidden="true">
-				@
-			</span>
+		<span
+			className={isTask ? "notes__mention-chip notes__mention-chip--task" : "notes__mention-chip"}
+			data-entity-id={entityId}
+			data-entity-type={entityType}
+		>
+			{isTask ? (
+				<TaskCheckbox entityId={entityId} label={displayLabel} />
+			) : (
+				<span className="notes__mention-at" aria-hidden="true">
+					@
+				</span>
+			)}
 			<EntityIcon icon={icon} size={14} className="notes__mention-glyph" />
 			<span className="notes__mention-label">{displayLabel}</span>
 		</span>

@@ -10,7 +10,8 @@
  * affordance — three consumers, one component (CLAUDE.md DRY rule).
  */
 
-import type { PropertyDef } from "@brainstorm-os/sdk-types";
+import { type PropertyDef, PropertyFormat } from "@brainstorm-os/sdk-types";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import {
 	type ReactElement,
 	type ReactNode,
@@ -19,6 +20,8 @@ import {
 	useContext,
 	useMemo,
 } from "react";
+import { t } from "../i18n";
+import { columnHeaderLabel } from "../logic/column-layout";
 import { effectiveColumnDef } from "../logic/effective-def";
 import type { EntityRow } from "../logic/in-memory-entities";
 import type { ColumnSpec } from "../types/list-view";
@@ -27,6 +30,26 @@ import { ComputedCell, computedColumnLabel } from "./computed-cells";
 import { EditableCell, type EntityPropertyEdit } from "./editable-cell";
 
 export type ColumnDefs = ReadonlyMap<string, PropertyDef | null>;
+
+/** A URL property's value as an openable http(s) link, else null — the only
+ *  schemes a card button may hand to the shell's external-link routing. */
+export function openableUrl(def: PropertyDef | null, value: unknown): string | null {
+	if (def?.format !== PropertyFormat.Url || typeof value !== "string") return null;
+	try {
+		const url = new URL(value.trim());
+		return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
+	} catch {
+		return null;
+	}
+}
+
+function hostOf(href: string): string {
+	try {
+		return new URL(href).host;
+	} catch {
+		return href;
+	}
+}
 
 /** Per-view inline-edit context: the commit callback + the effective defs for
  *  the visible columns. `null` (the default) means the view is read-only — a
@@ -88,17 +111,24 @@ export function CardFields({
 	columns,
 	columnDefs,
 	onEdit,
+	hideLabels = false,
+	urlAsButton = false,
 }: {
 	entity: EntityRow;
 	columns: ReadonlyArray<ColumnSpec>;
 	columnDefs: ColumnDefs;
 	onEdit: EntityPropertyEdit;
+	/** Values only — the field names stay as the accessible label (9.12.31). */
+	hideLabels?: boolean;
+	/** A URL property renders as an "open" link button (9.12.31 gallery). */
+	urlAsButton?: boolean;
 }): ReactElement {
 	const stop = useCallback((event: { stopPropagation: () => void }) => event.stopPropagation(), []);
 	return (
 		// kbn-onclick-exempt: not an affordance — these handlers only stopPropagation so clicks inside the fields area don't bubble to the card's open action
 		<dl
 			className="dbv-card__fields"
+			data-hide-labels={hideLabels ? "true" : undefined}
 			onClick={stop}
 			onDoubleClick={stop}
 			onPointerDown={stop}
@@ -117,7 +147,9 @@ export function CardFields({
 				if (c.rollup || c.formula) {
 					return (
 						<div className="dbv-card__field" data-computed="true" key={c.propertyId}>
-							<dt className="dbv-card__field-label">{computedColumnLabel(c)}</dt>
+							<dt className="dbv-card__field-label">
+								{columnHeaderLabel(c, computedColumnLabel(c) ?? "")}
+							</dt>
 							<dd className="dbv-card__field-value">
 								<ComputedCell column={c} entity={entity} />
 							</dd>
@@ -125,7 +157,27 @@ export function CardFields({
 					);
 				}
 				const def = columnDefs.get(c.propertyId) ?? null;
-				const label = def?.name?.trim() ? def.name : humanize(c.propertyId);
+				const label = columnHeaderLabel(c, def?.name?.trim() ? def.name : humanize(c.propertyId));
+				const href = urlAsButton ? openableUrl(def, entity.properties[c.propertyId]) : null;
+				if (href) {
+					return (
+						<div className="dbv-card__field" key={c.propertyId}>
+							<dt className="dbv-card__field-label">{label}</dt>
+							<dd className="dbv-card__field-value">
+								<a
+									className="bs-btn bs-btn--secondary bs-btn--sm dbv-card__url"
+									href={href}
+									target="_blank"
+									rel="noopener noreferrer"
+									aria-label={t("brainstorm.database.card.openUrl", { name: label, host: hostOf(href) })}
+								>
+									<Icon name={IconName.OpenExternal} size={14} />
+									<span className="dbv-card__url-host">{hostOf(href)}</span>
+								</a>
+							</dd>
+						</div>
+					);
+				}
 				return (
 					<div className="dbv-card__field" key={c.propertyId}>
 						<dt className="dbv-card__field-label">{label}</dt>

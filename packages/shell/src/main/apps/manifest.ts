@@ -59,8 +59,18 @@ export const APP_ID_PATTERN = /^[a-z][a-z0-9._-]{1,127}$/i; // reverse-DNS-like
  * that entire set with no consent sheet (read every other app's credentials,
  * write every entity type including the shell-owned ones), so the id is
  * refused at validation, at install, and at renderer registration.
+ *
+ * `io.brainstorm.shell` is the id the MAIN PROCESS acts as: it owns the shell's
+ * own settings namespace (`settings.put` keys under the calling app), and the
+ * ydoc worker's shell-only methods trust it. No renderer may present it.
  */
-export const RESERVED_APP_IDS: ReadonlySet<string> = new Set(["shell", "brainstorm"]);
+export const SHELL_MAIN_APP_ID = "io.brainstorm.shell";
+
+export const RESERVED_APP_IDS: ReadonlySet<string> = new Set([
+	"shell",
+	"brainstorm",
+	SHELL_MAIN_APP_ID,
+]);
 
 /** True when `id` is a platform-owned principal an app may not claim. */
 export function isReservedAppId(id: string): boolean {

@@ -24,6 +24,7 @@ import { HorizontalRulePlugin } from "@lexical/react/LexicalHorizontalRulePlugin
 import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPlugin";
 import { TabIndentationPlugin } from "@lexical/react/LexicalTabIndentationPlugin";
 import { type ReactNode, useMemo } from "react";
+import { createBlockBackgroundActions } from "../block-background";
 import type { BlockCommand } from "../block-command";
 import { useEditorT } from "../i18n";
 import { BLOCK_MARKDOWN_TRANSFORMERS } from "../markdown-block-transformers";
@@ -38,9 +39,11 @@ import { ColumnsPlugin } from "./columns-plugin";
 import { FormatChordsPlugin } from "./format-chords-plugin";
 import { InitialFocusPlugin } from "./initial-focus-plugin";
 import { InlineToolbarPlugin } from "./inline-toolbar-plugin";
+import { createInsertBlockActions } from "./insert-menu";
 import { ListMarkdownShortcutsPlugin } from "./list-markdown-shortcuts-plugin";
 import { SlashMenuPlugin } from "./slash-menu-plugin";
 import { TablesPlugin } from "./table-plugin";
+import { TabsPlugin } from "./tabs-plugin";
 import { TogglePlugin } from "./toggle-plugin";
 import { TurnIntoPlugin } from "./turn-into-plugin";
 
@@ -89,7 +92,14 @@ export function StandardEditingPlugins({
 		const base = orderCommandsByPalette(createStandardBlockCommands(t), palette);
 		return extraCommands && extraCommands.length > 0 ? [...base, ...extraCommands] : base;
 	}, [t, extraCommands, palette]);
-	const actions = useMemo(() => createStandardBlockActions(t), [t]);
+	const actions = useMemo(
+		() => [
+			...createInsertBlockActions(t, commands),
+			...createStandardBlockActions(t),
+			...createBlockBackgroundActions(t),
+		],
+		[t, commands],
+	);
 
 	return (
 		<BlockSelectionPlugin>
@@ -103,8 +113,10 @@ export function StandardEditingPlugins({
 			<TablesPlugin />
 			<TogglePlugin {...(docId ? { docId } : {})} />
 			<ColumnsPlugin />
+			<TabsPlugin />
 			<BlockGutterPlugin
 				commands={actions}
+				insertCommands={commands}
 				{...(scrollContainerSelector ? { scrollContainerSelector } : {})}
 			/>
 			{autoFocus ? <InitialFocusPlugin /> : null}

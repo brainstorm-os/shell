@@ -17,7 +17,7 @@
  * editors work; this component itself is provider-agnostic.
  */
 
-import { type PropertyDef, defaultViewFor } from "@brainstorm-os/sdk-types";
+import { type CellPresentation, type PropertyDef, defaultViewFor } from "@brainstorm-os/sdk-types";
 import { getCell } from "@brainstorm-os/sdk/property-ui";
 import type { ReactElement } from "react";
 import { toCellValue, toDbValue } from "../logic/db-cell-bridge";
@@ -36,6 +36,7 @@ export function EditableCell({
 	onEdit,
 	autoEdit,
 	onAutoEditHandled,
+	presentation,
 }: {
 	entity: EntityRow;
 	propertyId: string;
@@ -52,6 +53,9 @@ export function EditableCell({
 	 *  cell opens its editor on the rising edge. Read-only paints ignore it. */
 	autoEdit?: boolean;
 	onAutoEditHandled?: () => void;
+	/** How much room the cell has — an inspector row passes `Expanded` so a
+	 *  rich-text value edits in place at full height. */
+	presentation?: CellPresentation;
 }): ReactElement {
 	const raw = readPropertyPath(entity, propertyId);
 	const Cell = def ? getCell(def.valueType, defaultViewFor(def)) : undefined;
@@ -76,6 +80,7 @@ export function EditableCell({
 			{...(suggestions !== undefined ? { suggestions } : {})}
 			{...(autoEdit !== undefined ? { autoEdit } : {})}
 			{...(onAutoEditHandled !== undefined ? { onAutoEditHandled } : {})}
+			{...(presentation !== undefined ? { presentation } : {})}
 		/>
 	);
 }

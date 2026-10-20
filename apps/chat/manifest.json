@@ -12,6 +12,7 @@
     "entities.read:*",
     "entities.write:io.brainstorm.chat/Channel/v1",
     "entities.write:brainstorm/Message/v1",
+    "entities.write:io.brainstorm.chat/UserState/v1",
     "intents.dispatch:open",
     "roster.read",
     "roster.write",
@@ -33,7 +34,8 @@
             "name": { "type": "string" },
             "topic": { "type": "string" },
             "createdAt": { "type": "string" },
-            "participants": { "type": "array", "items": { "type": "object" } }
+            "participants": { "type": "array", "items": { "type": "object" } },
+            "pinned": { "type": "array", "items": { "type": "string" } }
           }
         }
       },
@@ -53,6 +55,20 @@
             "aiProvenance": { "type": "object" },
             "createdAt": { "type": "string" },
             "seq": { "type": "number" }
+          }
+        }
+      },
+      {
+        "id": "io.brainstorm.chat/UserState/v1",
+        "schemaUrl": "https://brainstorm.io/schemas/chat/user-state/v1.json",
+        "schema": {
+          "type": "object",
+          "required": ["owner"],
+          "properties": {
+            "owner": { "type": "string" },
+            "watermarks": { "type": "object" },
+            "prefs": { "type": "object" },
+            "updatedAt": { "type": "string" }
           }
         }
       }

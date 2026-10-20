@@ -6,6 +6,7 @@ import {
 	type LookupHost,
 	NetworkFetchError,
 	NetworkFetchErrorKind,
+	RedirectPolicy,
 	executeNetworkFetch,
 } from "./network-service";
 
@@ -660,5 +661,73 @@ describe("executeNetworkFetch — audit hygiene", () => {
 		expect(r?.status).toBe(201);
 		expect(r?.bytes).toBe(42);
 		expect(typeof r?.durationMs).toBe("number");
+	});
+});
+
+describe("executeNetworkFetch — RedirectPolicy.Strict (Agent-14)", () => {
+	const redirectTo = (location: string, status = 302): FetchImpl => {
+		const seen: string[] = [];
+		const impl: FetchImpl = async (_ip, req) => {
+			seen.push(req.url);
+			if (seen.length === 1) {
+				return { status, headers: { Location: location }, body: makeBody(new Uint8Array(0)) };
+			}
+			return { status: 200, headers: {}, body: makeBody(new TextEncoder().encode("ok")) };
+		};
+		return Object.assign(impl, { seen });
+	};
+	const run = (
+		fetchImpl: FetchImpl,
+		over: Partial<Parameters<typeof executeNetworkFetch>[0]>,
+		lookupHost: LookupHost = async () => [PUBLIC_IP],
+	) =>
+		executeNetworkFetch(
+			{
+				appId: "_shell.ai",
+				url: "https://api.example.com/v1",
+				redirectPolicy: RedirectPolicy.Strict,
+				...over,
+			},
+			{ fetchImpl, lookupHost, auditSink: () => undefined },
+		);
+
+	it("refuses to re-POST the body on a redirect, even same-origin 307", async () => {
+		const impl = redirectTo("https://api.example.com/v2", 307);
+		await expect(
+			run(impl, { method: "POST", body: new TextEncoder().encode("{}") }),
+		).rejects.toMatchObject({ kind: NetworkFetchErrorKind.RedirectRefused });
+		expect((impl as unknown as { seen: string[] }).seen).toHaveLength(1);
+	});
+
+	it("refuses an https → http downgrade", async () => {
+		await expect(run(redirectTo("http://api.example.com/v1"), {})).rejects.toMatchObject({
+			kind: NetworkFetchErrorKind.RedirectRefused,
+		});
+	});
+
+	it("does not carry allowPrivate to a different host a LAN endpoint redirects to", async () => {
+		const impl = redirectTo("http://169.254.169.254/latest");
+		await expect(
+			run(impl, { url: "http://10.0.0.5:8080/v1", allowPrivate: true }, async (h) =>
+				h === "10.0.0.5" ? [PRIVATE_IP] : ["169.254.169.254"],
+			),
+		).rejects.toMatchObject({ kind: NetworkFetchErrorKind.SsrfRefused });
+	});
+
+	it("still follows a harmless same-origin GET redirect", async () => {
+		const res = await run(redirectTo("https://api.example.com/v1/"), {});
+		expect(res.status).toBe(200);
+	});
+
+	it("leaves the default policy unchanged", async () => {
+		const res = await executeNetworkFetch(
+			{ appId: "app.test", url: "https://example.com/", method: "POST", body: new Uint8Array([1]) },
+			{
+				fetchImpl: redirectTo("https://example.com/x", 307),
+				lookupHost: async () => [PUBLIC_IP],
+				auditSink: () => undefined,
+			},
+		);
+		expect(res.status).toBe(200);
 	});
 });

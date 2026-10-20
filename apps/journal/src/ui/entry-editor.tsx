@@ -53,7 +53,7 @@ import {
 	type SerializedEditorState,
 	type SerializedLexicalNode,
 } from "lexical";
-import { useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { useOpenCommentBlockIds } from "../store/comments-bindings";
 import { clearJournalEditor, setJournalEditor } from "./editor-bridge";
 import { JournalDevPlugin } from "./journal-dev-plugin";
@@ -226,6 +226,10 @@ export function JournalEntryEditor({
 }: JournalEntryEditorProps) {
 	const doc = useYDoc(noteId);
 	const whenLoaded = useYDocLoaded(noteId);
+	const captureEditor = useCallback(
+		(editor: LexicalEditor) => setJournalEditor(editor, noteId),
+		[noteId],
+	);
 	const applyPending = useYDocApplyPending(noteId);
 	// Blocks with an open comment thread — drives the shared highlight +
 	// click-to-thread chip. Empty (and the plugin inert) without a runtime.
@@ -324,7 +328,7 @@ export function JournalEntryEditor({
 					/>
 				) : null}
 				<JournalMentionClickPlugin />
-				<EditorCapturePlugin onMount={setJournalEditor} onUnmount={clearJournalEditor} />
+				<EditorCapturePlugin onMount={captureEditor} onUnmount={clearJournalEditor} />
 				<JournalDevPlugin entryId={noteId} />
 			</FullEditorPlugins>
 		</BrainstormEditor>

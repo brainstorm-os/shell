@@ -133,5 +133,11 @@
   "chrome.meta": "Erstellt / geändert",
   "chrome.windowControls": "Fenstersteuerung",
   "chrome.entityHeader": "Kopfzeile (Symbol + Titel + Aktionen)",
-  "chrome.tabs": "Tabs"
+  "chrome.tabs": "Tabs",
+  "action.applyToType": "Auf Typ anwenden",
+  "action.applyToTypeHint": "Als Standardlayout für neue {type}-Entitäten festlegen",
+  "status.applying": "Wird angewendet…",
+  "status.appliedToType": "Als Standardlayout für {type} angewendet.",
+  "status.applyInvalid": "Dieses Layout kann nicht angewendet werden — korrigieren Sie es zuerst im Editor.",
+  "status.applyFailed": "Das Layout konnte nicht angewendet werden."
 }

@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { moveEntity, openEntity, quickLookEntity } from "./open-entity";
+import {
+	NavigationMode,
+	moveEntity,
+	navModeFromEvent,
+	openEntity,
+	quickLookEntity,
+} from "./open-entity";
 
 afterEach(() => {
 	vi.restoreAllMocks();
@@ -154,5 +160,22 @@ describe("moveEntity (9.8.7 — intent.move)", () => {
 		const payload = (received as { payload: { entityIds: string[] } } | null)?.payload;
 		expect(payload?.entityIds).toEqual(ids);
 		expect(payload?.entityIds).not.toBe(ids);
+	});
+});
+
+describe("navModeFromEvent", () => {
+	it("maps modifiers to the browser-identical modes", () => {
+		expect(navModeFromEvent(null)).toBe(NavigationMode.Replace);
+		expect(navModeFromEvent({})).toBe(NavigationMode.Replace);
+		expect(navModeFromEvent({ metaKey: true })).toBe(NavigationMode.NewTab);
+		expect(navModeFromEvent({ button: 1 })).toBe(NavigationMode.NewTab);
+		expect(navModeFromEvent({ shiftKey: true })).toBe(NavigationMode.NewWindow);
+	});
+
+	it("Alt+click opens beside the current pane (6.14 / doc 37 new-panel)", () => {
+		expect(navModeFromEvent({ altKey: true })).toBe(NavigationMode.NewPanel);
+		// Alt beats Cmd/Ctrl (a deliberate panel), Shift still means a window.
+		expect(navModeFromEvent({ metaKey: true, altKey: true })).toBe(NavigationMode.NewPanel);
+		expect(navModeFromEvent({ shiftKey: true, altKey: true })).toBe(NavigationMode.NewWindow);
 	});
 });

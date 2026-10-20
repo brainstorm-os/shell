@@ -8,13 +8,19 @@
  * SECURITY: every change only NARROWS — `composeGrants` filters the enabled set
  * to caps the app holds, and the provider picker offers only the app's granted
  * `ai.provider:<id>`s. The three-tier intersection remains the chokepoint.
+ *
+ * Agent-14: the provider list comes from the shell's `ai.providers()` (so
+ * user-added custom endpoints appear by name), and a free-form model field
+ * pins the model per conversation, with the provider's known models offered
+ * as suggestions. The broker re-validates the model id.
  */
 
+import type { AiProviderInfo } from "@brainstorm-os/sdk-types";
 import { Checkbox } from "@brainstorm-os/sdk/checkbox";
 import { Popover, PopoverSize } from "@brainstorm-os/sdk/popover";
 import { SelectMenu } from "@brainstorm-os/sdk/select-menu";
 import type { SelectMenuOption } from "@brainstorm-os/sdk/select-menu";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 import { type AgentI18nKey, t } from "./i18n";
 import {
@@ -22,7 +28,9 @@ import {
 	composeGrants,
 	enabledToggleableGrants,
 	grantVerb,
-	grantedProviderIds,
+	modelForRequest,
+	modelSuggestions,
+	pickerProviders,
 	providerForRequest,
 	resolveProvider,
 	toggleableAppCaps,
@@ -49,9 +57,10 @@ const VERB_LABEL_KEY: Record<string, AgentI18nKey> = {
 	delete: "tool.verb.delete",
 };
 
-export function providerLabel(id: string): string {
+export function providerLabel(id: string, info?: AiProviderInfo): string {
 	const key = PROVIDER_LABEL_KEY[id];
-	return key ? t(key) : id;
+	if (key) return t(key);
+	return info?.label ?? id;
 }
 
 export function grantLabel(cap: string): string {
@@ -70,22 +79,29 @@ export type ConversationSettings = {
 
 export type ConversationSettingsPopoverProps = {
 	appCaps: readonly string[];
+	/** The shell's routable providers (`ai.providers()`), or `null` when the
+	 *  shell predates it — the picker then falls back to the app's caps. */
+	providers: readonly AiProviderInfo[] | null;
 	settings: ConversationSettings;
 	onClose: () => void;
 	/** Persist a narrowed grant set (already composed from the enabled toggles). */
 	onGrantsChange: (grants: string[]) => void;
 	/** Persist the pinned provider (`undefined` = AUTO / shell default). */
 	onProviderChange: (provider: string | undefined) => void;
+	/** Persist the pinned model (`undefined` = the provider's default). */
+	onModelChange: (model: string | undefined) => void;
 	/** Persist the token budget (`undefined` = no limit). */
 	onBudgetChange: (tokenBudget: number | undefined) => void;
 };
 
 export function ConversationSettingsPopover({
 	appCaps,
+	providers,
 	settings,
 	onClose,
 	onGrantsChange,
 	onProviderChange,
+	onModelChange,
 	onBudgetChange,
 }: ConversationSettingsPopoverProps): ReactElement {
 	const toggleable = useMemo(() => toggleableAppCaps(appCaps), [appCaps]);
@@ -94,12 +110,29 @@ export function ConversationSettingsPopover({
 		[appCaps, settings.grants],
 	);
 
+	const offered = useMemo(() => pickerProviders(appCaps, providers), [appCaps, providers]);
 	const providerOptions = useMemo<SelectMenuOption[]>(() => {
 		const auto: SelectMenuOption = { value: AUTO_PROVIDER, label: t("settings.model.auto") };
-		const rest = grantedProviderIds(appCaps).map((id) => ({ value: id, label: providerLabel(id) }));
+		const rest = offered.map((p) => ({ value: p.id, label: providerLabel(p.id, p.info) }));
 		return [auto, ...rest];
-	}, [appCaps]);
+	}, [offered]);
 	const resolvedProvider = resolveProvider(appCaps, settings.provider);
+	const resolvedInfo = offered.find((p) => p.id === resolvedProvider)?.info;
+	const suggestions = modelSuggestions(resolvedInfo);
+	const suggestionOptions: SelectMenuOption[] = suggestions.map((m) => ({ value: m, label: m }));
+
+	const [modelDraft, setModelDraft] = useState(settings.model ?? "");
+	useEffect(() => setModelDraft(settings.model ?? ""), [settings.model]);
+	const modelInvalid = modelDraft.trim().length > 0 && modelForRequest(modelDraft) === undefined;
+	const commitModel = (raw: string) => {
+		setModelDraft(raw);
+		const trimmed = raw.trim();
+		if (trimmed.length === 0) onModelChange(undefined);
+		else {
+			const model = modelForRequest(trimmed);
+			if (model) onModelChange(model);
+		}
+	};
 
 	const onToggle = (cap: string, next: boolean) => {
 		const nextEnabled = new Set(enabled);
@@ -151,6 +184,44 @@ export function ConversationSettingsPopover({
 							data-testid="agent-settings-provider"
 						/>
 					</div>
+					<label className="agent-settings__field">
+						<span className="agent-settings__field-label">{t("settings.model.modelLabel")}</span>
+						<input
+							type="text"
+							className="bs-input"
+							spellCheck={false}
+							autoComplete="off"
+							maxLength={200}
+							value={modelDraft}
+							placeholder={
+								resolvedInfo
+									? t("settings.model.modelPlaceholderDefault", { model: resolvedInfo.defaultModel })
+									: t("settings.model.modelPlaceholder")
+							}
+							onChange={(e) => commitModel(e.target.value)}
+							aria-label={t("settings.model.modelLabel")}
+							aria-invalid={modelInvalid}
+							data-testid="agent-settings-model"
+						/>
+					</label>
+					{modelInvalid ? (
+						<p className="agent-settings__error" role="alert">
+							{t("settings.model.modelInvalid")}
+						</p>
+					) : null}
+					{suggestionOptions.length > 0 ? (
+						<div className="agent-settings__field">
+							<span className="agent-settings__field-label">{t("settings.model.suggestions")}</span>
+							<SelectMenu
+								value={suggestions.includes(modelDraft) ? modelDraft : null}
+								options={suggestionOptions}
+								placeholder={t("settings.model.suggestionsPlaceholder")}
+								ariaLabel={t("settings.model.suggestions")}
+								onChange={(next) => commitModel(next)}
+								data-testid="agent-settings-model-suggestions"
+							/>
+						</div>
+					) : null}
 				</section>
 
 				<section className="agent-settings__section">

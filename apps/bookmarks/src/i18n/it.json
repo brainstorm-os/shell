@@ -124,5 +124,6 @@
   "contentKind.profile": "Profilo",
   "contentKind.product": "Prodotto",
   "contentKind.website": "Sito web",
-  "contentKind.page": "Pagina"
+  "contentKind.page": "Pagina",
+  "menu.lockedHint": "Questo segnalibro è bloccato — sbloccalo per modificarlo"
 }

@@ -30,6 +30,7 @@ import type {
 	AiExtractResult,
 	AiGenerateRequest,
 	AiGenerateResult,
+	AiProviderInfo,
 	AiTransformRequest,
 	AiTransformResult,
 } from "./conversation";
@@ -39,6 +40,7 @@ import type { McpAgentTool } from "./mcp";
 import type { PropertyPredicate } from "./predicate";
 import type { Dictionary, PropertyDef } from "./properties";
 import type { ThemePreviewSpec } from "./theme-preview";
+import type { VersionHistoryService } from "./version-history";
 import type { WebViewClient } from "./web-view";
 
 // ─── Identity / boot handshake ──────────────────────────────────────────────
@@ -231,7 +233,21 @@ export type Entity<P extends Record<string, unknown> = Record<string, unknown>> 
 	createdBy: string;
 	createdAt: number;
 	updatedAt: number;
+	/** On a create/update result only: linked objects of a two-way relation
+	 *  that could not take their back-link when it was applied (e.g. locked in
+	 *  the meantime). Absent when every back-link landed. */
+	skippedLinks?: ReadonlyArray<SkippedLink>;
 };
+
+/** Why a two-way relation's back-link was not written (9.12.25). */
+export enum LinkSkipReason {
+	/** The linked object became read-only after the write was checked. */
+	Locked = "locked",
+	/** The caller lost write access to the linked object's type meanwhile. */
+	Denied = "denied",
+}
+
+export type SkippedLink = { entityId: EntityId; reason: LinkSkipReason };
 
 export type EntityQuery = {
 	type?: string | string[];
@@ -266,6 +282,9 @@ export type EntityMergeResult = {
 	linksRepointed: number;
 	/** Referrer entities whose property refs were rewritten to the survivor. */
 	refsRewritten: number;
+	/** Referrers left untouched because they are locked (read-only); they
+	 *  still point at a binned loser. Counted, never named. */
+	lockedReferrers: number;
 };
 
 export type EntitiesService = {
@@ -284,8 +303,16 @@ export type EntitiesService = {
 		id?: EntityId,
 		provenance?: AgentProvenanceRequest,
 	): Promise<Entity>;
-	update(id: EntityId, patch: Record<string, unknown>): Promise<Entity>;
-	delete(id: EntityId): Promise<void>;
+	/** `provenance` (optional, Agent-15) marks this edit as part of an agent
+	 *  approval in that conversation, so the shell journals the prior values
+	 *  for the run's diff + undo. Like create's, the agent is the verified
+	 *  caller — an app can only ever attribute an edit to itself. */
+	update(
+		id: EntityId,
+		patch: Record<string, unknown>,
+		provenance?: AgentProvenanceRequest,
+	): Promise<Entity>;
+	delete(id: EntityId, provenance?: AgentProvenanceRequest): Promise<void>;
 	/** Merge duplicate entities of ONE type into a survivor (F-158): applies
 	 *  `patch` to the survivor, repoints every stored link + property ref that
 	 *  targeted a loser onto the survivor, then soft-deletes the losers (they
@@ -1790,7 +1817,47 @@ export type SharingService = {
 	/** The resolved access record (active grants + revoked audit) for `entityId`.
 	 *  Requires `sharing.read`. */
 	access(entityId: string): Promise<SharedMember[]>;
+	/** Collab-C7 — the invite a `brainstorm://invite/` link the user opened
+	 *  delivered, verified, for the share dialog to PRE-FILL (consumed on read).
+	 *  Null when none is waiting. Requires `sharing.share`. Optional: an older
+	 *  shell may not expose it. */
+	pendingInvite?(): Promise<PendingInvite | null>;
+	/** Collab-C7 — the role new shares start at (the user's setting; Viewer by
+	 *  default). Requires `sharing.read`. */
+	defaultRole?(): Promise<RosterRole>;
+	/** Collab-C7 — who last edited a shared object and when (the authenticated
+	 *  sync sender, base64 pubkey — resolve a name via `roster.members`). Null
+	 *  for an object never edited while shared. Requires `sharing.read` AND
+	 *  read access to the object's type. */
+	lastEdit?(entityId: string): Promise<SharedLastEdit | null>;
 };
+
+/** Collab-C7 — an invite delivered by a deep link, waiting for the owner. */
+export type PendingInvite = {
+	invite: ShareInviteToken;
+	/** The inviter's self-asserted label / display name (a hint, not identity). */
+	label: string;
+	/** `ed25519:<hex>` fingerprint of the inviter's key — the identity. */
+	fingerprint: string;
+	receivedAt: number;
+};
+
+/** Collab-C7 — the last recorded editor of a shared object. */
+export type SharedLastEdit = { editor: string; editedAt: number };
+
+/** Collab-C7 — the roles a NEW share may default to (never Owner). */
+export const SHARE_DEFAULT_ROLES: readonly RosterRole[] = [RosterRole.Viewer, RosterRole.Editor];
+
+/** The safe default for a new share: read-only until the owner says otherwise. */
+export const DEFAULT_SHARE_ROLE = RosterRole.Viewer;
+
+/** Parse a stored / wire default role; anything but Viewer / Editor reads as
+ *  the safe default. */
+export function parseShareDefaultRole(value: unknown): RosterRole {
+	return SHARE_DEFAULT_ROLES.includes(value as RosterRole)
+		? (value as RosterRole)
+		: DEFAULT_SHARE_ROLE;
+}
 
 /** PRES-2b — the app-facing surface for LIVE PRESENCE (the avatar stack + remote
  *  cursors on a shared entity). Publish this device's presence for an entity and
@@ -2072,6 +2139,9 @@ export type AiService = {
 	extract(req: AiExtractRequest): Promise<AiExtractResult>;
 	/** Pre-send token/cost estimate for a generate request (doc 22 §Cost). */
 	cost(req: AiGenerateRequest): Promise<AiCostEstimate>;
+	/** The providers the calling app may pin (filtered by its `ai.provider:<id>`
+	 *  grants), with model suggestions. Capability: `ai.use`. */
+	providers?(): Promise<readonly AiProviderInfo[]>;
 };
 
 /**
@@ -2214,6 +2284,8 @@ export type AppRuntime = {
 		/** Agent-12a/12b — own-run trace demarcation + reads (no capability). */
 		readonly agentTrace: AgentTraceService;
 		readonly sharing: SharingService;
+		/** 10.16 — per-object version history (gated by the entity's own grants). */
+		readonly history: VersionHistoryService;
 		readonly presence: PresenceService;
 		readonly ui: UiService;
 		readonly theme: ThemeService;
@@ -2742,12 +2814,17 @@ export {
 	AI_CONTENT_PART_KINDS,
 	ANTHROPIC_PROVIDER_ID,
 	ATTACHMENT_KINDS,
+	AI_MODEL_ID_MAX_LENGTH,
 	AiContentPartKind,
 	AttachmentKind,
+	CUSTOM_PROVIDER_ID_PREFIX,
+	containsControlChars,
 	GEMINI_PROVIDER_ID,
 	GLM_PROVIDER_ID,
 	isAiContentPartKind,
 	isAttachmentKind,
+	isCustomProviderId,
+	isValidModelId,
 	MESSAGE_ROLES,
 	MESSAGE_TYPE_URL,
 	MISTRAL_PROVIDER_ID,
@@ -2773,6 +2850,7 @@ export type {
 	AiGenerateResult,
 	AiImagePart,
 	AiProvenance,
+	AiProviderInfo,
 	AiTextPart,
 	AiStreamEvent,
 	AiTransformRequest,
@@ -2800,11 +2878,14 @@ export {
 	AGENT_PROPOSAL_PROPERTY_KEY,
 	AGENT_DELEGATED_BY_PROPERTY_KEY,
 	AGENT_PROVENANCE_PROPERTY_KEY,
+	CREATED_BY_AGENT_PROPERTY_KEY,
 	RESERVED_PROPERTY_KEYS,
 	buildAgentProvenance,
 	parseProvenanceRequest,
+	projectAgentAuthorship,
 	readAgentProvenance,
 	stripAgentProvenance,
+	stripDerivedAuthorship,
 	stripReservedProperties,
 } from "./agent-provenance";
 export type { AgentProvenance, AgentProvenanceRequest } from "./agent-provenance";
@@ -2827,6 +2908,40 @@ export type {
 	AgentLoopStep,
 	AgentToolCall,
 } from "./agent-loop";
+
+// ─── Invite deep links (Collab-C7) ──────────────────────────────────────────
+export {
+	INVITE_LINK_PREFIX,
+	INVITE_TOKEN_MAX_LENGTH,
+	INVITE_TOKEN_MIN_LENGTH,
+	inviteLinkFor,
+	inviteTokenFromInput,
+	isInviteTokenShape,
+	parseInviteLink,
+} from "./invite-link";
+
+// ─── Agent run diff + undo (Agent-15) ───────────────────────────────────────
+export {
+	AGENT_CHANGE_FIELDS_MAX,
+	AGENT_CHANGE_HIDDEN_KEYS,
+	AGENT_CHANGE_PREVIEW_MAX,
+	AGENT_RUN_CHANGES_MAX,
+	AgentUndoRefusal,
+	AgentWriteKind,
+	describeFieldChange,
+	isAgentChangeHiddenKey,
+	isAgentUndoRefusal,
+	isAgentWriteKind,
+	lineDelta,
+	summarizeChangeValue,
+} from "./agent-run-changes";
+export type {
+	AgentFieldChange,
+	AgentLineDelta,
+	AgentRunChange,
+	AgentRunChanges,
+	AgentUndoResult,
+} from "./agent-run-changes";
 
 // ─── Agent trace (Agent-12a — doc 77 agent observability) ───────────────────
 export {
@@ -3120,6 +3235,7 @@ export {
 	ALLOWED_VIEWS,
 	type Cardinality,
 	CARDINALITY_HARD_MAX,
+	CellPresentation,
 	type CellProps,
 	DateGranularity,
 	type DateValue,
@@ -3145,6 +3261,9 @@ export {
 	type PropertyValueByValueType,
 	PropertyView,
 	type Range,
+	RICH_TEXT_STATE_MAX_CHARS,
+	richTextPlain,
+	type RichTextValue,
 	type ScalarValueByValueType,
 	type Scope,
 	presetOf,
@@ -3179,7 +3298,9 @@ export {
 	type FilterNode,
 	FilterNodeKind,
 	type FilterPredicateNode,
+	isHostRef,
 	isPropertyRef,
+	predicateReferencesHost,
 	type PropertyPath,
 	type PropertyPredicate,
 	type PropertyRef,
@@ -3191,18 +3312,23 @@ export {
 export {
 	type BoardLayoutOptions,
 	type CalendarLayoutOptions,
+	type ChartLayoutOptions,
+	ChartType,
 	CalendarRange,
 	CalendarRecurring,
 	CalendarWeekStart,
 	type ColumnFormula,
 	type ColumnRollup,
 	type ColumnSpec,
+	ColumnWrap,
 	type CompiledViewFilter,
 	CompositeOp,
 	EmptyPlacement,
+	GalleryCoverSource,
 	type GalleryLayoutOptions,
 	type GridLayoutOptions,
 	type GroupBy,
+	GroupOrderMode,
 	type LayoutOptions,
 	LinkDirection,
 	type List,
@@ -3317,3 +3443,31 @@ export {
 	buildNoteInsertPayload,
 	parseNoteInsertPayload,
 } from "./insert-intent";
+export {
+	CONFIRM_KIND_REVERSIBILITY,
+	CONFIRM_SKIP_KEY_PREFIX,
+	ConfirmKind,
+	ConfirmReversibility,
+	canRememberConfirm,
+	confirmKindFromSkipKey,
+	confirmSkipKey,
+	isConfirmKind,
+} from "./confirm-kind";
+
+// Version history (rung 10.16) — the `history` service contract + its enums.
+export {
+	type ChangeSetRevertResult,
+	HistoryAccess,
+	type HistoryPrincipal,
+	HistoryPrincipalKind,
+	type RevertSkipped,
+	RevertSkipReason,
+	VersionCause,
+	type VersionHistoryList,
+	type VersionHistoryService,
+	type VersionPreview,
+	type VersionPropertyChange,
+	VersionPropertyChangeKind,
+	type VersionRestoreResult,
+	type VersionSummary,
+} from "./version-history";

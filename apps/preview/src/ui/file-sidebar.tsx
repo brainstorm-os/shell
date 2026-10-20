@@ -14,6 +14,7 @@
 
 import { Orientation, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import type { AutoHidePanelProps } from "@brainstorm-os/sdk/panel-toggle";
 import { type ReactElement, useCallback, useMemo, useState } from "react";
 import type { PreviewFile } from "../demo/dataset";
 import { t } from "../i18n";
@@ -24,10 +25,16 @@ export function FileSidebar({
 	files,
 	activeId,
 	onOpen,
+	open = true,
+	autoHide,
 }: {
 	files: readonly PreviewFile[];
 	activeId: string | null;
 	onOpen: (file: PreviewFile) => void;
+	/** The library is on screen — pinned open, or revealed by auto-hide. */
+	open?: boolean;
+	/** 7.15 — auto-hide overlay wiring from `useAutoHidePanel`. */
+	autoHide?: AutoHidePanelProps;
 }): ReactElement {
 	const [query, setQuery] = useState("");
 	const visible = useMemo(() => filterPreviewFiles(files, query), [files, query]);
@@ -55,7 +62,13 @@ export function FileSidebar({
 	});
 
 	return (
-		<aside className="preview__sidebar" aria-label={t("sidebar.region")}>
+		<aside
+			{...autoHide}
+			className="preview__sidebar"
+			aria-label={t("sidebar.region")}
+			aria-hidden={open ? undefined : true}
+			inert={open ? undefined : true}
+		>
 			<div className="preview__sidebar-search">
 				<span className="preview__sidebar-search-icon" aria-hidden="true">
 					<Icon name={IconName.Search} size={14} />

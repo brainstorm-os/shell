@@ -7,7 +7,17 @@
  */
 
 import type { Task } from "../types/task";
+import { CompletionState, completionStateOf } from "./task-status";
+
+/** Won't do is closed (ticked) but never finished, so its name is struck
+ *  through — the markdown reading of the checkbox's third face. */
+function clipboardLine(task: Task): string {
+	const state = completionStateOf(task);
+	if (state === CompletionState.Done) return `- [x] ${task.name}`;
+	if (state === CompletionState.WontDo) return `- [x] ~~${task.name}~~`;
+	return `- [ ] ${task.name}`;
+}
 
 export function serializeTasksForClipboard(tasks: ReadonlyArray<Task>): string {
-	return tasks.map((task) => `- [${task.completedAt !== null ? "x" : " "}] ${task.name}`).join("\n");
+	return tasks.map(clipboardLine).join("\n");
 }

@@ -35,12 +35,23 @@ import {
 	type NodeKey,
 	type SerializedLexicalNode,
 } from "lexical";
+import {
+	$canHaveBlockBackground,
+	BLOCK_BACKGROUND_STYLE_PROP,
+	readBlockBackground,
+	withBlockBackground,
+} from "../block-background";
+import { SwatchColor } from "../text-color";
 
 export const BRAINSTORM_MIME = "application/x-brainstorm-blocks";
 export const BRAINSTORM_HTML_SENTINEL = "data-brainstorm-blocks";
 const PAYLOAD_VERSION = 1;
 
-type SerializedBlock = SerializedLexicalNode & { children?: SerializedBlock[] };
+type SerializedBlock = SerializedLexicalNode & {
+	children?: SerializedBlock[];
+	/** B11.23 — the block's background swatch name (re-validated on paste). */
+	blockBackground?: string;
+};
 
 export type ClipboardPayload = {
 	version: typeof PAYLOAD_VERSION;
@@ -315,6 +326,8 @@ function serializeNode(node: LexicalNode): SerializedBlock {
 	const json = node.exportJSON() as SerializedBlock;
 	if ($isElementNode(node)) {
 		json.children = node.getChildren().map(serializeNode);
+		const background = readBlockBackground(node.getStyle());
+		if (background !== SwatchColor.Default) json.blockBackground = background;
 	}
 	return json;
 }
@@ -329,6 +342,14 @@ function createNodeFromJson(editor: LexicalEditor, json: SerializedBlock): Lexic
 	const entry = registry.get(json.type);
 	if (!entry) return null;
 	const node = entry.klass.importJSON(json);
+	if ($canHaveBlockBackground(node) && typeof json.blockBackground === "string") {
+		node.setStyle(
+			withBlockBackground(
+				node.getStyle(),
+				readBlockBackground(`${BLOCK_BACKGROUND_STYLE_PROP}: ${json.blockBackground}`),
+			),
+		);
+	}
 	if ($isElementNode(node) && Array.isArray(json.children)) {
 		// importJSON may have already populated children; clear and rebuild
 		// from the serialized tree so deeply-nested formatting round-trips.
