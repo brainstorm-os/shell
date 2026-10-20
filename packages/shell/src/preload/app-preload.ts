@@ -675,6 +675,9 @@ let lastChromeCss = "";
 // the strip row ABOVE the app, so the header below stops reserving their gutter.
 let chromeFullscreen = false;
 let chromeStripVisible = false;
+// Which window edges this pane's header runs along (mirrors `PaneEdges` in
+// `main/apps/window-container.ts`). A lone pane spans both; a split pane one.
+let chromePaneEdges = { left: true, right: true };
 
 function whenDocumentReady(fn: () => void): void {
 	if (typeof document === "undefined") return;
@@ -877,13 +880,17 @@ function themeColorScheme(color: string): "dark" | "light" {
 //   Any other case → 12px
 //
 // When the tab strip is visible the OS controls live in the strip row, not over
-// this header, so the gutter collapses to the default on every platform.
+// this header, so the gutter collapses to the default on every platform. In a
+// split view a pane reserves a gutter only on the window edge it runs along:
+// the right pane never sits under the traffic lights, the left pane never under
+// the Win/Linux controls (`window:pane-edges-changed`).
 function applyChrome(): void {
 	try {
 		const reserveControls = !chromeFullscreen && !chromeStripVisible;
-		const padLeft = IS_MAC && reserveControls ? CHROME_PAD_MAC_LEFT : CHROME_PAD_DEFAULT;
+		const padLeft =
+			IS_MAC && reserveControls && chromePaneEdges.left ? CHROME_PAD_MAC_LEFT : CHROME_PAD_DEFAULT;
 		let padRight = CHROME_PAD_DEFAULT;
-		if (reserveControls) {
+		if (reserveControls && chromePaneEdges.right) {
 			if (IS_WIN) padRight = CHROME_PAD_WIN_RIGHT;
 			else if (IS_LINUX) padRight = CHROME_PAD_LINUX_RIGHT;
 		}
@@ -1141,6 +1148,18 @@ ipcRenderer.on("window:strip-visible-changed", (_event, stripVisible: boolean) =
 		const root = document.documentElement;
 		if (root) root.dataset.stripVisible = stripVisible ? "true" : "false";
 	});
+	applyChrome();
+});
+
+// Split view: the container tells each pane which window edges it runs along,
+// so only the left pane reserves the traffic-light gutter and only the right
+// pane the Win/Linux controls gutter. Shape-checked — main is trusted, but a
+// malformed payload must not leave the header with an undefined inset.
+ipcRenderer.on("window:pane-edges-changed", (_event, edges: unknown) => {
+	if (!edges || typeof edges !== "object") return;
+	const { left, right } = edges as { left?: unknown; right?: unknown };
+	if (typeof left !== "boolean" || typeof right !== "boolean") return;
+	chromePaneEdges = { left, right };
 	applyChrome();
 });
 

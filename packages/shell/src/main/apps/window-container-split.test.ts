@@ -4,6 +4,7 @@ import { SPLIT_DIVIDER_PX, SPLIT_MIN_PANE_PX } from "../window/split-layout";
 import { SplitOrder, SplitPane } from "../window/split-state";
 import {
 	type BaseWindowHandle,
+	PANE_EDGES_CHANNEL,
 	type Rectangle,
 	type Tab,
 	type TabViewFactory,
@@ -408,5 +409,33 @@ describe("WindowContainer split view", () => {
 		t.container.setRoute(side.webContentsId, "brainstorm://entity/c");
 		expect(side.route).toBe("brainstorm://entity/c");
 		expect(t.primary.route).toBe("brainstorm://entity/a");
+	});
+
+	it("reserves the OS-control gutter only on the window edge each pane runs along", () => {
+		const t = setup();
+		const edges = (tab: Tab) =>
+			(view(tab).webContents.send as ReturnType<typeof vi.fn>).mock.calls
+				.filter((c) => c[0] === PANE_EDGES_CHANNEL)
+				.map((c) => c[1]);
+		// A lone pane spans the whole window: traffic lights AND overlay controls.
+		expect(edges(t.primary).at(-1)).toEqual({ left: true, right: true });
+
+		const side = t.container.openSidePane({ ...t.spec("Side"), appId: OTHER });
+		// Primary first: it alone sits under the traffic lights; the side pane
+		// alone under the Win/Linux controls.
+		expect(edges(t.primary).at(-1)).toEqual({ left: true, right: false });
+		expect(edges(side).at(-1)).toEqual({ left: false, right: true });
+
+		// A divider drag re-lays out on every pointer move: no re-send without a change.
+		const before = edges(t.primary).length;
+		t.container.layout();
+		expect(edges(t.primary).length).toBe(before);
+
+		t.container.swapPanes();
+		expect(edges(t.primary).at(-1)).toEqual({ left: false, right: true });
+		expect(edges(side).at(-1)).toEqual({ left: true, right: false });
+
+		t.container.closeSidePane();
+		expect(edges(t.primary).at(-1)).toEqual({ left: true, right: true });
 	});
 });

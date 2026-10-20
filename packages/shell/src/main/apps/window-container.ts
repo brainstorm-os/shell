@@ -181,6 +181,17 @@ export type Tab = {
 	icon: string | null;
 };
 
+/** Which window edges a pane's header runs along. The app header reserves the
+ *  OS window controls only on the edges it actually abuts: in a split, the
+ *  left pane alone sits under the macOS traffic lights and the right pane
+ *  alone under the Win/Linux `titleBarOverlay`, so neither reserves the other
+ *  side's gutter. Sent to the pane's preload on `PANE_EDGES_CHANNEL`. */
+export type PaneEdges = { left: boolean; right: boolean };
+export const PANE_EDGES_CHANNEL = "window:pane-edges-changed";
+const WINDOW_EDGES: PaneEdges = { left: true, right: true };
+const LEFT_PANE_EDGES: PaneEdges = { left: true, right: false };
+const RIGHT_PANE_EDGES: PaneEdges = { left: false, right: true };
+
 export type WindowContainerOptions = {
 	appId: string;
 	baseWindow: BaseWindowHandle;
@@ -220,6 +231,9 @@ export class WindowContainer {
 	private stripVisible = false;
 	private revealed = false;
 	private readonly perTabDetach = new Map<string, () => void>();
+	/** Last edges sent per tab, so a resize-driven `layout()` only re-sends on
+	 *  a real change (the divider drag lays out on every pointer move). */
+	private readonly paneEdgesSent = new Map<string, string>();
 	private readonly changeListeners = new Set<() => void>();
 	private detachBaseWindow: (() => void) | null = null;
 	private disposed = false;
@@ -676,10 +690,39 @@ export class WindowContainer {
 			const primaryFirst = this.split.order === SplitOrder.PrimaryFirst;
 			active.view.setBounds(primaryFirst ? rects.left : rects.right);
 			this.side.view.setBounds(primaryFirst ? rects.right : rects.left);
+			this.syncPaneEdges(active);
+			this.syncPaneEdges(this.side);
 			// A resize moves the divider; the chrome draws it, so it must hear.
 			this.pushChromeState();
 		} else if (active) {
 			active.view.setBounds(body);
+			this.syncPaneEdges(active);
+		}
+	}
+
+	/** The window edges `tab`'s header runs along under the current layout. */
+	private edgesFor(tab: Tab): PaneEdges {
+		if (!this.isSplit()) return WINDOW_EDGES;
+		const sideFirst = this.split.order === SplitOrder.SideFirst;
+		const isLeft = (tab === this.side) === sideFirst;
+		return isLeft ? LEFT_PANE_EDGES : RIGHT_PANE_EDGES;
+	}
+
+	private syncPaneEdges(tab: Tab): void {
+		const edges = this.edgesFor(tab);
+		const key = `${edges.left}:${edges.right}`;
+		if (this.paneEdgesSent.get(tab.tabId) === key) return;
+		this.paneEdgesSent.set(tab.tabId, key);
+		this.sendPaneEdges(tab, edges);
+	}
+
+	private sendPaneEdges(tab: Tab, edges: PaneEdges): void {
+		const wc = tab.view?.webContents;
+		if (!wc || wc.isDestroyed()) return;
+		try {
+			wc.send(PANE_EDGES_CHANNEL, edges);
+		} catch {
+			// Renderer gone between layout and send — harmless.
 		}
 	}
 
@@ -864,8 +907,10 @@ export class WindowContainer {
 			this.reveal();
 			// A tab can finish loading after the strip is already up (opened into an
 			// existing multi-tab window); its preload assumed the single-tab gutter,
-			// so re-send the live state once it can receive it.
+			// so re-send the live state once it can receive it. Same for the pane
+			// edges: a side pane is laid out before its renderer exists.
 			this.sendStripVisible(tab, this.stripVisible);
+			this.sendPaneEdges(tab, this.edgesFor(tab));
 		};
 		// Shell window-management chords (close tab / cycle tabs) are intercepted
 		// before the app renderer sees them.
@@ -921,6 +966,7 @@ export class WindowContainer {
 	private unwireTab(tab: Tab): void {
 		this.perTabDetach.get(tab.tabId)?.();
 		this.perTabDetach.delete(tab.tabId);
+		this.paneEdgesSent.delete(tab.tabId);
 	}
 
 	private teardownTab(tab: Tab): void {

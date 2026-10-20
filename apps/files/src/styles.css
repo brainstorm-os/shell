@@ -1392,7 +1392,9 @@ body:not([data-inspector="open"]) .inspector {
 .inspector__body {
 	flex: 1 1 auto;
 	overflow-y: auto;
-	padding: var(--space-2);
+	/* The inset every inspector body shares (Database / Preview / Notes),
+	 * which is also where the tab labels above start. */
+	padding: var(--space-4);
 	font-size: var(--text-size-md);
 }
 
