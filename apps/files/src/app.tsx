@@ -947,6 +947,7 @@ export function FilesApp() {
 					icon={(appearanceFolder.properties.icon as never) ?? null}
 					cover={(appearanceFolder.properties.cover as never) ?? null}
 					covers={runtime?.services?.covers}
+					icons={runtime?.services?.icons}
 					onChangeIcon={(icon) => store.setEntityIcon(appearanceFolder.id, icon)}
 					onChangeCover={(cover) => store.setEntityCover(appearanceFolder.id, cover)}
 					onClose={() => setAppearance(null)}

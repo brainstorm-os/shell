@@ -10,7 +10,7 @@
  * [[preview-drop-pattern]].
  */
 
-import type { SettingsService } from "@brainstorm-os/sdk-types";
+import type { IconsService, SettingsService } from "@brainstorm-os/sdk-types";
 
 type StorageValue = unknown;
 
@@ -124,6 +124,8 @@ export type WhiteboardBrainstorm = {
 		/** Per-device, app-namespaced settings — backs the per-board camera
 		 *  memory (9.17.24). Absent in preview / standalone. */
 		settings?: SettingsService;
+		/** Vault icon store — backs the icon picker's Upload + Library tabs. */
+		icons?: IconsService;
 		/** Present once the shell exposes the shared entities service.
 		 *  When available Whiteboard reads/writes the shared object space
 		 *  (9.3.5.5) instead of its `kv.json` silo. */

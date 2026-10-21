@@ -223,7 +223,7 @@
   "link.created": "{source} → {target} lié en tant que {name}",
   "link.already": "Déjà lié via {name}",
   "link.failed": "Impossible de créer le lien {name}",
-  "link.unavailable": "La création de liens nécessite le service d'entités partagé",
+  "link.unavailable": "Les liens ne peuvent pas être créés ici.",
   "lock.refusedEdit": "{name} est verrouillé — déverrouillez-le pour le modifier",
   "lock.refusedLink": "{name} est verrouillé — déverrouillez-le pour ajouter des liens",
   "history.fab": "Afficher la lecture de l'historique",

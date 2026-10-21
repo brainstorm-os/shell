@@ -221,7 +221,7 @@
   "notes.format.invalidPhone": "Número de telefone inválido",
   "notes.file.region": "Arquivos de {name}",
   "notes.file.empty": "Nenhum arquivo",
-  "notes.file.uploadsPending": "O envio de arquivos chegará quando a API de upload do armazenamento estiver conectada.",
+  "notes.file.uploadsPending": "O envio de arquivos ainda não está disponível aqui.",
   "notes.link.pickerRegion": "Vincular {name} a uma nota",
   "notes.link.search": "Pesquisar notas",
   "notes.link.searchPlaceholder": "Pesquisar notas para vincular…",

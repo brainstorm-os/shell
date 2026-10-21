@@ -221,7 +221,7 @@
   "notes.format.invalidPhone": "Numero di telefono non valido",
   "notes.file.region": "File per {name}",
   "notes.file.empty": "Nessun file",
-  "notes.file.uploadsPending": "I caricamenti di file arriveranno quando l'API di caricamento dello storage sarà collegata.",
+  "notes.file.uploadsPending": "I caricamenti di file non sono ancora disponibili qui.",
   "notes.link.pickerRegion": "Colleghi {name} a una nota",
   "notes.link.search": "Cerca note",
   "notes.link.searchPlaceholder": "Cerca note da collegare…",

@@ -1112,6 +1112,7 @@ export function JournalApp(): ReactElement {
 						<IconPickerButton
 							value={focusEntry?.icon ?? null}
 							size={18}
+							icons={getJournalRuntime()?.services?.icons}
 							ariaLabel={t("iconPicker")}
 							onChange={(icon) => void setEntryIcon(focus, icon)}
 						/>

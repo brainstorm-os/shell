@@ -18,7 +18,7 @@
   "stage.noFileSelected": "Nada para visualizar",
   "stage.noFileSelectedHint": "Abra um arquivo ou imagem em Arquivos, ou pressione Espaço em um objeto para vê-lo aqui com o Quick Look.",
   "stage.noPreviewFor": "Sem visualização para {mime}",
-  "stage.rendererNotWired": "Renderizador para {kind} ainda não conectado",
+  "stage.rendererNotWired": "Ainda não há pré-visualização para arquivos {kind}.",
   "stage.rendererFailed": "Falha no renderizador: {detail}",
   "stage.unavailable": "Visualização indisponível",
   "context.fromNote": "Da nota:",

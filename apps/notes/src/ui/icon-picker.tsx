@@ -7,10 +7,7 @@
  */
 
 import type { Icon } from "@brainstorm-os/sdk-types";
-import {
-	type IconUploadService,
-	IconPicker as SdkIconPicker,
-} from "@brainstorm-os/sdk/icon-picker";
+import { IconPicker as SdkIconPicker, iconUploadFromIcons } from "@brainstorm-os/sdk/icon-picker";
 import { useMemo } from "react";
 import { t } from "../i18n/t";
 import { ActionId } from "../keyboard/action-ids";
@@ -32,15 +29,7 @@ export function IconPicker({ value, onChange, onClose }: IconPickerProps) {
 	// Wire the custom-image Upload/Library tabs to the vault icon store when the
 	// shell exposes it (B11.14). Absent on older shells — the tabs stay
 	// placeholders (the SDK picker handles the undefined case).
-	const iconUpload = useMemo<IconUploadService | undefined>(() => {
-		const icons = getBrainstorm()?.services.icons;
-		if (!icons) return undefined;
-		return {
-			upload: (filename, bytes) => icons.uploadBytes(filename, bytes),
-			list: async () =>
-				(await icons.list()).map((entry) => ({ url: entry.url, thumbUrl: entry.thumbUrl })),
-		};
-	}, []);
+	const iconUpload = useMemo(() => iconUploadFromIcons(getBrainstorm()?.services.icons), []);
 
 	return (
 		<SdkIconPicker

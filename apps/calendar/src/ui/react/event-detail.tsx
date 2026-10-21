@@ -39,6 +39,7 @@ import {
 	utcToZonedParts,
 	zonedTimeToUtc,
 } from "../../logic/timezone";
+import { getCalendarRuntime } from "../../runtime";
 import type { Attendee } from "../../types/attendee";
 import type { Event } from "../../types/event";
 import { reminderOffsetLabel } from "../reminder-labels";
@@ -239,6 +240,7 @@ export function EventDetail({
 	const chooseIcon = (): void => {
 		openIconPicker({
 			value: draft.icon ?? null,
+			icons: getCalendarRuntime()?.services?.icons,
 			onChange: (icon: Icon | null) => {
 				patch({ icon });
 				closePicker();

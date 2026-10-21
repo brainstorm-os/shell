@@ -12,6 +12,7 @@ import { IconKind } from "@brainstorm-os/sdk-types";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { iconUploadFromIcons } from "./icon-upload";
 import { IconPicker, type IconPickerLabels, type IconUploadService } from "./picker";
 
 const LABELS: IconPickerLabels = {
@@ -266,5 +267,25 @@ describe("IconPicker (shared SDK component)", () => {
 		});
 		expect(onClose).toHaveBeenCalledTimes(1);
 		expect(onChange).not.toHaveBeenCalled();
+	});
+});
+
+describe("iconUploadFromIcons", () => {
+	it("is undefined without a service, so hosts keep the placeholder path", () => {
+		expect(iconUploadFromIcons(undefined)).toBeUndefined();
+		expect(iconUploadFromIcons(null)).toBeUndefined();
+	});
+
+	it("adapts uploadBytes/list and strips the extra entry fields", async () => {
+		const bytes = new Uint8Array([1]);
+		const icons = {
+			uploadBytes: vi.fn(async () => ({ url: "u", thumbUrl: "t" })),
+			list: vi.fn(async () => [{ url: "a", thumbUrl: "ta", hash: "h", bytes: 3 }]),
+		};
+		const adapted = iconUploadFromIcons(icons);
+		if (!adapted) throw new Error("expected an adapter");
+		await expect(adapted.upload("x.png", bytes)).resolves.toEqual({ url: "u", thumbUrl: "t" });
+		expect(icons.uploadBytes).toHaveBeenCalledWith("x.png", bytes);
+		await expect(adapted.list()).resolves.toEqual([{ url: "a", thumbUrl: "ta" }]);
 	});
 });

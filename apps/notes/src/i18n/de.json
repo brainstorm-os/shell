@@ -221,7 +221,7 @@
   "notes.format.invalidPhone": "Keine gültige Telefonnummer",
   "notes.file.region": "Dateien für {name}",
   "notes.file.empty": "Keine Dateien",
-  "notes.file.uploadsPending": "Datei-Uploads folgen, sobald die Speicher-Upload-API angebunden ist.",
+  "notes.file.uploadsPending": "Datei-Uploads sind hier noch nicht verfügbar.",
   "notes.link.pickerRegion": "{name} mit einer Notiz verknüpfen",
   "notes.link.search": "Notizen suchen",
   "notes.link.searchPlaceholder": "Notizen zum Verknüpfen suchen…",

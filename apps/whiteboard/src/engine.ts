@@ -2600,6 +2600,7 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 		void import("@brainstorm-os/sdk/picker-host").then(({ openIconPicker }) => {
 			openIconPicker({
 				value: state.whiteboard.icon ?? null,
+				icons: getBrainstorm()?.services?.icons,
 				onChange: (next) => {
 					state.whiteboard.icon = next;
 					persistBoard();

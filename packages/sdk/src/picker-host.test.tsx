@@ -201,6 +201,34 @@ describe("openInlinePropertyForm", () => {
 });
 
 describe("openIconPicker", () => {
+	it("threads the host's icons service into the Upload tab (F-524)", () => {
+		const icons = {
+			uploadBytes: vi.fn(async () => ({ url: "brainstorm://icon/x", thumbUrl: "t" })),
+			list: vi.fn(async () => []),
+		};
+		flushSync(() => openIconPicker({ value: null, onChange: () => {}, icons }));
+		const upload = [...document.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
+			(tab) => tab.textContent === "Upload",
+		);
+		if (!upload) throw new Error("no Upload tab");
+		flushSync(() => upload.click());
+		expect(document.querySelector(".icon-picker__dropzone")).not.toBeNull();
+		expect(document.querySelector(".icon-picker__pending")).toBeNull();
+		flushSync(() => closePicker());
+	});
+
+	it("without an icons service the Upload tab keeps its placeholder", () => {
+		flushSync(() => openIconPicker({ value: null, onChange: () => {} }));
+		const upload = [...document.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
+			(tab) => tab.textContent === "Upload",
+		);
+		if (!upload) throw new Error("no Upload tab");
+		flushSync(() => upload.click());
+		expect(document.querySelector(".icon-picker__dropzone")).toBeNull();
+		expect(document.querySelector(".icon-picker__pending")).not.toBeNull();
+		flushSync(() => closePicker());
+	});
+
 	it("Escape closes the icon picker (keyboard parity with the backdrop)", () => {
 		try {
 			flushSync(() => openIconPicker({ value: null, onChange: vi.fn() }));

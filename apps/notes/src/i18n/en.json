@@ -221,7 +221,7 @@
   "notes.format.invalidPhone": "Not a valid phone number",
   "notes.file.region": "Files for {name}",
   "notes.file.empty": "No files",
-  "notes.file.uploadsPending": "File uploads land when the storage upload API is wired up.",
+  "notes.file.uploadsPending": "File uploads aren't available here yet.",
   "notes.link.pickerRegion": "Link {name} to a note",
   "notes.link.search": "Search notes",
   "notes.link.searchPlaceholder": "Search notes to link…",

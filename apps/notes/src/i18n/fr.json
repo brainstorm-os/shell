@@ -221,7 +221,7 @@
   "notes.format.invalidPhone": "Numéro de téléphone non valide",
   "notes.file.region": "Fichiers pour {name}",
   "notes.file.empty": "Aucun fichier",
-  "notes.file.uploadsPending": "Les envois de fichiers arriveront quand l'API d'envoi du stockage sera connectée.",
+  "notes.file.uploadsPending": "Les envois de fichiers ne sont pas encore disponibles ici.",
   "notes.link.pickerRegion": "Lier {name} à une note",
   "notes.link.search": "Rechercher des notes",
   "notes.link.searchPlaceholder": "Rechercher des notes à lier…",
