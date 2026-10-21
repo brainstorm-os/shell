@@ -62,7 +62,11 @@ export function IconPicker({ value, onChange, onClose }: IconPickerProps) {
 				libraryPending: t("notes.iconPicker.library.pending"),
 				uploadAction: t("notes.iconPicker.upload.action"),
 				uploading: t("notes.iconPicker.upload.uploading"),
+				dropHint: t("notes.iconPicker.upload.dropHint"),
+				unsupportedFile: t("notes.iconPicker.upload.unsupported"),
 				libraryEmpty: t("notes.iconPicker.library.empty"),
+				loading: t("notes.iconPicker.library.loading"),
+				libraryItem: t("notes.iconPicker.library.item"),
 				skinToneRegion: t("notes.iconPicker.skinTone"),
 				tintRegion: t("notes.iconPicker.tint"),
 			}}

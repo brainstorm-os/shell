@@ -337,33 +337,95 @@
 	cursor: pointer;
 }
 
-/* Upload + Library tabs (B11.14 custom emoji). */
+/* Upload + Library tabs (B11.14 custom emoji). The Upload tab is ONE
+ * drop zone that fills the body — click to browse, or drag an image onto
+ * it — so the whole panel is the target instead of a lone button adrift
+ * in empty space. */
 .icon-picker__upload {
+	flex: 1;
+	min-height: 0;
 	display: flex;
 	flex-direction: column;
-	align-items: center;
-	justify-content: center;
 	gap: var(--space-3);
-	min-height: 160px;
-	padding: var(--space-5);
-	text-align: center;
+	padding: var(--space-4);
 }
 
 .icon-picker__upload-input {
 	display: none;
 }
 
-.icon-picker__upload-error {
-	color: var(--danger, #dc2626);
-	font-size: var(--text-size-xs);
-	max-width: 260px;
+.icon-picker__upload .icon-picker__dropzone {
+	flex: 1;
+	min-height: 0;
 }
 
+.icon-picker__upload-error {
+	flex: 0 0 auto;
+	color: var(--danger);
+	font-size: var(--text-size-sm);
+	text-align: center;
+}
+
+/* Shared drop zone — the click affordance and the drag-and-drop target in
+ * one. The cover picker reuses this base and adds only its compact
+ * "replace image" modifier; a consumer sets its own flex sizing. */
+.icon-picker__dropzone {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-1);
+	width: 100%;
+	padding: var(--space-5) var(--space-3);
+	border: var(--border-width) dashed var(--border-strong);
+	border-radius: var(--radius-md);
+	background: transparent;
+	color: var(--text);
+	font: inherit;
+	text-align: center;
+	cursor: pointer;
+	transition:
+		border-color var(--motion-duration-fast) var(--motion-easing-standard),
+		background var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.icon-picker__dropzone:hover,
+.icon-picker__dropzone--over {
+	border-color: var(--color-accent-default);
+	background: var(--color-accent-subtle);
+}
+
+.icon-picker__dropzone:disabled {
+	opacity: 0.6;
+	cursor: progress;
+}
+
+.icon-picker__dropzone:focus-visible {
+	outline: 2px solid var(--color-focus-ring);
+	outline-offset: -1px;
+	/* Ring replaces the dashed border (no sandwich). */
+	border-color: transparent;
+}
+
+.icon-picker__dropzone-title {
+	font-size: var(--text-size-md);
+	font-weight: 500;
+}
+
+.icon-picker__dropzone-hint {
+	font-size: var(--text-size-xs);
+	color: var(--text-dim);
+}
+
+/* The library owns the body's one scrollbar — without `flex: 1; min-height: 0`
+ * a long list would simply be clipped by the panel's `overflow: hidden`. */
 .icon-picker__library {
+	flex: 1;
+	min-height: 0;
 	display: grid;
 	grid-template-columns: repeat(auto-fill, 40px);
 	gap: var(--space-2);
-	padding: var(--space-2);
+	padding: var(--space-3);
 	overflow-y: auto;
 	align-content: start;
 }
@@ -379,8 +441,13 @@
 }
 
 .icon-picker__library-cell:hover {
-	background: var(--color-accent-subtle, rgba(0, 0, 0, 0.06));
-	border-color: var(--color-border-subtle, rgba(0, 0, 0, 0.1));
+	background: var(--color-accent-subtle);
+	border-color: var(--color-border-subtle);
+}
+
+.icon-picker__library-cell:focus-visible {
+	outline: 2px solid var(--color-focus-ring);
+	outline-offset: -1px;
 }
 
 .icon-picker__library-img {

@@ -12,7 +12,7 @@ import { IconKind } from "@brainstorm-os/sdk-types";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { IconPicker, type IconPickerLabels } from "./picker";
+import { IconPicker, type IconPickerLabels, type IconUploadService } from "./picker";
 
 const LABELS: IconPickerLabels = {
 	region: "Pick icon",
@@ -29,7 +29,11 @@ const LABELS: IconPickerLabels = {
 	libraryPending: "Library pending",
 	uploadAction: "Choose image…",
 	uploading: "Uploading…",
+	dropHint: "Drop an image here",
+	unsupportedFile: "Unsupported file",
 	libraryEmpty: "No custom icons yet",
+	loading: "Loading library…",
+	libraryItem: "Uploaded icon",
 	skinToneRegion: "Skin tone",
 	skinToneOption: "Skin tone: {tone}",
 	skinToneNames: {
@@ -109,6 +113,146 @@ describe("IconPicker (shared SDK component)", () => {
 		});
 		const active = container.querySelector('[role="tab"][aria-selected="true"]');
 		expect(active?.textContent).toBe("Icon");
+	});
+
+	function clickTab(label: string) {
+		const tab = [...container.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
+			(t) => t.textContent === label,
+		);
+		if (!tab) throw new Error(`no tab ${label}`);
+		act(() => tab.click());
+	}
+
+	function flush() {
+		return act(async () => {
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+	}
+
+	function service(list: { url: string; thumbUrl: string }[] = []): IconUploadService {
+		return {
+			upload: vi.fn(async (name: string) => ({
+				url: `brainstorm://icon/${name}`,
+				thumbUrl: `thumb:${name}`,
+			})),
+			list: vi.fn(async () => list),
+		};
+	}
+
+	it("Upload tab is a drop zone that fills the body, with no stray footer", () => {
+		act(() => {
+			root.render(
+				<IconPicker
+					value={null}
+					onChange={() => {}}
+					onClose={() => {}}
+					labels={LABELS}
+					iconUpload={service()}
+				/>,
+			);
+		});
+		clickTab("Upload");
+		const zone = container.querySelector<HTMLButtonElement>(".icon-picker__dropzone");
+		expect(zone?.textContent).toBe("Choose image…Drop an image here");
+		// The old 28px icon-button class crammed "Choose image…" into a square.
+		expect(zone?.classList.contains("icon-picker__action")).toBe(false);
+		// Skin-tone / tint rows belong to Emoji / Icon only — Upload has no footer band.
+		expect(container.querySelector(".icon-picker__footer")).toBeNull();
+		expect(container.querySelector(".icon-picker__search")).toBeNull();
+	});
+
+	it("dropping an image uploads it and picks the stored URL", async () => {
+		const onChange = vi.fn();
+		const onClose = vi.fn();
+		const svc = service();
+		act(() => {
+			root.render(
+				<IconPicker
+					value={null}
+					onChange={onChange}
+					onClose={onClose}
+					labels={LABELS}
+					iconUpload={svc}
+				/>,
+			);
+		});
+		clickTab("Upload");
+		const zone = container.querySelector<HTMLButtonElement>(".icon-picker__dropzone");
+		if (!zone) throw new Error("no drop zone");
+		const file = new File([new Uint8Array([1, 2, 3])], "logo.png", { type: "image/png" });
+		await act(async () => {
+			const event = new Event("drop", { bubbles: true, cancelable: true });
+			Object.defineProperty(event, "dataTransfer", { value: { files: [file] } });
+			zone.dispatchEvent(event);
+		});
+		await flush();
+		expect(svc.upload).toHaveBeenCalledWith("logo.png", new Uint8Array([1, 2, 3]));
+		expect(onChange).toHaveBeenCalledWith({
+			kind: IconKind.Image,
+			value: "brainstorm://icon/logo.png",
+		});
+		expect(onClose).toHaveBeenCalledTimes(1);
+	});
+
+	it("rejects a dropped non-image without touching the store", async () => {
+		const onChange = vi.fn();
+		const svc = service();
+		act(() => {
+			root.render(
+				<IconPicker
+					value={null}
+					onChange={onChange}
+					onClose={() => {}}
+					labels={LABELS}
+					iconUpload={svc}
+				/>,
+			);
+		});
+		clickTab("Upload");
+		const zone = container.querySelector<HTMLButtonElement>(".icon-picker__dropzone");
+		if (!zone) throw new Error("no drop zone");
+		const file = new File(["hello"], "notes.txt", { type: "text/plain" });
+		await act(async () => {
+			const event = new Event("drop", { bubbles: true, cancelable: true });
+			Object.defineProperty(event, "dataTransfer", { value: { files: [file] } });
+			zone.dispatchEvent(event);
+		});
+		await flush();
+		expect(svc.upload).not.toHaveBeenCalled();
+		expect(onChange).not.toHaveBeenCalled();
+		expect(container.querySelector('[role="alert"]')?.textContent).toBe("Unsupported file");
+	});
+
+	it("Library tab says it is loading, then names every uploaded icon", async () => {
+		const svc = service([{ url: "brainstorm://icon/a.png", thumbUrl: "thumb:a" }]);
+		act(() => {
+			root.render(
+				<IconPicker
+					value={null}
+					onChange={() => {}}
+					onClose={() => {}}
+					labels={LABELS}
+					iconUpload={svc}
+				/>,
+			);
+		});
+		clickTab("Library");
+		expect(container.querySelector(".icon-picker__pending")?.textContent).toBe("Loading library…");
+		await flush();
+		const cells = container.querySelectorAll(".icon-picker__library-cell");
+		expect(cells).toHaveLength(1);
+		expect(cells[0]?.getAttribute("aria-label")).toBe("Uploaded icon");
+		expect(container.querySelector(".icon-picker__footer")).toBeNull();
+	});
+
+	it("without an upload service the Upload tab shows the plain-language placeholder", () => {
+		act(() => {
+			root.render(<IconPicker value={null} onChange={() => {}} onClose={() => {}} labels={LABELS} />);
+		});
+		clickTab("Upload");
+		expect(container.querySelector(".icon-picker__pending")?.textContent).toBe("Upload pending");
+		expect(container.querySelector(".icon-picker__dropzone")).toBeNull();
 	});
 
 	it("backdrop click closes without mutating the icon", () => {
