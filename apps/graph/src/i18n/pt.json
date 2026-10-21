@@ -223,7 +223,7 @@
   "link.created": "Vinculado {source} → {target} como {name}",
   "link.already": "Já vinculado via {name}",
   "link.failed": "Não foi possível criar o link {name}",
-  "link.unavailable": "A criação de links requer o serviço compartilhado de entidades",
+  "link.unavailable": "Links não podem ser criados aqui.",
   "lock.refusedEdit": "{name} está bloqueado — desbloqueie para editar",
   "lock.refusedLink": "{name} está bloqueado — desbloqueie para adicionar links",
   "history.fab": "Mostrar reprodução do histórico",

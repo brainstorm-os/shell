@@ -12,6 +12,7 @@ export {
 	type IconPickerLabels,
 	type IconUploadService,
 } from "./picker";
+export { type IconUploadSource, iconUploadFromIcons } from "./icon-upload";
 export { DEFAULT_ICON_PICKER_LABELS } from "../i18n/common-labels";
 export {
 	EMOJI_GROUPS,

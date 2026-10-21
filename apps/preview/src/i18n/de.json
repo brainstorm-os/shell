@@ -18,7 +18,7 @@
   "stage.noFileSelected": "Nichts zum Vorschauen",
   "stage.noFileSelectedHint": "Öffne eine Datei oder ein Bild aus Dateien oder drücke die Leertaste auf einem Objekt, um es hier per Quick Look anzusehen.",
   "stage.noPreviewFor": "Keine Vorschau für {mime}",
-  "stage.rendererNotWired": "Renderer für {kind} noch nicht angebunden",
+  "stage.rendererNotWired": "Für {kind}-Dateien gibt es noch keine Vorschau.",
   "stage.rendererFailed": "Renderer fehlgeschlagen: {detail}",
   "stage.unavailable": "Vorschau nicht verfügbar",
   "context.fromNote": "Aus Notiz:",

@@ -219,7 +219,7 @@ export const DEFAULT_PROPERTY_UI_LABELS: PropertyUiLabels = {
 
 	fileRegion: (name) => `Files for ${name}`,
 	fileEmpty: "No files",
-	fileUploadsPending: "File uploads land when the storage upload API is wired up.",
+	fileUploadsPending: "File uploads aren't available here yet.",
 
 	linkPickerRegion: (name) => `Link ${name}`,
 	linkSearch: "Search to link",

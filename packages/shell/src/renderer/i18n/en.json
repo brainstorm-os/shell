@@ -1473,7 +1473,7 @@
   "shell.settings.network.outcome.aborted": "Aborted",
   "shell.settings.network.outcome.errored": "Errored",
   "shell.settings.network.embeds.title": "Embed providers",
-  "shell.settings.network.embeds.placeholder": "Curated provider list ships with the Stage 9 embed sandbox.",
+  "shell.settings.network.embeds.placeholder": "Links from YouTube, Vimeo, Loom, Figma and CodeSandbox embed in a sandboxed frame. Other links stay bookmark cards.",
   "shell.format.justNow": "just now",
   "shell.format.secondsAgo": "{count}s ago",
   "shell.format.minutesAgo": "{count}m ago",

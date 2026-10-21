@@ -18,7 +18,7 @@
   "stage.noFileSelected": "Nothing to preview",
   "stage.noFileSelectedHint": "Open a file or image from Files, or press Space on any object to Quick Look it here.",
   "stage.noPreviewFor": "No preview for {mime}",
-  "stage.rendererNotWired": "Renderer for {kind} not yet wired",
+  "stage.rendererNotWired": "No preview available for {kind} files yet.",
   "stage.rendererFailed": "Renderer failed: {detail}",
   "stage.unavailable": "Preview unavailable",
   "context.fromNote": "From note:",

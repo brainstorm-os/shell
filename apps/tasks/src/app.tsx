@@ -727,6 +727,7 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 		(task: Task) => {
 			openIconPicker({
 				value: task.icon ?? null,
+				icons: getBrainstorm()?.services.icons,
 				onChange: (icon) =>
 					patchTask(task.id, (existing) => ({ ...existing, icon, updatedAt: nowAnchor() })),
 			});
@@ -1759,6 +1760,7 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 				rowProps: (task) => rowPropsFor(task, now),
 				...(objectMenuRuntime ? { objectMenuRuntime } : {}),
 				onPickProjectIcon,
+				icons: getBrainstorm()?.services.icons,
 				...(repository ? { onRemoveProject, onRenameProject, onReorderTasks } : {}),
 			}),
 		);
@@ -2081,6 +2083,7 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 			value: proj.icon ?? null,
 			ariaLabel: t("tasks.header.iconPicker.open"),
 			size: 18,
+			icons: getBrainstorm()?.services.icons,
 			onChange: (icon) => onPickProjectIcon(proj.id, icon),
 		});
 	}, [headerProject?.id, headerProject?.icon, openTaskRecord, onPickProjectIcon]);

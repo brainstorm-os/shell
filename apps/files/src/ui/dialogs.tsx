@@ -5,10 +5,10 @@
  * editor (shared `<IconPicker>` / `<CoverPicker>`).
  */
 
-import type { Cover, Icon as IconValue } from "@brainstorm-os/sdk-types";
+import type { Cover, Icon as IconValue, IconsService } from "@brainstorm-os/sdk-types";
 import { CoverPicker, type CoverPickerService } from "@brainstorm-os/sdk/cover-picker";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
-import { IconPicker } from "@brainstorm-os/sdk/icon-picker";
+import { IconPicker, iconUploadFromIcons } from "@brainstorm-os/sdk/icon-picker";
 import { Popover, PopoverAlign, PopoverSize } from "@brainstorm-os/sdk/popover";
 import { useEffect, useRef, useState } from "react";
 import { t } from "../i18n";
@@ -347,6 +347,7 @@ export type FolderAppearanceProps = {
 	icon: IconValue | null;
 	cover: Cover | null;
 	covers: CoverPickerService | undefined;
+	icons: IconsService | undefined;
 	onChangeIcon: (icon: IconValue | null) => void;
 	onChangeCover: (cover: Cover | null) => void;
 	onClose: () => void;
@@ -357,6 +358,7 @@ export function FolderAppearanceDialog({
 	icon,
 	cover,
 	covers,
+	icons,
 	onChangeIcon,
 	onChangeCover,
 	onClose,
@@ -373,7 +375,12 @@ export function FolderAppearanceDialog({
 			testId="folder-appearance"
 		>
 			{target === AppearanceTarget.Icon ? (
-				<IconPicker value={icon} onChange={(next) => onChangeIcon(next)} onClose={onClose} />
+				<IconPicker
+					value={icon}
+					onChange={(next) => onChangeIcon(next)}
+					onClose={onClose}
+					iconUpload={iconUploadFromIcons(icons)}
+				/>
 			) : (
 				<CoverPicker
 					value={cover}

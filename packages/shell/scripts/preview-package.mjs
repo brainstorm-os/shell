@@ -174,6 +174,15 @@ function main() {
 		}
 	}
 
+	// art/emoji — the icon picker's built-in glyph set, served via
+	// brainstorm://emoji/<codepoint>.webp. It lives OUTSIDE the asar as an
+	// extraResources entry; forgetting it ships a picker full of broken
+	// images (0.15.0 regression).
+	const emojiDir = join(found.root, "art", "emoji");
+	const sampleEmoji = join(emojiDir, "1f600.webp");
+	if (!existsSync(sampleEmoji)) fail(`missing art/emoji extraResources (expected ${sampleEmoji})`);
+	else ok(`art/emoji present (${readdirSync(emojiDir).length} glyphs)`);
+
 	// at least one bundled .node — look in resources/app.asar.unpacked/
 	// (asarUnpack rewrites the path) or anywhere under the resources root.
 	const nativeFile = findFileRecursive(found.root, (_abs, name) => name.endsWith(".node"));

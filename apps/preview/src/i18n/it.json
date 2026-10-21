@@ -18,7 +18,7 @@
   "stage.noFileSelected": "Niente da visualizzare in anteprima",
   "stage.noFileSelectedHint": "Apri un file o un'immagine da File, o premi Spazio su un oggetto per vederlo qui con Quick Look.",
   "stage.noPreviewFor": "Nessuna anteprima per {mime}",
-  "stage.rendererNotWired": "Renderer per {kind} non ancora collegato",
+  "stage.rendererNotWired": "Nessuna anteprima disponibile per i file {kind} per ora.",
   "stage.rendererFailed": "Renderer non riuscito: {detail}",
   "stage.unavailable": "Anteprima non disponibile",
   "context.fromNote": "Dalla nota:",

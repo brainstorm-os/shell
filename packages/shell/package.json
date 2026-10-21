@@ -73,6 +73,11 @@
         "to": "art/wallpaper"
       },
       {
+        "from": "art/emoji",
+        "to": "art/emoji",
+        "filter": ["*.webp"]
+      },
+      {
         "from": "art",
         "to": "art",
         "filter": [

@@ -32,7 +32,15 @@ export type IconPickerLabels = {
 	 *  `*Pending` placeholders show). */
 	uploadAction: string;
 	uploading: string;
+	/** Drop-zone affordance under the action, e.g. "Drag an image here, or click to browse". */
+	dropHint: string;
+	/** Shown when a dropped file's extension is outside the accepted image set. */
+	unsupportedFile: string;
 	libraryEmpty: string;
+	/** Library tab while the uploaded-icon list is being fetched. */
+	loading: string;
+	/** Accessible name of one uploaded-icon cell (the images carry no title). */
+	libraryItem: string;
 	skinToneRegion: string;
 	/** Per-tone option label, `{tone}` substituted with the friendly tone
 	 *  name from `skinToneNames`. Drives the radio's accessible name. */
@@ -150,11 +158,15 @@ export const DEFAULT_ICON_PICKER_LABELS: IconPickerLabels = {
 	tabIcon: "Icon",
 	tabUpload: "Upload",
 	tabLibrary: "Library",
-	uploadPending: "Custom-image uploads land with the entities write half.",
-	libraryPending: "Your uploaded icons will appear here.",
+	uploadPending: "This app can't upload custom images yet. Pick an emoji or an icon instead.",
+	libraryPending: "Icons you upload will appear here.",
 	uploadAction: "Choose image…",
 	uploading: "Uploading…",
+	dropHint: "Drag an image here, or click to browse",
+	unsupportedFile: "That file type isn't supported. Use PNG, JPEG, WebP, GIF, AVIF or SVG.",
 	libraryEmpty: "No custom icons yet — upload one from the Upload tab.",
+	loading: "Loading…",
+	libraryItem: "Uploaded icon",
 	skinToneRegion: "Skin tone",
 	skinToneOption: "Skin tone: {tone}",
 	skinToneNames: {
