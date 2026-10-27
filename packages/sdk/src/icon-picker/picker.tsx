@@ -8,8 +8,9 @@
  *   - Icon tab: every Phosphor icon from `@phosphor-icons/core`
  *     (1530 glyphs, 18 categories), virtualised; the React components
  *     come from a lazy chunk so the host bundle stays small.
- *   - Upload + Library: tabs render placeholders pending an SDK
- *     `icons` service for apps (B7.2).
+ *   - Upload + Library: a drag-and-drop / click-to-browse zone and the
+ *     grid of previously-uploaded images, backed by the host's
+ *     `iconUpload` service; without one both tabs show a placeholder.
  *
  * Both grids share a column-count driven by ResizeObserver so cells stay
  * uniformly sized across resizes.
@@ -260,10 +261,16 @@ export function IconPicker({ value, onChange, onClose, labels, iconUpload }: Ico
 						))}
 				</div>
 
-				<div className="icon-picker__footer">
-					{tab === PickerTab.Emoji && <SkinToneRow value={skinTone} onChange={setSkinTone} labels={L} />}
-					{tab === PickerTab.Icon && <TintRow value={tintColor} onChange={setTintColor} labels={L} />}
-				</div>
+				{tab === PickerTab.Emoji && (
+					<div className="icon-picker__footer">
+						<SkinToneRow value={skinTone} onChange={setSkinTone} labels={L} />
+					</div>
+				)}
+				{tab === PickerTab.Icon && (
+					<div className="icon-picker__footer">
+						<TintRow value={tintColor} onChange={setTintColor} labels={L} />
+					</div>
+				)}
 			</div>
 		</div>
 	);
@@ -506,6 +513,7 @@ function PendingTab({ message }: { message: string }) {
 // ─── Upload + Library tabs (B11.14 custom emoji) ────────────────────────
 
 const ICON_UPLOAD_ACCEPT = ".png,.jpg,.jpeg,.webp,.gif,.avif,.svg";
+const ICON_UPLOAD_EXTS = /\.(png|jpe?g|webp|gif|avif|svg)$/i;
 
 function UploadTab({
 	service,
@@ -518,10 +526,17 @@ function UploadTab({
 }) {
 	const inputRef = useRef<HTMLInputElement | null>(null);
 	const [busy, setBusy] = useState(false);
+	const [dragOver, setDragOver] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
 	async function onFile(file: File | undefined) {
 		if (!file) return;
+		// The hidden input filters by `accept`, but a drop bypasses it — check
+		// the extension on both paths so a stray .txt never reaches the store.
+		if (!ICON_UPLOAD_EXTS.test(file.name)) {
+			setError(labels.unsupportedFile);
+			return;
+		}
 		setBusy(true);
 		setError(null);
 		try {
@@ -543,18 +558,40 @@ function UploadTab({
 				accept={ICON_UPLOAD_ACCEPT}
 				className="icon-picker__upload-input"
 				aria-label={labels.uploadAction}
-				onChange={(e) => void onFile(e.target.files?.[0])}
+				onChange={(e) => {
+					void onFile(e.target.files?.[0]);
+					e.target.value = "";
+				}}
 				disabled={busy}
 			/>
 			<button
 				type="button"
-				className="icon-picker__action"
-				onClick={() => inputRef.current?.click()}
+				className={
+					dragOver ? "icon-picker__dropzone icon-picker__dropzone--over" : "icon-picker__dropzone"
+				}
 				disabled={busy}
+				onClick={() => inputRef.current?.click()}
+				onDragOver={(e) => {
+					e.preventDefault();
+					setDragOver(true);
+				}}
+				onDragLeave={() => setDragOver(false)}
+				onDrop={(e) => {
+					e.preventDefault();
+					setDragOver(false);
+					void onFile(e.dataTransfer.files?.[0]);
+				}}
 			>
-				{busy ? labels.uploading : labels.uploadAction}
+				<span className="icon-picker__dropzone-title">
+					{busy ? labels.uploading : labels.uploadAction}
+				</span>
+				<span className="icon-picker__dropzone-hint">{labels.dropHint}</span>
 			</button>
-			{error && <div className="icon-picker__upload-error">{error}</div>}
+			{error && (
+				<div className="icon-picker__upload-error" role="alert">
+					{error}
+				</div>
+			)}
 		</div>
 	);
 }
@@ -585,7 +622,7 @@ function LibraryTab({
 		};
 	}, [service]);
 
-	if (items === null) return <div className="icon-picker__pending">{labels.uploading}</div>;
+	if (items === null) return <div className="icon-picker__pending">{labels.loading}</div>;
 	if (items.length === 0) return <div className="icon-picker__pending">{labels.libraryEmpty}</div>;
 	// Plain focusable buttons in a grid — natively Tab-reachable + Enter/Space
 	// activate, so the library is keyboard-accessible without a custom listbox.
@@ -596,7 +633,7 @@ function LibraryTab({
 					key={item.url}
 					type="button"
 					className="icon-picker__library-cell"
-					title={labels.tabLibrary}
+					aria-label={labels.libraryItem}
 					onClick={() => onPick(item.url)}
 				>
 					<img src={item.thumbUrl} alt="" className="icon-picker__library-img" />

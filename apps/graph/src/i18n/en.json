@@ -223,7 +223,7 @@
   "link.created": "Linked {source} → {target} as {name}",
   "link.already": "Already linked via {name}",
   "link.failed": "Couldn't create the {name} link",
-  "link.unavailable": "Link creation needs the shared entities service",
+  "link.unavailable": "Links can't be created here.",
   "lock.refusedEdit": "{name} is locked — unlock it to edit",
   "lock.refusedLink": "{name} is locked — unlock it to add links",
   "history.fab": "Show history playback",

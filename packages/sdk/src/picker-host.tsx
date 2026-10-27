@@ -23,7 +23,12 @@ import {
 	type CoverPickerService,
 } from "@brainstorm-os/sdk/cover-picker";
 import { createEntityIconElement } from "@brainstorm-os/sdk/entity-icon";
-import { IconPicker, type IconPickerLabels } from "@brainstorm-os/sdk/icon-picker";
+import {
+	IconPicker,
+	type IconPickerLabels,
+	type IconUploadSource,
+	iconUploadFromIcons,
+} from "@brainstorm-os/sdk/icon-picker";
 import { type ReactNode, useEffect, useRef } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import {
@@ -84,13 +89,18 @@ export function openIconPicker(opts: {
 	value: Icon | null;
 	onChange: (icon: Icon | null) => void;
 	labels?: Partial<IconPickerLabels>;
+	/** The host runtime's `services.icons`; without it the Upload + Library
+	 *  tabs show their "not available here" placeholder. */
+	icons?: IconUploadSource | null | undefined;
 }): void {
 	const r = ensureRoot();
+	const iconUpload = iconUploadFromIcons(opts.icons);
 	r.render(
 		<EscapeClose onEscape={closePicker}>
 			<IconPicker
 				value={opts.value}
 				labels={opts.labels}
+				{...(iconUpload ? { iconUpload } : {})}
 				onChange={(icon) => opts.onChange(icon)}
 				onClose={closePicker}
 			/>
@@ -150,6 +160,8 @@ export type IconPickerButtonOptions = {
 	ariaLabel: string;
 	onChange: (icon: Icon | null) => void;
 	labels?: Partial<IconPickerLabels>;
+	/** The host runtime's `services.icons` — see `openIconPicker`. */
+	icons?: IconUploadSource | null | undefined;
 	/** Rendered when the object has no own icon. Defaults to the
 	 *  dashed-add glyph (a 'set me' affordance); callers that want a
 	 *  type fallback (e.g. the per-object canonical icon from
@@ -189,6 +201,7 @@ export function createIconPickerButton(opts: IconPickerButtonOptions): HTMLButto
 		openIconPicker({
 			value: current,
 			...(opts.labels ? { labels: opts.labels } : {}),
+			...(opts.icons ? { icons: opts.icons } : {}),
 			onChange: (icon) => {
 				current = icon;
 				paint();
@@ -213,11 +226,12 @@ export function IconPickerButton(props: IconPickerButtonOptions) {
 			...(props.size !== undefined ? { size: props.size } : {}),
 			ariaLabel: props.ariaLabel,
 			...(props.labels ? { labels: props.labels } : {}),
+			...(props.icons ? { icons: props.icons } : {}),
 			onChange: (icon) => onChange.current(icon),
 		});
 		el.replaceChildren(btn);
 		return () => el.replaceChildren();
-	}, [props.value, props.size, props.ariaLabel, props.labels]);
+	}, [props.value, props.size, props.ariaLabel, props.labels, props.icons]);
 	return <span ref={host} style={{ display: "inline-flex" }} />;
 }
 

@@ -17,7 +17,7 @@ import { RichTextPropertyEditor } from "@brainstorm-os/editor";
 import type { PropertiesService } from "@brainstorm-os/sdk-types";
 import { CoverPicker, type CoverPickerService } from "@brainstorm-os/sdk/cover-picker";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
-import { IconPicker, type IconUploadService } from "@brainstorm-os/sdk/icon-picker";
+import { IconPicker, iconUploadFromIcons } from "@brainstorm-os/sdk/icon-picker";
 import { PropertiesPanel } from "@brainstorm-os/sdk/properties-panel";
 import {
 	DEFAULT_PROPERTY_UI_LABELS,
@@ -170,14 +170,7 @@ export function PersonDetail({
 		() => getBrainstorm()?.services?.covers ?? COVERS_UNAVAILABLE,
 		[],
 	);
-	const iconUpload = useMemo<IconUploadService | undefined>(() => {
-		const icons = getBrainstorm()?.services?.icons;
-		if (!icons) return undefined;
-		return {
-			upload: (filename, bytes) => icons.uploadBytes(filename, bytes),
-			list: async () => (await icons.list()).map((e) => ({ url: e.url, thumbUrl: e.thumbUrl })),
-		};
-	}, []);
+	const iconUpload = useMemo(() => iconUploadFromIcons(getBrainstorm()?.services?.icons), []);
 
 	// Stable cover subject — the band re-renders off the explicit `cover` prop.
 	const coverSubject = useMemo(() => ({ id: person.id }), [person.id]);

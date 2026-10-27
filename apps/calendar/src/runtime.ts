@@ -12,6 +12,7 @@
 
 import type {
 	CalDavService,
+	IconsService,
 	PropertiesService,
 	VaultEntity as SdkVaultEntity,
 	SettingsService,
@@ -83,6 +84,8 @@ export type CalendarRuntime = {
 		/** Per-device, vault-scoped settings — persists the source-filter
 		 *  visibility (9.15f). */
 		settings?: SettingsService;
+		/** Vault icon store — backs the icon picker's Upload + Library tabs. */
+		icons?: IconsService;
 	};
 };
 

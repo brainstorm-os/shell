@@ -223,7 +223,7 @@
   "link.created": "Collegato {source} → {target} come {name}",
   "link.already": "Già collegato tramite {name}",
   "link.failed": "Impossibile creare il link {name}",
-  "link.unavailable": "La creazione dei link richiede il servizio condiviso delle entità",
+  "link.unavailable": "I link non possono essere creati qui.",
   "lock.refusedEdit": "{name} è bloccato — sbloccalo per modificarlo",
   "lock.refusedLink": "{name} è bloccato — sbloccalo per aggiungere link",
   "history.fab": "Mostra riproduzione della cronologia",

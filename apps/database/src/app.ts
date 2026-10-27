@@ -46,6 +46,7 @@ import {
 	type FileImportResult,
 	GENERIC_OBJECT_TYPE,
 	type Icon,
+	type IconsService,
 	type ObjectDragPayload,
 	type PropertiesService,
 	type PropertiesSnapshot,
@@ -1114,6 +1115,7 @@ function renderStageHeader(state: AppState): void {
 			createIconPickerButton({
 				value: list.icon,
 				size: 18,
+				icons: getRuntime()?.services?.icons,
 				ariaLabel: t("brainstorm.database.stage.changeListIcon"),
 				onChange: (icon) => commitListIcon(state, list.id, icon),
 			}),
@@ -1156,6 +1158,7 @@ function renderStageHeader(state: AppState): void {
 			createIconPickerButton({
 				value: list.icon,
 				size: 18,
+				icons: getRuntime()?.services?.icons,
 				ariaLabel: t("brainstorm.database.stage.changeListIcon"),
 				onChange: (icon) => commitListIcon(state, list.id, icon),
 			}),
@@ -1777,6 +1780,7 @@ function renderInspector(state: AppState): void {
 		if (recordLocked) return;
 		openIconPicker({
 			value: readEntityIcon(entity),
+			icons: getRuntime()?.services?.icons,
 			onChange: (icon) => void persistEntityPatch(state, entity, { icon }),
 		});
 	});
@@ -5525,6 +5529,8 @@ type BrainstormRuntime = {
 			uploadBytes(filename: string, bytes: Uint8Array): Promise<{ url: string; thumbUrl: string }>;
 			list(): Promise<ReadonlyArray<{ url: string; thumbUrl: string }>>;
 		};
+		/** Vault icon store — backs the icon picker's Upload + Library tabs. */
+		icons?: IconsService;
 		/** Pin-any-object-to-dashboard (7.13). Drives the shared object
 		 *  menu's Pin / Unpin toggle. Manifest grants `dashboard.pin`
 		 *  (default-minimum). */

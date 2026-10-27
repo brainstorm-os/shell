@@ -21,7 +21,9 @@ describe("preview i18n", () => {
 
 	it("interpolates the stage error keys", () => {
 		expect(t("stage.noPreviewFor", { mime: "image/heic" })).toBe("No preview for image/heic");
-		expect(t("stage.rendererNotWired", { kind: "pdf" })).toBe("Renderer for pdf not yet wired");
+		expect(t("stage.rendererNotWired", { kind: "pdf" })).toBe(
+			"No preview available for pdf files yet.",
+		);
 		expect(t("stage.rendererFailed", { detail: "boom" })).toBe("Renderer failed: boom");
 	});
 

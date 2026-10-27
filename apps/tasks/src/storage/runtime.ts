@@ -13,6 +13,7 @@ import type {
 	BlocksService,
 	BpService,
 	ExportTextFormat,
+	IconsService,
 	LaunchContext,
 	PropertiesService,
 	VaultEntitiesService as SdkVaultEntitiesService,
@@ -171,6 +172,8 @@ export type TasksBrainstorm = {
 		properties?: PropertiesService;
 		/** Cross-app intent dispatch (object-menu Open routes through it). */
 		intents?: IntentsService;
+		/** Vault icon store — backs the icon picker's Upload + Library tabs. */
+		icons?: IconsService;
 		/** Dashboard pin surface (object-menu Pin/Unpin). */
 		dashboard?: DashboardService;
 		/** Vault-entities aggregator. We consume `onChange` only — fans on

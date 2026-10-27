@@ -8,7 +8,7 @@
  * replaces only the broker registration behind it, never this shape.
  */
 
-import type { StoredAsset } from "@brainstorm-os/sdk-types";
+import type { IconsService, StoredAsset } from "@brainstorm-os/sdk-types";
 
 export type VaultEntityShape = {
 	id: string;
@@ -60,6 +60,8 @@ export type BrainstormRuntime = {
 		}) => unknown | Promise<unknown>;
 	};
 	services?: {
+		/** Vault icon store — backs the icon picker's Upload + Library tabs. */
+		icons?: IconsService;
 		vaultEntities?: {
 			list(): Promise<VaultSnapshot>;
 			onChange?(listener: () => void): BrainstormSubscription;

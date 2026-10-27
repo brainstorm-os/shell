@@ -12,7 +12,7 @@
  * falls back to the in-memory demo dataset per [[preview-drop-pattern]].
  */
 
-import type { BpService, VaultEntitiesService } from "@brainstorm-os/sdk-types";
+import type { BpService, IconsService, VaultEntitiesService } from "@brainstorm-os/sdk-types";
 import { entityTitleOr } from "@brainstorm-os/sdk/entity-title";
 import type { SaveFileService } from "@brainstorm-os/sdk/export-file";
 import type { NoteLike } from "./logic/journal-projection";
@@ -158,6 +158,8 @@ export type JournalRuntime = {
 		/** File-upload surface — backs the shared editor's media blocks
 		 *  (drag-drop / paste / `/image`). Optional; absent in preview. */
 		storage?: StorageService;
+		/** Vault icon store — backs the icon picker's Upload + Library tabs. */
+		icons?: IconsService;
 		/** Block-registry lookups for the shared editor's `/embed` card.
 		 *  Optional; absent in preview / standalone. */
 		blocks?: BlocksService;

@@ -18,7 +18,7 @@
   "stage.noFileSelected": "Nada que previsualizar",
   "stage.noFileSelectedHint": "Abre un archivo o imagen desde Archivos, o pulsa Espacio en cualquier objeto para verlo aquí con Vista rápida.",
   "stage.noPreviewFor": "Sin vista previa para {mime}",
-  "stage.rendererNotWired": "El renderizador de {kind} aún no está conectado",
+  "stage.rendererNotWired": "Aún no hay vista previa para archivos {kind}.",
   "stage.rendererFailed": "Error del renderizador: {detail}",
   "stage.unavailable": "Vista previa no disponible",
   "context.fromNote": "De la nota:",

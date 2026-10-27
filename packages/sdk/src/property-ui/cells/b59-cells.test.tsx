@@ -179,7 +179,7 @@ describe("File cells (accept-only)", () => {
 			onChange: vi.fn(),
 			noteId: "n1",
 		});
-		expect(h.container.querySelector(".bs-cell-file-pending")?.textContent).toContain("uploads land");
+		expect(h.container.querySelector(".bs-cell-file-pending")?.textContent).toContain("aren't available here");
 		expect(h.container.querySelector(".bs-cell-file-empty")).not.toBeNull();
 	});
 

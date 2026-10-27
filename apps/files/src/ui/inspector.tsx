@@ -170,6 +170,7 @@ function PreviewTab({
 	const onEditIcon = (): void => {
 		openIconPicker({
 			value: icon,
+			icons: runtime?.services?.icons,
 			onChange: (next) => store.setEntityIcon(entity.id, next),
 		});
 	};

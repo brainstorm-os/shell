@@ -289,12 +289,12 @@ function ImageTab({
 			<button
 				type="button"
 				className={[
-					"cover-picker__dropzone",
-					dragOver ? "cover-picker__dropzone--over" : "",
+					"icon-picker__dropzone",
+					dragOver ? "icon-picker__dropzone--over" : "",
 					// Once an image is chosen the big drop target is redundant
 					// and pushes the focal control + Apply off-screen — slim it
 					// to a single "replace" bar.
-					selectedUrl ? "cover-picker__dropzone--compact" : "",
+					selectedUrl ? "icon-picker__dropzone--compact" : "",
 				]
 					.filter(Boolean)
 					.join(" ")}
@@ -312,10 +312,10 @@ function ImageTab({
 					if (f) void onFile(f);
 				}}
 			>
-				<span className="cover-picker__dropzone-title">
+				<span className="icon-picker__dropzone-title">
 					{uploading ? labels.uploading : labels.upload}
 				</span>
-				{!selectedUrl && <span className="cover-picker__dropzone-hint">{labels.dropHint}</span>}
+				{!selectedUrl && <span className="icon-picker__dropzone-hint">{labels.dropHint}</span>}
 			</button>
 
 			{library.length === 0 ? (

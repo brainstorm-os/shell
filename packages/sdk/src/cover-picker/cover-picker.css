@@ -1,9 +1,9 @@
 /**
  * Cover-specific bits layered on the shared `.icon-picker` chrome
- * (panel / backdrop / tabs / action / body / empty). Only the
- * cover-unique surfaces live here: the live preview band, the upload
- * drop zone, the row-virtualised library, the focal-point control, the
- * gradient/colour swatch grid, and the Apply footer.
+ * (panel / backdrop / tabs / action / body / empty / drop zone). Only the
+ * cover-unique surfaces live here: the live preview band, the compact
+ * drop-zone modifier, the row-virtualised library, the focal-point
+ * control, the gradient/colour swatch grid, and the Apply footer.
  *
  * Layout contract: the body is a non-scrolling flex column. The
  * fixed-height bits (preview / drop zone / focal / footer) never shrink;
@@ -52,63 +52,17 @@
 	gap: var(--space-3, var(--space-3));
 }
 
-/* Upload drop zone — the click affordance and the drag-and-drop target
-   in one, replacing the old lone button + bare empty sentence. */
-.cover-picker__dropzone {
+/* The drop zone itself is the shared `.icon-picker__dropzone`; here it
+   keeps its natural height so the library below takes the leftover. */
+.cover-picker__image .icon-picker__dropzone {
 	flex: 0 0 auto;
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	gap: var(--space-1, var(--space-1));
-	width: 100%;
-	padding: var(--space-5, var(--space-5)) var(--space-3, var(--space-3));
-	border: var(--border-width) dashed var(--border-strong, rgba(127, 127, 127, 0.45));
-	border-radius: var(--radius-md);
-	background: var(--color-surface-default, rgba(127, 127, 127, 0.08));
-	color: var(--text, inherit);
-	cursor: pointer;
-	transition: border-color 120ms ease, background-color 120ms ease;
-}
-
-.cover-picker__dropzone:hover,
-.cover-picker__dropzone--over {
-	border-color: var(--color-accent-default);
-	background: var(--color-accent-subtle);
-}
-
-.cover-picker__dropzone:disabled {
-	opacity: 0.6;
-	cursor: progress;
-}
-
-.cover-picker__dropzone:focus-visible {
-	outline: 2px solid var(--color-focus-ring);
-	outline-offset: -1px;
-	/* Ring replaces the dashed border (no sandwich) — match the swatch. */
-	border-color: transparent;
-}
-
-.cover-picker__dropzone-title {
-	font-size: var(--text-size-md);
-	font-weight: 500;
-}
-
-.cover-picker__dropzone-hint {
-	font-size: var(--text-size-xs);
-	color: var(--text-dim, rgba(127, 127, 127, 0.9));
 }
 
 /* Slim "replace image" bar once a cover is chosen — keeps the focal
    control + Apply on screen instead of a tall empty-state target. */
-.cover-picker__dropzone--compact {
+.cover-picker__image .icon-picker__dropzone--compact {
 	flex-direction: row;
 	padding: var(--space-2, var(--space-2)) var(--space-3, var(--space-3));
-}
-
-.cover-picker__dropzone--compact .cover-picker__dropzone-title {
-	font-size: var(--text-size-md);
-	font-weight: 500;
 }
 
 /* "Remove cover" is an icon-only button — square, centred glyph, sized

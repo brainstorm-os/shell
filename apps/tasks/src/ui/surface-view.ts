@@ -13,6 +13,7 @@ import type { Icon } from "@brainstorm-os/sdk-types";
 import { Orientation, attachCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
 import { createEmptyState } from "@brainstorm-os/sdk/empty-state";
 import { IconName, createIconElement } from "@brainstorm-os/sdk/icon";
+import type { IconUploadSource } from "@brainstorm-os/sdk/icon-picker";
 import {
 	type ObjectMenuContext,
 	type ObjectMenuRuntime,
@@ -56,6 +57,8 @@ export type SurfaceViewProps = {
 	 *  omits them and the icon/menu fall back to display-only chrome. */
 	objectMenuRuntime?: ObjectMenuRuntime;
 	onPickProjectIcon?(projectId: string, icon: Icon | null): void;
+	/** The runtime's `services.icons` for the project-icon picker's Upload tab. */
+	icons?: IconUploadSource | null | undefined;
 	/** Commit a new name for the body-title inline rename (double-click).
 	 *  Optional — preview mode (no runtime) omits it and the title is
 	 *  display-only. */
@@ -171,6 +174,7 @@ function renderHeader(props: SurfaceViewProps): HTMLElement {
 				value: project.icon ?? null,
 				ariaLabel: t("tasks.header.iconPicker.open"),
 				size: 22,
+				icons: props.icons,
 				onChange: (icon) => props.onPickProjectIcon?.(projectId, icon),
 			}),
 		);
