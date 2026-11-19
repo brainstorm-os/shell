@@ -90,4 +90,21 @@ describe("serializedStateToMarkdown", () => {
 		expect(serializedStateToMarkdown(many, { maxBlocks: 2 })).toBe("1\n\n2");
 		expect(serializedStateToMarkdown(doc([para(), para(text("x"))]))).toBe("x"); // empty para dropped
 	});
+
+	it("exports a bookmark or web embed as its plain URL, never an embed endpoint", () => {
+		expect(
+			serializedStateToMarkdown(
+				doc([
+					{
+						type: "web-embed",
+						url: "https://youtu.be/dQw4w9WgXcQ",
+						embedUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
+						kind: "youtube",
+					},
+					{ type: "bookmark", url: "https://example.com/a", title: "T", description: "" },
+					{ type: "web-embed", url: "javascript:alert(1)", embedUrl: null, kind: "bookmark" },
+				]),
+			),
+		).toBe("https://youtu.be/dQw4w9WgXcQ\n\nhttps://example.com/a");
+	});
 });

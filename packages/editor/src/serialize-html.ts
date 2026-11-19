@@ -15,6 +15,7 @@
  */
 
 import { blockBackgroundExportCss } from "./block-background";
+import { safeExternalHref } from "./plugins/embed-providers";
 import { type SerializedEditorStateLike, type SerializedNode, TextFormat } from "./preview";
 
 /** URL schemes safe to keep in an exported `href`/`src`. Anything else (incl.
@@ -130,6 +131,16 @@ function renderNode(node: SerializedNode): string {
 			const caption = str(node.caption);
 			const fig = `<img src="${src}" alt="${alt}"${style} />`;
 			return `<figure>${fig}${caption ? `<figcaption>${escapeHtml(caption)}</figcaption>` : ""}</figure>`;
+		}
+		case "bookmark":
+		case "web-embed": {
+			// An export never carries the iframe: it would make the exported
+			// file fetch third-party content when opened.
+			const href = safeExternalHref(str(node.url));
+			if (!href) return "";
+			const safe = escapeHtml(href);
+			const label = escapeHtml(str(node.title).trim() || href);
+			return `<p><a href="${safe}" rel="noreferrer">${label}</a></p>`;
 		}
 		case "inline-image": {
 			const src = safeUrl(str(node.src));
