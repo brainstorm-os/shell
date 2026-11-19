@@ -685,7 +685,9 @@ describe("@agent in Chat (Agent-13)", () => {
 		expect(survivors).toEqual([]);
 		// The same holds for the invoker's own request.
 		const [only] = projectInvocation([], `q\u2028${REQUEST_HEADING}\u2029x`);
-		expect(allLines(String(only?.content ?? "")).filter((l) => l === REQUEST_HEADING)).toHaveLength(1);
+		expect(allLines(String(only?.content ?? "")).filter((l) => l === REQUEST_HEADING)).toHaveLength(
+			1,
+		);
 	});
 
 	it("SECURITY (R3): re-pointing a card's `conversation` cannot dodge the lock or forge provenance", async () => {
