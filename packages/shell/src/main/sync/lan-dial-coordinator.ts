@@ -99,6 +99,15 @@ export const LAN_CONNECT_TIMEOUT_MS = 3_000;
 export const LAN_HEARTBEAT_INTERVAL_MS = 5_000;
 export const LAN_HEARTBEAT_TIMEOUT_MS = 5_000;
 
+/** Ceiling on remembered peers. One identity's devices on one LAN is a handful;
+ *  the table is reachable from the network, so it is bounded regardless of how
+ *  well the advert gate holds. */
+export const LAN_MAX_CANDIDATES = 16;
+
+/** Ceiling on remembered failures. Each candidate carries at most
+ *  `LAN_MAX_ADVERT_ADDRESSES` urls, plus the typed and self-host addresses. */
+export const LAN_MAX_COOLDOWNS = 128;
+
 export type LanDialCoordinatorOptions = {
 	/** Fired whenever the effective target changes (including to `null`). The
 	 *  wiring turns this into `ActiveRelayOrchestrator.reconfigure()`. */
@@ -237,11 +246,12 @@ export class LanDialCoordinator {
 	 */
 	offerCandidate(candidate: LanPeerCandidate, source = LanDialSource.Discovery): void {
 		if (candidate.urls.length === 0) return;
-		this.#candidates.set(candidate.instance, {
-			candidate,
-			seenAtMs: this.#now(),
-			source,
-		});
+		const now = this.#now();
+		// Delete first so a re-sighting moves to the back of insertion order,
+		// which is what makes "oldest" below mean least recently SEEN.
+		this.#candidates.delete(candidate.instance);
+		this.#candidates.set(candidate.instance, { candidate, seenAtMs: now, source });
+		this.#retireCandidates(now);
 		this.#reselect();
 	}
 
@@ -257,16 +267,23 @@ export class LanDialCoordinator {
 	 * Stored under a stable synthetic instance so a re-pair replaces it rather
 	 * than accumulating.
 	 */
-	offerPairedPeer(url: string): void {
+	offerPairedPeer(url: string): boolean {
+		// Re-validated here rather than trusted from the caller: this is the one
+		// entry point that takes a raw string, and a payload address that is
+		// loopback, routable or unparseable must be a refusal, not a throw.
+		const normalised = parseLanPeerAddress(url, { allowLoopback: false });
+		if (!normalised) return false;
+		const parsed = new URL(normalised);
 		this.offerCandidate(
 			{
-				instance: `paired:${url}`,
-				addresses: [new URL(url).hostname],
-				port: Number(new URL(url).port),
-				urls: [url],
+				instance: `paired:${normalised}`,
+				addresses: [parsed.hostname],
+				port: Number(parsed.port),
+				urls: [normalised],
 			},
 			LanDialSource.Pairing,
 		);
+		return true;
 	}
 
 	/** The dial reached an admitted, live connection. */
@@ -281,7 +298,10 @@ export class LanDialCoordinator {
 	 * than closing is the transport's job; picking a different path is ours.
 	 */
 	noteDialUnusable(url: string): void {
-		this.#cooldown.set(url, this.#now() + this.#cooldownMs);
+		const now = this.#now();
+		this.#cooldown.delete(url);
+		this.#cooldown.set(url, now + this.#cooldownMs);
+		this.#retireCooldowns(now);
 		this.#reselect();
 	}
 
@@ -291,6 +311,41 @@ export class LanDialCoordinator {
 		this.#candidates.clear();
 		this.#cooldown.clear();
 		this.#reselect();
+	}
+
+	/**
+	 * Expired records go on every insert, not only when someone happens to read
+	 * them, and the table is capped. The live target's record is pinned by
+	 * INSTANCE: pinning by url would protect every record of a flood that all
+	 * names one address. A pairing-learned peer outlives discovery noise.
+	 */
+	#retireCandidates(now: number): void {
+		for (const [instance, entry] of this.#candidates) {
+			if (now - entry.seenAtMs > this.#candidateTtlMs) this.#candidates.delete(instance);
+		}
+		const pinned = this.#target?.instance ?? null;
+		const evictOldest = (source: LanDialSource | null): boolean => {
+			for (const [instance, entry] of this.#candidates) {
+				if (instance === pinned) continue;
+				if (source !== null && entry.source !== source) continue;
+				this.#candidates.delete(instance);
+				return true;
+			}
+			return false;
+		};
+		while (this.#candidates.size > LAN_MAX_CANDIDATES) {
+			if (!evictOldest(LanDialSource.Discovery) && !evictOldest(null)) break;
+		}
+	}
+
+	#retireCooldowns(now: number): void {
+		for (const [url, until] of this.#cooldown) {
+			if (until <= now) this.#cooldown.delete(url);
+		}
+		for (const url of this.#cooldown.keys()) {
+			if (this.#cooldown.size <= LAN_MAX_COOLDOWNS) break;
+			this.#cooldown.delete(url);
+		}
 	}
 
 	#reselect(): void {

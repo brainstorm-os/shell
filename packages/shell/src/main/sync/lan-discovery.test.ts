@@ -15,14 +15,25 @@ const NOW = 1_800_000_000_000;
 const PORT = 51_820;
 const ADDRESSES = ["192.168.1.10"];
 
-function advert(overrides: Record<string, unknown> = {}, name = "brainstorm-aabbccdd") {
+const NAME = "brainstorm-aabbccdd00112233";
+
+function signed(args: { secret?: Uint8Array; name?: string; port?: number; addresses?: string[] }) {
+	const name = args.name ?? NAME;
 	return {
 		name,
-		txt: {
-			...buildLanAdvertTxt({ secret: SECRET, port: PORT, addresses: ADDRESSES, nowMs: NOW }),
-			...overrides,
-		},
+		txt: buildLanAdvertTxt({
+			secret: args.secret ?? SECRET,
+			instance: name,
+			port: args.port ?? PORT,
+			addresses: args.addresses ?? ADDRESSES,
+			nowMs: NOW,
+		}),
 	};
+}
+
+function advert(overrides: Record<string, unknown> = {}, name = NAME) {
+	const base = signed({ name });
+	return { name, txt: { ...base.txt, ...overrides } };
 }
 
 describe("LAN_SERVICE_TYPE", () => {
@@ -40,11 +51,9 @@ describe("parseLanAdvert", () => {
 	});
 
 	it("refuses an advert tagged by a different identity — the whole point of the gate", () => {
-		const record = {
-			name: "brainstorm-deadbeef",
-			txt: buildLanAdvertTxt({ secret: ROGUE, port: PORT, addresses: ADDRESSES, nowMs: NOW }),
-		};
+		const record = signed({ secret: ROGUE });
 		expect(parseLanAdvert({ record, secret: SECRET, nowMs: NOW })).toBeNull();
+		expect(parseLanAdvert({ record, secret: ROGUE, nowMs: NOW })).not.toBeNull();
 	});
 
 	it("refuses an advert with no tag at all", () => {
@@ -64,7 +73,7 @@ describe("parseLanAdvert", () => {
 				record: advert(),
 				secret: SECRET,
 				nowMs: NOW,
-				ownInstance: "brainstorm-aabbccdd",
+				ownInstance: NAME,
 			}),
 		).toBeNull();
 	});
@@ -77,8 +86,18 @@ describe("parseLanAdvert", () => {
 			["non-string name", { record: { name: 7, txt: advert().txt } }],
 			["empty name", { record: advert({}, "") }],
 			["oversized name", { record: advert({}, "x".repeat(LAN_MAX_INSTANCE_NAME + 1)) }],
-			["missing txt", { record: { name: "brainstorm-aabbccdd" } }],
-			["wrong txt version", { record: advert({ [LanTxtKey.Version]: "2" }) }],
+			["a name this product did not mint", { record: signed({ name: "Trusted laptop" }) }],
+			["a name with surrounding whitespace", { record: { ...advert(), name: ` ${NAME} ` } }],
+			["missing txt", { record: { name: NAME } }],
+			["the retired v1 txt version", { record: advert({ [LanTxtKey.Version]: "1" }) }],
+			["loopback, even correctly tagged", { record: signed({ addresses: ["127.0.0.1"] }) }],
+			[
+				"loopback beside a real address, correctly tagged",
+				{ record: signed({ addresses: ["192.168.1.10", "127.0.0.1"] }) },
+			],
+			["a padded address, correctly tagged", { record: signed({ addresses: [" 10.0.0.1"] }) }],
+			["a non-canonical octet, correctly tagged", { record: signed({ addresses: ["10.0.0.1e0"] }) }],
+			["an empty octet, correctly tagged", { record: signed({ addresses: ["10..0.1"] }) }],
 			["non-numeric port", { record: advert({ [LanTxtKey.Port]: "http" }) }],
 			["zero port", { record: advert({ [LanTxtKey.Port]: "0" }) }],
 			["out-of-range port", { record: advert({ [LanTxtKey.Port]: "70000" }) }],
@@ -106,7 +125,61 @@ describe("parseLanAdvert", () => {
 	});
 });
 
+describe("stale, duplicate and multi-address records", () => {
+	it("keeps every advertised address, in advertised order", () => {
+		const addresses = ["192.168.1.10", "10.0.0.4", "172.16.3.3", "169.254.9.9"];
+		const candidate = parseLanAdvert({ record: signed({ addresses }), secret: SECRET, nowMs: NOW });
+		expect(candidate?.addresses).toEqual(addresses);
+		expect(candidate?.urls).toEqual(addresses.map((a) => `ws://${a}:${PORT}`));
+	});
+
+	it("verifies whatever order the responder delivers the address list in", () => {
+		const record = signed({ addresses: ["192.168.1.10", "10.0.0.4"] });
+		const reordered = {
+			...record,
+			txt: { ...record.txt, [LanTxtKey.Addresses]: "192.168.1.10,10.0.0.4" },
+		};
+		const flipped = {
+			...record,
+			txt: { ...record.txt, [LanTxtKey.Addresses]: "10.0.0.4,192.168.1.10" },
+		};
+		expect(parseLanAdvert({ record: reordered, secret: SECRET, nowMs: NOW })?.urls[0]).toBe(
+			`ws://192.168.1.10:${PORT}`,
+		);
+		expect(parseLanAdvert({ record: flipped, secret: SECRET, nowMs: NOW })?.urls[0]).toBe(
+			`ws://10.0.0.4:${PORT}`,
+		);
+	});
+
+	it("a duplicate delivery of one record parses to the same candidate", () => {
+		const record = signed({});
+		const a = parseLanAdvert({ record, secret: SECRET, nowMs: NOW });
+		const b = parseLanAdvert({ record, secret: SECRET, nowMs: NOW + 1_000 });
+		expect(b).toEqual(a);
+	});
+
+	it("a record still cached by the responder after its epochs passed is refused", () => {
+		const record = signed({});
+		expect(parseLanAdvert({ record, secret: SECRET, nowMs: NOW + 5 * 60_000 })).not.toBeNull();
+		expect(parseLanAdvert({ record, secret: SECRET, nowMs: NOW + 11 * 60_000 })).toBeNull();
+	});
+
+	it("a verbatim replay under a different instance name is refused", () => {
+		const captured = signed({});
+		for (const name of ["brainstorm-ffffffffffffffff", "Andrew's laptop - trusted"]) {
+			expect(parseLanAdvert({ record: { ...captured, name }, secret: SECRET, nowMs: NOW })).toBeNull();
+		}
+	});
+});
+
 describe("mintLanInstanceName", () => {
+	it("mints a name the parser accepts", () => {
+		const name = mintLanInstanceName(() => new Uint8Array(8).fill(0x5a));
+		expect(parseLanAdvert({ record: signed({ name }), secret: SECRET, nowMs: NOW })?.instance).toBe(
+			name,
+		);
+	});
+
 	it("is random per boot, so the name is not a tracking handle", () => {
 		let n = 0;
 		const seq = () => new Uint8Array(8).fill(n++);
