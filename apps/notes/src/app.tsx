@@ -95,6 +95,7 @@ import {
 	buildNoteExportItems,
 	runNoteExport,
 } from "./ui/note-export";
+import { useNoteTools } from "./ui/note-tools";
 import { NotesList } from "./ui/notes-list";
 import { noteObjectMenuContext } from "./ui/object-menu-context";
 import { OutlinePanel } from "./ui/outline-panel";
@@ -1072,6 +1073,10 @@ export function NotesApp() {
 		/>
 	) : null;
 
+	// Tool-10 — other apps' tools in every note's object menu, with the chips
+	// that report each call's outcome.
+	const noteTools = useNoteTools();
+
 	const shell = (
 		<div
 			className="notes"
@@ -1111,6 +1116,7 @@ export function NotesApp() {
 									noteId: note.id,
 									noteTitle: headerTitle,
 									runtime,
+									tools: noteTools.seams,
 									onRemove: onDelete,
 									onShare: () => setShareTargetId(note.id),
 									...(objectMenuExtraItems ? { extraItems: objectMenuExtraItems } : {}),
@@ -1183,6 +1189,7 @@ export function NotesApp() {
 									noteId: note.id,
 									noteTitle: headerTitle,
 									runtime,
+									tools: noteTools.seams,
 									onRemove: onDelete,
 									onShare: () => setShareTargetId(note.id),
 									...(objectMenuExtraItems ? { extraItems: objectMenuExtraItems } : {}),
@@ -1226,6 +1233,7 @@ export function NotesApp() {
 					runtime={runtime}
 					onRemoveNote={onRemoveNote}
 					onLinkInto={onLinkInto}
+					tools={noteTools.seams}
 				/>
 			</aside>
 			{navAutoHide.edgeProps && <div {...navAutoHide.edgeProps} />}
@@ -1438,6 +1446,8 @@ export function NotesApp() {
 					onClose={() => setShareTargetId(null)}
 				/>
 			) : null}
+
+			{noteTools.element}
 		</div>
 	);
 

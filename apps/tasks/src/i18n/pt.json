@@ -286,5 +286,7 @@
   "tasks.row.toggle.open": "Marcar “{name}” como concluída",
   "tasks.row.toggle.done": "“{name}” está concluída — marcar como não será feita",
   "tasks.row.toggle.wontDo": "“{name}” não será feita — reabrir",
-  "tasks.quickLook.value.wontDo": "Não será feita"
+  "tasks.quickLook.value.wontDo": "Não será feita",
+  "tasks.tool.untitled": "Tarefa sem título",
+  "tasks.tool.createTask.fromSource": "De “{title}”"
 }

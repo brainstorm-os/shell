@@ -286,5 +286,7 @@
   "tasks.row.toggle.open": "Mark “{name}” done",
   "tasks.row.toggle.done": "“{name}” is done — mark won’t do",
   "tasks.row.toggle.wontDo": "“{name}” won’t be done — reopen",
-  "tasks.quickLook.value.wontDo": "Won’t do"
+  "tasks.quickLook.value.wontDo": "Won’t do",
+  "tasks.tool.untitled": "Untitled task",
+  "tasks.tool.createTask.fromSource": "From “{title}”"
 }

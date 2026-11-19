@@ -23,6 +23,7 @@ import type {
 import { t } from "../i18n/t";
 import { NOTE_TYPE } from "../store/entities-repository";
 import type { NotesBrainstorm } from "../store/runtime";
+import type { NoteToolSeams } from "./note-tools";
 
 /** Narrow the Notes runtime to exactly the structural slice the shared
  *  object menu reads (`capabilities` + `intents.dispatch` + the
@@ -39,6 +40,7 @@ function asObjectMenuRuntime(runtime: NotesBrainstorm): ObjectMenuRuntime {
 				dispatch: (i) => runtime.services.intents.dispatch(i as Omit<Intent, "source">),
 			},
 			...(runtime.services.dashboard ? { dashboard: runtime.services.dashboard } : {}),
+			...(runtime.services.appTools ? { appTools: runtime.services.appTools } : {}),
 		},
 	};
 }
@@ -55,6 +57,10 @@ export type NoteObjectMenuInput = {
 	onShare?: () => void | Promise<void>;
 	/** App-specific entries (Export…) spliced in before Remove. */
 	extraItems?: ObjectMenuExtraItem[];
+	/** Tool-10 — the reporting + argument seams. Present → other apps' tools
+	 *  Notes may call appear as rows; omitted → none do, because the menu will
+	 *  not offer a call whose outcome nobody would see. */
+	tools?: NoteToolSeams;
 };
 
 export function noteObjectMenuContext({
@@ -64,6 +70,7 @@ export function noteObjectMenuContext({
 	onRemove,
 	onShare,
 	extraItems,
+	tools,
 }: NoteObjectMenuInput): ObjectMenuContext {
 	if (!runtime) return null;
 	// 9.3.5.V 7c — cross-app "Add to collection": Lists are vault entities,
@@ -98,5 +105,6 @@ export function noteObjectMenuContext({
 		...(extraItems && extraItems.length > 0 ? { extraItems } : {}),
 		...(onRemove ? { onRemove } : {}),
 		...(onShare ? { onShare } : {}),
+		...(tools ? { onToolResult: tools.onToolResult, onToolArguments: tools.onToolArguments } : {}),
 	};
 }

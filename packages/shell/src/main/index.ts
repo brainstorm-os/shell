@@ -406,6 +406,7 @@ import { SelectiveSyncStore, selectiveSyncPolicyPath } from "./sync/selective-sy
 import { ThemePreviewService, makeThemeServiceHandler } from "./theme/theme-preview-service";
 import { AppCallHost } from "./tools/app-call-host";
 import { getToolApprovalHost } from "./tools/tool-approval-host";
+import { makeToolEntityResolvers } from "./tools/tool-entity-resolvers";
 import { makeToolsServiceHandler } from "./tools/tools-service";
 import { wireAppCallIpc } from "./tools/wire-app-call";
 import { wireToolApprovalIpc } from "./tools/wire-tool-approval";
@@ -4619,12 +4620,11 @@ void app.whenReady().then(async () => {
 			// Tool-8 — the read-only lock is a synced entity property, and it has to
 			// hold on EVERY write path or it is decoration (the lesson the read-only
 			// lock fleet already taught). Unreadable ⇒ treated as locked.
-			resolveEntityLocked: async (entityId: string) => {
-				const repo = await getEntitiesRepoForActiveSession();
-				const row = repo?.get(entityId);
-				if (!row) return true;
-				return (row.properties as Record<string, unknown> | undefined)?.locked === true;
-			},
+			// SECURITY — a tool declaring `allowedTypes` on an entityRef argument
+			// is checked against the entity's REAL type from entities.db, never
+			// the caller's claim about it (per-type read isolation; the same rule
+			// the presence service follows).
+			...makeToolEntityResolvers(getEntitiesRepoForActiveSession),
 			// Tool-5 — the user's per-tool approvals, so an app UPDATE that
 			// rewrites a tool re-prompts instead of inheriting the friction its
 			// old description earned.
@@ -4645,14 +4645,6 @@ void app.whenReady().then(async () => {
 			resolveAppLabel: async (appId) => {
 				const repo = await getAppsRepoForActiveSession();
 				return repo ? resolveAppName(repo, appId) : undefined;
-			},
-			// SECURITY — a tool declaring `allowedTypes` on an entityRef argument
-			// is checked against the entity's REAL type from entities.db, never
-			// the caller's claim about it (per-type read isolation; the same rule
-			// the presence service follows).
-			resolveEntityType: async (entityId) => {
-				const repo = await getEntitiesRepoForActiveSession();
-				return repo?.get(entityId)?.type ?? null;
 			},
 			getRepo: async () => {
 				const session = getActiveVaultSession();

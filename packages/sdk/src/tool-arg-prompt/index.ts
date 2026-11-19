@@ -9,6 +9,7 @@ export {
 	type ToolArgDraft,
 	ToolArgFieldError,
 	type ToolArgPromptTarget,
+	toolArgsFromTarget,
 } from "./arg-prompt-logic";
 export {
 	ToolArgumentPrompt,

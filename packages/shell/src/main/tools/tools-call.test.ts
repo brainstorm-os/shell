@@ -453,6 +453,93 @@ describe("tools.call (Tool-4)", () => {
 		).resolves.toEqual({ value: "done" });
 	});
 
+	it("holds a writes-vault tool to the same lock (Tool-10)", async () => {
+		// The provider writes its OWN data, but the broker cannot see what it does
+		// with the id it is handed — so a locked object is not handed over at all.
+		const source: AppToolInput = {
+			name: "source",
+			description: "what to make a task from",
+			required: true,
+			valueType: ValueType.EntityRef,
+		};
+		repo.insertMany([tool({ effect: AppToolEffect.WritesVault, input: [source] })]);
+		const grants: ReadonlyArray<[string, string]> = [
+			[CALLER, toolsCallCapability(PROVIDER)],
+			[PROVIDER, TOOLS_PROVIDE_CAPABILITY],
+			[PROVIDER, "entities.write:io.example/Thing/v1"],
+		];
+		await expect(
+			handler(
+				{ resolveEntityLocked: async () => true },
+				grants,
+			)(envelope([{ tool: TOOL, args: { source: "e1" } }])),
+		).rejects.toMatchObject({ name: "Denied" });
+		expect(host.call).not.toHaveBeenCalled();
+		expect(records.at(-1)).toMatchObject({ outcome: "refused", reason: "locked-object" });
+		await expect(
+			handler(
+				{ resolveEntityLocked: async () => false },
+				grants,
+			)(envelope([{ tool: TOOL, args: { source: "e1" } }])),
+		).resolves.toEqual({ value: "done" });
+	});
+
+	it("refuses a writes-vault tool whose provider holds no write grant (Tool-10)", async () => {
+		repo.insertMany([tool({ effect: AppToolEffect.WritesVault })]);
+		await expect(
+			handler({}, [
+				[CALLER, toolsCallCapability(PROVIDER)],
+				[PROVIDER, TOOLS_PROVIDE_CAPABILITY],
+				[PROVIDER, "entities.read:*"],
+			])(envelope([{ tool: TOOL }])),
+		).rejects.toMatchObject({ name: "Unavailable" });
+		expect(host.call).not.toHaveBeenCalled();
+		expect(records.at(-1)).toMatchObject({ outcome: "refused", reason: "provider-effect" });
+	});
+
+	it("an AGENT's writes-vault call always asks the shell, and a decline writes nothing (Tool-10)", async () => {
+		const t = tool({ effect: AppToolEffect.WritesVault });
+		repo.insertMany([t]);
+		const AGENT = "ed25519:0123456789abcdef";
+		const grants: ReadonlyArray<[string, string]> = [
+			[AGENT, toolsCallCapability(PROVIDER)],
+			[PROVIDER, TOOLS_PROVIDE_CAPABILITY],
+			[PROVIDER, "entities.write:io.example/Thing/v1"],
+		];
+		// Already approved at its current declaration: the ask below is the
+		// EFFECT's, not a first-use prompt — it recurs on every agent call.
+		const approvals = approvalsFor([t]);
+		const no = approver(false);
+		await expect(
+			handler(
+				{ getApprovals: async () => approvals, getApprovalHost: () => no as never },
+				grants,
+			)(envelope([{ tool: TOOL }], AGENT)),
+		).rejects.toMatchObject({ name: "NeedsConfirm" });
+		expect(no.asked).toHaveLength(1);
+		expect(no.asked[0]).toMatchObject({ agentInitiated: true, callerAppId: AGENT });
+		expect(host.call).not.toHaveBeenCalled();
+		// `confirmed: true` from the caller buys nothing — the agent cannot
+		// approve itself.
+		await expect(
+			handler(
+				{ getApprovals: async () => approvals, getApprovalHost: () => no as never },
+				grants,
+			)(envelope([{ tool: TOOL, confirmed: true }], AGENT)),
+		).rejects.toMatchObject({ name: "NeedsConfirm" });
+		expect(host.call).not.toHaveBeenCalled();
+		const yes = approver(true);
+		for (let i = 0; i < 2; i += 1) {
+			await expect(
+				handler(
+					{ getApprovals: async () => approvals, getApprovalHost: () => yes as never },
+					grants,
+				)(envelope([{ tool: TOOL }], AGENT)),
+			).resolves.toEqual({ value: "done" });
+		}
+		expect(yes.asked).toHaveLength(2);
+	});
+
 	it("treats an unresolvable lock as LOCKED", async () => {
 		const target: AppToolInput = {
 			name: "target",
@@ -569,6 +656,9 @@ describe("tools.call (Tool-4)", () => {
 		expect(decideAppToolFriction(AppToolEffect.ReadsVault, UserGesture)).toBe(AutoRun);
 		expect(decideAppToolFriction(AppToolEffect.ReadsVault, Agent)).toBe(Confirm);
 		expect(decideAppToolFriction(AppToolEffect.External, UserGesture)).toBe(Confirm);
+		// Tool-10 — a provider-side write: the click confirms, an agent asks.
+		expect(decideAppToolFriction(AppToolEffect.WritesVault, UserGesture)).toBe(AutoRun);
+		expect(decideAppToolFriction(AppToolEffect.WritesVault, Agent)).toBe(Confirm);
 	});
 
 	it("asks for an external call and runs it once approved", async () => {

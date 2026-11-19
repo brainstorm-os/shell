@@ -140,8 +140,9 @@ export type ToolsCallOptions = {
 	 *  declaring `allowedTypes` may be called; the caller's claim about a
 	 *  referenced object's type is never trusted. */
 	resolveEntityType?: (entityId: string) => Promise<string | null>;
-	/** Is this object read-only? Required before a `proposes-write` tool may
-	 *  touch it; absent ⇒ treated as locked (fail closed). */
+	/** Is this object read-only? Required before a `proposes-write` or
+	 *  `writes-vault` tool may touch it; absent ⇒ treated as locked (fail
+	 *  closed). */
 	resolveEntityLocked?: (entityId: string) => Promise<boolean>;
 	/** The shell-owned approval prompt (Tool-8). Absent = nothing can be
 	 *  approved, so a call needing approval refuses rather than proceeding. */
@@ -450,7 +451,13 @@ export async function handleToolsCall(
 	// object and comes back with a change to it, so it is a write path — the
 	// proposal would be built against something the user froze. Refused BEFORE
 	// the provider sees the id, so a locked object is not even readable this way.
-	if (tool.effect === AppToolEffect.ProposesWrite) {
+	//
+	// Tool-10 — `writes-vault` is held to the same rule. Its write lands in the
+	// provider's own data, not in the referenced object, but the broker cannot
+	// see what a provider does with an id once it has it, and a provider holding
+	// a wide write grant COULD aim at the object it was handed. Refusing here is
+	// the only place the answer does not depend on the provider behaving.
+	if (tool.effect === AppToolEffect.ProposesWrite || tool.effect === AppToolEffect.WritesVault) {
 		const locked = await lockedTarget(tool.input, args, options);
 		if (locked) {
 			record("refused", "locked-object", argKeys);

@@ -58,6 +58,9 @@ export function createEntitiesRepository(entities: EntitiesService): TasksReposi
 		},
 		saveTask: (task) =>
 			upsertEntity(entities, TASK_TYPE, task.id, taskToProps(task), "saveTask", logError),
+		createTask: async (task) => {
+			await entities.create(TASK_TYPE, taskToProps(task), task.id);
+		},
 		saveProject: (project) =>
 			upsertEntity(
 				entities,

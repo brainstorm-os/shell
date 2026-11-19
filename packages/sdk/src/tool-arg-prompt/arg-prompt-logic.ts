@@ -98,6 +98,29 @@ export function initialToolArgDraft(
 	return draft;
 }
 
+/**
+ * The call's arguments when the menu's target ALONE answers the tool — its
+ * one promptable input is an entityRef the target pre-fills ("Create task"
+ * on a note). Returns `null` whenever a human could add or change anything,
+ * so the form still opens for every tool that has a real question to ask.
+ *
+ * A form whose only field is a pre-filled object id is not a question; it is
+ * a raw id shown to a user who already said which object they meant by
+ * opening its menu. The returned bag is still `validateAppToolArgs`' own
+ * output, and the broker still resolves the object's REAL type itself — the
+ * target's `entityType` here only decides which input the id goes in.
+ */
+export function toolArgsFromTarget(
+	inputs: readonly AppToolInput[],
+	target: ToolArgPromptTarget,
+): Readonly<Record<string, unknown>> | null {
+	const prefill = prefillableRefName(inputs, target);
+	if (prefill === null) return null;
+	if (promptedInputs(inputs).some((input) => input.name !== prefill)) return null;
+	const built = buildToolArgs(inputs, initialToolArgDraft(inputs, target));
+	return built.ok ? built.args : null;
+}
+
 export type ToolArgBuildResult =
 	| { ok: true; args: Readonly<Record<string, unknown>> }
 	| { ok: false; fieldErrors: Readonly<Record<string, ToolArgFieldError>> };
