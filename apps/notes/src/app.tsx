@@ -98,6 +98,7 @@ import { NotesList } from "./ui/notes-list";
 import { noteObjectMenuContext } from "./ui/object-menu-context";
 import { OutlinePanel } from "./ui/outline-panel";
 import { NotesRightPanel, RightTab } from "./ui/right-panel-tabs";
+import { buildSiteExportItems, fetchVaultAsset, readThemeTokens } from "./ui/site-export";
 
 const NAV_PREF_KEY = "notes.navOpen";
 const PROPS_PREF_KEY = "notes.propsOpen";
@@ -906,6 +907,38 @@ export function NotesApp() {
 		[noteExportInput],
 	);
 
+	// "Publish website…" (IE-12) — the open note plus the sub-pages it embeds,
+	// as a zipped static site. Membership is decided against the live notes
+	// map at publish time, so a page deleted since the menu opened is left out.
+	const notesRef = useRef(notes);
+	notesRef.current = notes;
+	const publishRootId = note?.id;
+	const siteExportItems = useMemo(() => {
+		const files = runtime?.services.files;
+		const entities = runtime?.services.entities;
+		if (!files || !entities || !publishRootId || !hasBodyDocTransport(entities)) return undefined;
+		return buildSiteExportItems({
+			rootId: publishRootId,
+			title: headerTitle,
+			files,
+			transport: entities,
+			getPage: (id) => {
+				const page = notesRef.current.get(id);
+				return page ? { title: page.title } : null;
+			},
+			fetchAsset: fetchVaultAsset,
+			readTokens: () => readThemeTokens(document.documentElement.style),
+			labels: {
+				action: t("notes.publish.action"),
+				dialogTitle: t("notes.publish.dialogTitle"),
+				filterName: t("notes.publish.filterName"),
+				pages: t("notes.publish.pages"),
+				untitled: t("notes.list.untitled"),
+				unpublished: t("notes.publish.unpublished"),
+			},
+		});
+	}, [runtime, publishRootId, headerTitle]);
+
 	// B11.6 — `Cmd+P` prints the open note. "Print" routes to PDF export (the
 	// document's print artifact, per B11.12), reusing the same save flow as the
 	// object-menu PDF row. preventDefault suppresses Chromium's own print
@@ -985,8 +1018,9 @@ export function NotesApp() {
 			coverItem,
 			...(saveAsTemplateItem ? [saveAsTemplateItem] : []),
 			...(noteExportItems ?? []),
+			...(siteExportItems ?? []),
 		];
-	}, [noteCover, noteExportItems, note?.id, saveNoteAsTemplate]);
+	}, [noteCover, noteExportItems, siteExportItems, note?.id, saveNoteAsTemplate]);
 
 	// The properties panel only makes sense with an open note. The persisted
 	// `propsOpen` preference is remembered, but the panel is never *shown*
