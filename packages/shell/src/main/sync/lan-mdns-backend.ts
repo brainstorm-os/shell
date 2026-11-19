@@ -118,11 +118,25 @@ export async function createLanMdnsBackend(options?: {
 				// Patched before the first announce: `publish` probes for ~250 ms
 				// before it reads `records()`. Never pass `probe: false`, which
 				// would announce synchronously with the unrestricted set.
-				const buildRecords = service.records?.bind(service);
-				if (buildRecords) {
-					const allowed = [...advert.addresses];
-					service.records = () => restrictAddressRecords(buildRecords(), allowed);
+				// FAIL CLOSED. Without the hook the library would publish an
+				// address record for every interface, so a version that stops
+				// exposing it must mean "do not advertise", never "advertise
+				// unrestricted". Still inside the probe window: nothing has been
+				// announced yet.
+				if (typeof service.records !== "function") {
+					// An empty hook first, so whatever the library still does with
+					// this service on its own timers has nothing to send.
+					service.records = () => [];
+					try {
+						service.stop();
+					} catch (error) {
+						options?.onError?.(error);
+					}
+					throw new Error("lan-mdns-backend: records hook unavailable, refusing to advertise");
 				}
+				const buildRecords = service.records.bind(service);
+				const allowed = [...advert.addresses];
+				service.records = () => restrictAddressRecords(buildRecords(), allowed);
 				// A responder error after publish must not become an unhandled
 				// 'error' event on the emitter, which would take the main process
 				// down.
@@ -140,20 +154,23 @@ export async function createLanMdnsBackend(options?: {
 					// already gone; do not hang the reconcile queue on it.
 					setTimeout(resolve, 1_000).unref?.();
 				});
-			let service = announce(advert.txt);
+			let service: BonjourServiceLike;
+			try {
+				service = announce(advert.txt);
+			} catch (error) {
+				return Promise.reject(error);
+			}
 			const publication: LanMdnsPublication = {
 				// `bonjour-service` has no in-place TXT update (1.4.4 registers a
 				// snapshot of the records at announce), so a rotated tag reaches
 				// the wire only by withdrawing and re-announcing under the SAME
 				// name. The goodbye is also what makes a browsing peer see the
 				// refreshed advert as a new sighting.
+				// Throws when the re-announce is refused: the old record is already
+				// withdrawn, and the caller must stop claiming an advert exists.
 				async updateTxt(txt) {
-					try {
-						await withdraw(service);
-						service = announce(txt);
-					} catch (error) {
-						options?.onError?.(error);
-					}
+					await withdraw(service);
+					service = announce(txt);
 				},
 				stop: () => withdraw(service),
 			};

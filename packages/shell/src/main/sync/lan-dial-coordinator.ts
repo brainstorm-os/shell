@@ -35,7 +35,7 @@
  */
 
 import { LanDialMode } from "@brainstorm-os/protocol/sync-status-types";
-import { isBindableAddress } from "./lan-address";
+import { lanWsUrl } from "./lan-address";
 import type { LanPeerCandidate } from "./lan-discovery";
 
 // The enum itself lives in `@brainstorm-os/protocol` so the Settings control
@@ -133,8 +133,8 @@ export function parseLanDialMode(raw: unknown): LanDialMode {
  *
  * Accepts `host:port`, `ws://host:port`, and a bare host (default port
  * rejected — a LAN listener's port is ephemeral, so an address without one is
- * not actionable). The host must be a private IPv4 or loopback literal, the
- * same predicate the listener binds by: a hostname would mean a DNS lookup
+ * not actionable). The host must be a canonical private IPv4 or loopback
+ * literal, the same predicate the listener binds by: a hostname would mean a DNS lookup
  * driven by typed input, and a routable address would mean dialling the
  * internet from a control labelled "local network".
  */
@@ -144,31 +144,21 @@ export function parseLanPeerAddress(
 ): string | null {
 	const trimmed = raw.trim();
 	if (trimmed.length === 0 || trimmed.length > 64) return null;
-	const withScheme = /^wss?:\/\//i.test(trimmed) ? trimmed : `ws://${trimmed}`;
-	let url: URL;
-	try {
-		url = new URL(withScheme);
-	} catch {
-		return null;
-	}
-	// `wss://` to a peer is meaningless: there is no certificate a LAN device
-	// could present, and admission is channel-bound anyway.
-	if (url.protocol !== "ws:") return null;
-	if (url.pathname !== "/" && url.pathname !== "") return null;
-	if (url.username || url.password || url.search || url.hash) return null;
-	if (!url.port) return null;
-	const port = Number(url.port);
-	if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) return null;
-	const host = url.hostname;
-	if (!isBindableAddress(host)) return null;
+	// Matched as text, not handed to `new URL`: URL parsing NORMALISES the host
+	// (`010.0.0.1` becomes `8.0.0.1`, `0xa.0.0.1` becomes `10.0.0.1`), so a
+	// check on its output validates an address the user never typed. Only
+	// `ws://` is accepted — `wss://` to a peer is meaningless, there is no
+	// certificate a LAN device could present and admission is channel-bound —
+	// and credentials, a path, a query or a fragment simply do not match.
+	const m = /^(?:ws:\/\/)?([0-9.]+):([1-9]\d{0,4})\/?$/i.exec(trimmed);
+	if (!m) return null;
 	// Loopback is a legitimate TYPED address (local testing, a second shell on
 	// one machine) but never a legitimate PAIRED one: a peer device is not on
 	// your loopback, and a pairing payload's slot holds the relay's address
 	// whenever a relay is configured. Adopting that would put the durable node
 	// on the LAN transport with the channel-bound handshake it never answers —
 	// the F-466 failure mode, arrived at from provenance instead of the address.
-	if (opts.allowLoopback === false && /^127\./.test(host)) return null;
-	return `ws://${host}:${port}`;
+	return lanWsUrl(m[1] ?? "", Number(m[2]), { allowLoopback: opts.allowLoopback !== false });
 }
 
 export class LanDialCoordinator {

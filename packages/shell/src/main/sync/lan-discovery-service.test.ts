@@ -352,4 +352,45 @@ describe("LanDiscoveryService", () => {
 		expect(onError).toHaveBeenCalled();
 		await svc.dispose();
 	});
+
+	it("reports 'not advertising' when the responder refuses, on first publish and on rotation", async () => {
+		const onError = vi.fn();
+		let refuse = false;
+		let stops = 0;
+		const backend: LanMdnsBackend = {
+			publish: async () => {
+				if (refuse) throw new Error("records hook missing");
+				return {
+					updateTxt: async () => {
+						throw new Error("records hook missing");
+					},
+					stop: async () => {
+						stops += 1;
+					},
+				};
+			},
+			browse: () => ({ stop: () => undefined }),
+		};
+		let now = NOW;
+		const svc = new LanDiscoveryService({
+			readState: () => HOSTING,
+			discoverySecret: () => SECRET,
+			backend,
+			onCandidate: () => undefined,
+			onError,
+			now: () => now,
+			setTimer: () => 0,
+			clearTimer: () => undefined,
+		});
+		await svc.apply();
+		expect(svc.advertising).toBe(true);
+		now += LAN_DISCOVERY_EPOCH_MS;
+		refuse = true;
+		await svc.apply();
+		expect(svc.advertising).toBe(false);
+		expect(svc.instance).toBeNull();
+		expect(stops).toBe(1);
+		expect(onError).toHaveBeenCalled();
+		await svc.dispose();
+	});
 });

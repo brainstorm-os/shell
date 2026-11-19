@@ -177,6 +177,10 @@ describe("hostile advert fields", () => {
 		["an IPv6 literal", genuine({ addresses: ["fe80::1"] })],
 		["an IPv4-mapped IPv6 literal", genuine({ addresses: ["::ffff:192.168.1.10"] })],
 		["a hex octet", genuine({ addresses: ["0xc0.168.1.10"] })],
+		["a leading-zero octet that URL parsing reads as octal", genuine({ addresses: ["010.0.0.1"] })],
+		["a trailing-zero-padded octet", genuine({ addresses: ["192.168.1.010"] })],
+		["a short-form address", genuine({ addresses: ["10.1"] })],
+		["the cloud metadata address", genuine({ addresses: ["169.254.169.254"] })],
 		["an address with a port smuggled in", genuine({ addresses: ["192.168.1.10:22"] })],
 		["an address with a path", genuine({ addresses: ["192.168.1.10/x"] })],
 		[
@@ -363,6 +367,12 @@ describe("pairing-payload provenance", () => {
 		"not a url",
 		"",
 		"ws://[fe80::1]:80",
+		"ws://010.0.0.1:80",
+		"ws://0xa.0.0.1:80",
+		"ws://10.1:80",
+		"ws://167772161:80",
+		"ws://169.254.169.254:80",
+		"ws://192.168.1.20:080",
 	])("refuses %s rather than adopting it or throwing", (url) => {
 		const { c } = coordinator();
 		c.setMode(LanDialMode.Auto);
