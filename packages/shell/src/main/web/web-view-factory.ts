@@ -30,6 +30,7 @@ import {
 import { type DownloadItem, type Session, type WebContents, WebContentsView, app } from "electron";
 import { TabChord, type WebContentsViewHandle, tabChordFor } from "../apps/window-container";
 import { networkEgressHostOf } from "../network/audit-log";
+import { addRequestHeaderRewriter } from "./request-header-rewriters";
 import { sitePermissionKindsFor, webOriginOf } from "./site-permissions";
 import { MAX_DOWNLOAD_BYTES, sanitizeDownloadFilename } from "./web-download";
 import {
@@ -459,13 +460,9 @@ function configureSessionPolicy(
 		if (trustedFirstParty(details)) return false;
 		return isThirdPartyRequest(details.url, firstParty);
 	};
-	ses.webRequest.onBeforeSendHeaders((details, callback) => {
-		if (stripsThirdPartyCookies(details)) {
-			callback({ requestHeaders: withoutCookieHeader(details.requestHeaders) });
-			return;
-		}
-		callback({ requestHeaders: details.requestHeaders });
-	});
+	addRequestHeaderRewriter(ses, (details, headers) =>
+		stripsThirdPartyCookies(details) ? withoutCookieHeader(headers) : headers,
+	);
 	ses.webRequest.onHeadersReceived((details, callback) => {
 		if (details.responseHeaders && stripsThirdPartyCookies(details)) {
 			callback({ responseHeaders: withoutSetCookieHeaders(details.responseHeaders) });

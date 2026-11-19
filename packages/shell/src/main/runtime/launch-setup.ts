@@ -43,6 +43,7 @@ import { SettingsRepository } from "../storage/settings-repo";
 import type { AppCallHost } from "../tools/app-call-host";
 import { getActiveVaultSession } from "../vault/session";
 import { readSpellcheckDictionary } from "../vault/vault-spellcheck-dictionary-store";
+import { installEmbedReferrer } from "../web/embed-referrer";
 import {
 	SPELLCHECK_CONTEXT_CHANNEL,
 	enableSessionSpellcheck,
@@ -460,6 +461,9 @@ const defaultTabViewFactory: TabViewFactory = (spec) => {
 	// (idempotent; app renderers share session.defaultSession). Only elements
 	// that opt in (spellcheck=true / contentEditable — B11.16b) are checked.
 	enableSessionSpellcheck(view.webContents.session, app.getPreferredSystemLanguages());
+	// B11.20 — a web-embed player that requires an embedder identity (YouTube)
+	// gets a fixed Referer on its document request; see embed-referrer.ts.
+	installEmbedReferrer(view.webContents.session);
 	// B11.17a — hydrate the active vault's custom dictionary into the session
 	// (once). Async store read; failures leave the dictionary empty.
 	const dictVaultPath = getActiveVaultSession()?.vaultPath;
