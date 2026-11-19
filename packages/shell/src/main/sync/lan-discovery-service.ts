@@ -24,11 +24,11 @@
 
 import {
 	LAN_SERVICE_TYPE,
-	type LanAdvertRecord,
 	type LanMdnsBackend,
 	type LanMdnsBrowse,
 	type LanMdnsPublication,
 	type LanPeerCandidate,
+	type LanPublishRequest,
 	buildLanAdvertTxt,
 	mintLanInstanceName,
 	parseLanAdvert,
@@ -131,7 +131,7 @@ export class LanDiscoveryService {
 			return;
 		}
 		const state = this.#options.readState();
-		const secret = this.#options.discoverySecret();
+		const secret = this.#readSecret();
 		// No identity ⇒ nothing to prove and nothing we could verify. Refuse
 		// both halves rather than advertising an untagged record.
 		if (!secret) {
@@ -140,7 +140,7 @@ export class LanDiscoveryService {
 			return;
 		}
 
-		if (state.browse) this.#startBrowse(backend, secret);
+		if (state.browse) this.#startBrowse(backend);
 		else this.#stopBrowse();
 
 		const wantAdvert = state.advertise && state.listener !== null && state.listener.port > 0;
@@ -153,13 +153,24 @@ export class LanDiscoveryService {
 		await this.#startOrRefreshAdvert(backend, secret, listener);
 	}
 
-	#startBrowse(backend: LanMdnsBackend, secret: Uint8Array): void {
+	#readSecret(): Uint8Array | null {
+		try {
+			return this.#options.discoverySecret();
+		} catch (error) {
+			this.#options.onError?.(error);
+			return null;
+		}
+	}
+
+	#startBrowse(backend: LanMdnsBackend): void {
 		if (this.#browse) return;
 		try {
 			this.#browse = backend.browse(LAN_SERVICE_TYPE, (record) => {
-				// Re-read the secret per record: a vault that closed between the
-				// browse starting and this record arriving must not verify.
-				const live = this.#options.discoverySecret() ?? secret;
+				// Re-read the secret per record and REFUSE without one: a record
+				// arriving after the vault closed must not verify against the key
+				// captured when the browse started.
+				const live = this.#readSecret();
+				if (!live) return;
 				const candidate = parseLanAdvert({
 					record,
 					secret: live,
@@ -196,17 +207,19 @@ export class LanDiscoveryService {
 		listener: { addresses: readonly string[]; port: number },
 	): Promise<void> {
 		const key = `${listener.port}|${[...listener.addresses].sort().join(",")}`;
-		const txt = buildLanAdvertTxt({
-			secret,
-			port: listener.port,
-			addresses: listener.addresses,
-			nowMs: this.#now(),
-		});
-		if (this.#publication && this.#advertKey === key) {
+		const mint = (instance: string) =>
+			buildLanAdvertTxt({
+				secret,
+				instance,
+				port: listener.port,
+				addresses: listener.addresses,
+				nowMs: this.#now(),
+			});
+		if (this.#publication && this.#instance && this.#advertKey === key) {
 			// Same listener, new epoch: refresh the TXT in place rather than
 			// churning the instance name, which peers use as a de-dup key.
 			try {
-				await this.#publication.updateTxt(txt);
+				await this.#publication.updateTxt(mint(this.#instance));
 			} catch (error) {
 				this.#options.onError?.(error);
 			}
@@ -215,11 +228,12 @@ export class LanDiscoveryService {
 		}
 		await this.#stopAdvert();
 		const instance = mintLanInstanceName(this.#randomBytes);
-		const advert: LanAdvertRecord & { type: string } = {
+		const advert: LanPublishRequest = {
 			type: LAN_SERVICE_TYPE,
 			name: instance,
 			port: listener.port,
-			txt,
+			addresses: [...listener.addresses],
+			txt: mint(instance),
 		};
 		try {
 			const publication = await backend.publish(advert);

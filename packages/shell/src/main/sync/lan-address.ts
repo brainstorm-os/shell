@@ -61,6 +61,22 @@ export function isPrivateIpv4(address: string): boolean {
  * listener binds an address no peer can reach, and every symptom points at
  * discovery or admission instead.
  *
+ * **IPv6 position (written, `P2P-1`): IPv4 only, on every path.** The listener
+ * binds private IPv4, the advert carries private IPv4 literals and publishes no
+ * AAAA record, and a typed or paired address must be a private IPv4 literal.
+ * Reasons, in order: a link-local IPv6 address is only dialable with a zone id
+ * (`fe80::1%en0`) that is meaningless on the peer and cannot go in a `ws://`
+ * URL portably; a global-scope IPv6 address is ROUTABLE, so advertising or
+ * binding one turns "sync on my local network" into an internet-facing service
+ * and breaks the conservative `isLanRelayUrl` claim behind the "no server"
+ * status line; and privacy addresses rotate, which would churn the tag's
+ * address commitment. ULA (`fc00::/7`) is the one form with none of those
+ * problems and is the natural first extension. The cost is stated rather than
+ * hidden: on an IPv6-ONLY network `lanInterfaces()` is empty, the listener
+ * stays off, discovery advertises nothing, and sync uses the relay. That case
+ * must surface as "no local network address" in Settings, never as a silent
+ * no-op.
+ *
  * The ranking is by interface name, which is the only signal available without
  * probing: physical adapters first, virtual/overlay adapters last, everything
  * unknown in between. It is a heuristic and it is allowed to be, because the
@@ -68,17 +84,33 @@ export function isPrivateIpv4(address: string): boolean {
  * bound address explicitly, and a user can always type one in.
  */
 export function rankLanInterfaces(interfaces: readonly LanInterface[]): LanInterface[] {
-	return [...interfaces].sort((a, b) => interfaceRank(a.name) - interfaceRank(b.name));
+	return [...interfaces].sort(
+		(a, b) =>
+			interfaceRank(a.name) - interfaceRank(b.name) || addressRank(a.address) - addressRank(b.address),
+	);
 }
 
 /** Lower sorts earlier. */
 function interfaceRank(name: string): number {
 	const n = name.toLowerCase();
 	// Overlay / virtual adapters a peer on the physical LAN cannot reach.
-	if (/^(docker|br-|veth|virbr|vmnet|vboxnet|utun|tun|tap|zt|wg|tailscale|ham)/.test(n)) return 2;
+	if (VIRTUAL_INTERFACE_PREFIX.test(n)) return 2;
 	if (n.includes("virtual") || n.includes("vethernet") || n.includes("loopback")) return 2;
+	if (n.includes("vpn") || n.includes("wsl") || n.includes("hyper-v")) return 2;
 	// Physical adapters, the ones a home or office LAN actually runs on.
-	if (/^(en|eth|wlan|wl|wlp|enp|eno|ens)\d/.test(n)) return 0;
+	if (/^(en|eth|wlan|wl|wlp|enp|eno|ens|enx)\w*\d/.test(n)) return 0;
 	if (n.includes("wi-fi") || n.includes("wifi") || n.includes("ethernet")) return 0;
 	return 1;
+}
+
+const VIRTUAL_INTERFACE_PREFIX =
+	/^(docker|br-|bridge|veth|virbr|vmnet|vboxnet|vnic|utun|tun|tap|ppp|ipsec|zt|wg|tailscale|nordlynx|ham|podman|cni|flannel|lxc|lxd)/;
+
+/**
+ * Within one class of adapter, a self-assigned link-local address goes last:
+ * `169.254/16` on a physical adapter means DHCP failed, so the adapter with a
+ * routed private address is the one the LAN is actually on.
+ */
+function addressRank(address: string): number {
+	return address.startsWith("169.254.") ? 1 : 0;
 }

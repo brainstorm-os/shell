@@ -592,6 +592,7 @@
   "shell.windowStrip.scrollRight": "Button label in the dashboard window strip (open-window switcher): “Scroll windows right”.",
   "shell.settings.sync.lan.live": "Shown in Settings > Sync when this device is syncing over the local network. {peer} is a ws:// address.",
   "shell.settings.sync.lan.thisDevice": "Label for the address other devices type in to reach this one.",
+  "shell.settings.sync.lan.noAddress": "Shown in Settings > Sync when accepting local-network connections is on but this device could not listen on any private IPv4 address (no such address, an IPv6-only network, or the socket could not be opened).",
   "shell.settings.sync.lan.dial.label": "Label for the picker choosing how this device finds other devices on the local network.",
   "shell.settings.sync.lan.dial.off": "Picker option: never look for devices on the local network.",
   "shell.settings.sync.lan.dial.auto": "Picker option: discover devices automatically over mDNS.",

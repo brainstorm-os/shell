@@ -83,6 +83,20 @@ describe("<LanSyncControl>", () => {
 		expect(html).toContain("ws://192.168.1.10:51820");
 	});
 
+	it("says so when hosting is on but there is no address to host on", async () => {
+		bridge.getLanPeering.mockResolvedValue({ ...PEERING, listenerUrl: null });
+		const { container } = await mount(<LanSyncControl />);
+		expect(container.querySelector('[data-testid="lan-no-address"]')).not.toBeNull();
+		expect(container.querySelector('[data-testid="lan-listener-url"]')).toBeNull();
+	});
+
+	it("does not warn about an address while hosting is off", async () => {
+		bridge.getLanHostMode.mockResolvedValue("off");
+		bridge.getLanPeering.mockResolvedValue({ ...PEERING, listenerUrl: null });
+		const { container } = await mount(<LanSyncControl />);
+		expect(container.querySelector('[data-testid="lan-no-address"]')).toBeNull();
+	});
+
 	it("lists a discovered peer while finding devices automatically", async () => {
 		const { html } = await mount(<LanSyncControl />);
 		expect(html).toContain("brainstorm-aabbccdd");

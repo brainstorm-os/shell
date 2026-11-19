@@ -29,7 +29,7 @@
  * for crypto imports and this module legitimately verifies a MAC.
  */
 
-import { isBindableAddress } from "./lan-address";
+import { isBindableAddress, isPrivateIpv4 } from "./lan-address";
 import {
 	LAN_DISCOVERY_TAG_CHARS,
 	type LanDiscoveryTagInput,
@@ -54,7 +54,7 @@ export enum LanTxtKey {
 
 /** TXT schema version. A peer advertising anything else is ignored outright
  *  rather than best-effort parsed. */
-export const LAN_TXT_VERSION = "1";
+export const LAN_TXT_VERSION = "2";
 
 /** How many addresses one advert may carry. A machine with Wi-Fi, Ethernet, a
  *  VPN `utun` and a Docker bridge legitimately has several; four is enough for
@@ -65,12 +65,29 @@ export const LAN_MAX_ADVERT_ADDRESSES = 4;
  *  by definition. */
 export const LAN_MAX_INSTANCE_NAME = 63;
 
+/** The only shape `mintLanInstanceName` produces. Anything else was not minted
+ *  by this product, so it is refused before any MAC work; it also guarantees
+ *  the name has no dots, which `bonjour-service` would rewrite on publish and
+ *  so break the commitment. */
+const LAN_INSTANCE_NAME_RE = /^brainstorm-[0-9a-f]{16}$/;
+
 /** The advert as it goes on the wire / comes off it. `txt` values are strings
  *  because that is all a TXT record holds. */
 export type LanAdvertRecord = {
 	name: string;
 	port: number;
 	txt: Readonly<Record<string, string>>;
+};
+
+/**
+ * What we ask the responder to publish. `addresses` is the complete set of
+ * addresses the advert may disclose in ANY record: the responder must not add
+ * the machine's hostname or its other interfaces on its own initiative, which
+ * would hand a passive observer a stable handle that outlives the rotation.
+ */
+export type LanPublishRequest = LanAdvertRecord & {
+	type: string;
+	addresses: readonly string[];
 };
 
 /** A record that passed every check: safe to hand to the dialer. */
@@ -91,7 +108,7 @@ export type LanPeerCandidate = {
 export type LanMdnsBackend = {
 	/** Publish one service instance. Resolves with a handle that can refresh the
 	 *  TXT in place (tag rotation) and stop the advert. */
-	publish(advert: LanAdvertRecord & { type: string }): Promise<LanMdnsPublication>;
+	publish(advert: LanPublishRequest): Promise<LanMdnsPublication>;
 	/** Start browsing. `onRecord` fires per discovered/updated instance. */
 	browse(type: string, onRecord: (record: unknown) => void): LanMdnsBrowse;
 };
@@ -108,13 +125,23 @@ export type LanMdnsBrowse = {
 /** Mint the TXT record for our own advert, tag included. */
 export function buildLanAdvertTxt(args: {
 	secret: Uint8Array;
+	/** The instance name the advert is published under. Authenticated. */
+	instance: string;
 	port: number;
 	addresses: readonly string[];
 	nowMs: number;
 }): Record<string, string> {
-	const addresses = [...args.addresses].sort();
+	// Caller order is PREFERENCE order (most reachable first) and is kept on the
+	// wire; the tag is over the sorted set, so order is a hint an on-path
+	// attacker could shuffle but only among addresses the host really signed.
+	const addresses = [...args.addresses];
 	const epoch = lanDiscoveryEpoch(args.nowMs);
-	const input: LanDiscoveryTagInput = { epoch, port: args.port, addresses };
+	const input: LanDiscoveryTagInput = {
+		instance: args.instance,
+		epoch,
+		port: args.port,
+		addresses,
+	};
 	return {
 		[LanTxtKey.Version]: LAN_TXT_VERSION,
 		[LanTxtKey.Port]: String(args.port),
@@ -127,7 +154,7 @@ export function buildLanAdvertTxt(args: {
 /**
  * Turn a raw browse result into a candidate, or `null`.
  *
- * `null` for: a non-object, a missing or oversized instance name, a bad TXT
+ * `null` for: a non-object, an instance name this product did not mint, a bad TXT
  * version, a port that is not an integer in `1..65535`, an address list that is
  * empty / oversized / contains anything that is not a private IPv4 literal, a
  * malformed epoch, a wrong-length tag, or a tag that does not verify. There is
@@ -148,8 +175,10 @@ export function parseLanAdvert(args: {
 	const raw = record as { name?: unknown; txt?: unknown };
 
 	if (typeof raw.name !== "string") return null;
-	const instance = raw.name.trim();
-	if (instance.length === 0 || instance.length > LAN_MAX_INSTANCE_NAME) return null;
+	// Not trimmed: the name is authenticated byte-for-byte, and "repairing" it
+	// first would verify a name the peer never signed.
+	const instance = raw.name;
+	if (!LAN_INSTANCE_NAME_RE.test(instance)) return null;
 	if (args.ownInstance && instance === args.ownInstance) return null;
 
 	if (!raw.txt || typeof raw.txt !== "object") return null;
@@ -164,7 +193,7 @@ export function parseLanAdvert(args: {
 	if (!addresses) return null;
 
 	const epochRaw = txt[LanTxtKey.Epoch];
-	if (typeof epochRaw !== "string" || !/^\d{1,15}$/.test(epochRaw)) return null;
+	if (typeof epochRaw !== "string" || !/^[1-9]\d{0,14}$/.test(epochRaw)) return null;
 	const epoch = Number(epochRaw);
 	if (!Number.isSafeInteger(epoch)) return null;
 
@@ -178,7 +207,7 @@ export function parseLanAdvert(args: {
 	const ok = verifyLanDiscoveryTag({
 		secret,
 		tag,
-		input: { epoch, port, addresses: sorted },
+		input: { instance, epoch, port, addresses: sorted },
 		nowMs,
 	});
 	if (!ok) return null;
@@ -192,7 +221,9 @@ export function parseLanAdvert(args: {
 }
 
 function parseBoundedInt(value: unknown, min: number, max: number): number | null {
-	if (typeof value !== "string" || !/^\d{1,7}$/.test(value)) return null;
+	// Canonical decimal only: one spelling per value, so two records that
+	// differ on the wire never verify as the same advert.
+	if (typeof value !== "string" || !/^[1-9]\d{0,6}$/.test(value)) return null;
 	const n = Number(value);
 	if (!Number.isSafeInteger(n) || n < min || n > max) return null;
 	return n;
@@ -205,10 +236,13 @@ function parseAddressList(value: unknown): readonly string[] | null {
 	const out: string[] = [];
 	for (const part of parts) {
 		const address = part.trim();
-		// `isBindableAddress` is the same predicate the listener binds by:
-		// private IPv4 or loopback literal, nothing routable, no hostnames. A
-		// hostname here would mean a DNS lookup driven by an attacker's advert.
-		if (!isBindableAddress(address)) return null;
+		// Private IPv4 literals only. No hostnames (a DNS lookup driven by an
+		// advert), nothing routable, and NOT loopback even under a valid tag: a
+		// peer is never on our loopback, so such an advert can only point the
+		// dial at a local service.
+		// `isBindableAddress` supplies the strict four-octet literal check;
+		// `isPrivateIpv4` then removes the loopback it deliberately allows.
+		if (address !== part || !isBindableAddress(address) || !isPrivateIpv4(address)) return null;
 		if (out.includes(address)) return null;
 		out.push(address);
 	}

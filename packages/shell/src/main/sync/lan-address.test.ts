@@ -80,4 +80,93 @@ describe("rankLanInterfaces", () => {
 		rankLanInterfaces(input);
 		expect(input[0]?.name).toBe("docker0");
 	});
+
+	// Synthetic machines. The first column is what the OS enumerated, in the
+	// order it enumerated it; the second is the address the listener must bind.
+	it.each<[string, [string, string][], string]>([
+		[
+			"Linux laptop with Docker enumerated first",
+			[
+				["docker0", "172.17.0.1"],
+				["br-4f2a9c", "172.18.0.1"],
+				["wlp3s0", "192.168.1.23"],
+			],
+			"192.168.1.23",
+		],
+		[
+			"macOS with a VPN tunnel ahead of Wi-Fi",
+			[
+				["utun4", "10.8.0.2"],
+				["en0", "192.168.1.10"],
+				["bridge100", "192.168.64.1"],
+			],
+			"192.168.1.10",
+		],
+		[
+			"Windows with Hyper-V, WSL and a VPN client",
+			[
+				["vEthernet (Default Switch)", "172.28.112.1"],
+				["vEthernet (WSL)", "172.22.0.1"],
+				["Corp VPN", "10.20.0.7"],
+				["Wi-Fi", "192.168.0.14"],
+			],
+			"192.168.0.14",
+		],
+		[
+			"Ethernet that failed DHCP beside working Wi-Fi",
+			[
+				["en5", "169.254.20.3"],
+				["en0", "192.168.1.10"],
+			],
+			"192.168.1.10",
+		],
+		[
+			"Wi-Fi and Ethernet both up: OS order decides between equals",
+			[
+				["en0", "192.168.1.10"],
+				["en7", "192.168.1.11"],
+			],
+			"192.168.1.10",
+		],
+		[
+			"a USB Ethernet dongle with a MAC-derived name",
+			[
+				["tailscale0", "10.64.0.3"],
+				["enx00e04c680001", "192.168.5.9"],
+			],
+			"192.168.5.9",
+		],
+		[
+			"containers only: a wrong-but-explainable choice beats none",
+			[
+				["podman0", "10.88.0.1"],
+				["cni0", "10.244.0.1"],
+			],
+			"10.88.0.1",
+		],
+		[
+			"an unknown adapter still beats a known overlay",
+			[
+				["wg0", "10.9.0.2"],
+				["weird9", "10.0.0.5"],
+			],
+			"10.0.0.5",
+		],
+		[
+			"only link-local anywhere",
+			[
+				["utun2", "169.254.9.9"],
+				["en0", "169.254.1.1"],
+			],
+			"169.254.1.1",
+		],
+	])("%s", (_machine, enumerated, expected) => {
+		const ranked = rankLanInterfaces(enumerated.map(([name, address]) => ({ name, address })));
+		expect(ranked[0]?.address).toBe(expected);
+		expect(ranked).toHaveLength(enumerated.length);
+	});
+
+	it("an empty enumeration (an IPv6-only network) ranks to nothing", () => {
+		expect(rankLanInterfaces([])).toEqual([]);
+	});
 });
