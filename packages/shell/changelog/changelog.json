@@ -3,19 +3,202 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
-      "version": "0.15.1",
+      "version": "0.16.0",
       "date": "2026-11-19",
-      "icon": "🧽",
-      "title": "A smoother first day, and a pass over every app",
-      "summary": "A fix-and-polish release. A new vault now opens on its dashboard, the emoji picker works again in the installed app, and every app was reviewed screen by screen in light and dark.",
+      "icon": "🤝",
+      "title": "Ask the agent in Chat, publish a website, and apps that work together",
+      "summary": "Mention the agent in a channel and approve what it proposes. Turn a note into a task in one click, publish a page tree as a website, and embed maps and music. Plus a pass over every app and your first day.",
       "body": [
         {
           "kind": "h1",
-          "text": "Your first day"
+          "text": "Ask the agent in Chat"
         },
         {
           "kind": "p",
-          "text": "We walked through the app the way a new person does, from the welcome screen to every app's first open, and fixed what got in the way."
+          "text": "Mention the agent in any channel and it answers in the thread. When it wants to create something, it shows a card and waits for you."
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "@agent in a channel.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Type "
+            },
+            {
+              "text": "@agent",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " and your request. The reply is posted in the channel, marked as asked by you."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Nothing is saved until you approve.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " A proposed task or note appears as a card with "
+            },
+            {
+              "text": "Approve",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " and "
+            },
+            {
+              "text": "Discard",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ". Only the person who asked can approve it."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "It runs on your device.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Your own model and your own settings are used. Other people's messages are treated as background, never as instructions to your agent."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Apps can do things for each other"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Create a task from a note.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Open a note's menu and choose "
+            },
+            {
+              "text": "Create task",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ". Tasks adds it to your inbox. The first time, Brainstorm asks whether Notes may use this tool, and shows exactly which apps are involved."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Publish a website"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "A page and its sub-pages become a site.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Choose "
+            },
+            {
+              "text": "Publish website…",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " on a note. You get a ZIP with ordinary web pages, styled with your current theme, that you can host anywhere."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "You confirm the pages first.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Brainstorm lists every page that will be included. Linked pages are offered but left unticked, and nothing outside the list is published."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "More embeds"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Maps, music and more.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Paste a link from Google Maps, OpenStreetMap, Spotify, SoundCloud, CodePen or Miro, alongside YouTube, Vimeo, Loom, Figma and CodeSandbox."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Nothing loads until you click.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Each embed shows a card first and connects to the provider only when you press "
+            },
+            {
+              "text": "Load",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ". YouTube videos, which used to fail with a player error, now play."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Sync on your own network"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Safer device discovery.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Finding your other devices on a local network no longer reveals your computer's name or its other network addresses, and a device stays discoverable after the first ten minutes."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "ℹ️",
+          "text": [
+            {
+              "text": "Mixed versions. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "A device on 0.15 and one on 0.16 will not find each other automatically on a local network. Pairing by address and syncing through a relay work as before. Update both to restore discovery."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Your first day"
         },
         {
           "kind": "li",
