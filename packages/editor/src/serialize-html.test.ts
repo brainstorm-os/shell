@@ -109,7 +109,10 @@ describe("serializedStateToHtml", () => {
 });
 
 describe("serializedStateToHtml — publishing mode (IE-12)", () => {
-	const published = new Map([["in-1", "roadmap.html"]]);
+	const published = new Map([
+		["in-1", "roadmap.html"],
+		["in-set-id-22", "roadmap.html"],
+	]);
 	const site = {
 		resolveEntityHref: (id: string) => published.get(id) ?? null,
 		resolveAssetSrc: (id: string) => (id === "asset-in" ? "assets/1.png" : null),
@@ -167,6 +170,71 @@ describe("serializedStateToHtml — publishing mode (IE-12)", () => {
 		expect(html).not.toContain("secret-id-9");
 		expect(html).not.toContain("secret-asset");
 		expect(html).not.toContain("brainstorm:");
+	});
+
+	it("scrubs a vault URL split across differently formatted runs", () => {
+		const bold = (t: string) => ({ type: "text", text: t, format: 1 });
+		const splits: unknown[][] = [
+			[text("brainstorm://entity/secret-"), bold("id-9")],
+			[text("brainstorm://"), bold("entity/"), text("secret-id-9")],
+			[text("brain"), bold("storm://entity/secret-id-9")],
+			[text("see brainstorm://entity/sec"), bold("ret-id"), text("-9 after")],
+		];
+		for (const children of splits) {
+			for (const url of ["brainstorm://entity/secret-id-9", "brainstorm://entity/in-1"]) {
+				const html = serializedStateToHtml(para([{ type: "link", url, children }]), site);
+				expect(html).not.toContain("secret-id-9");
+				expect(html).not.toMatch(/secret-|id-9|ret-id/);
+			}
+		}
+		const loose = serializedStateToHtml(
+			para([text("go brainstorm://entity/secret-"), bold("id-9"), text(" now")]),
+			site,
+		);
+		expect(loose).toBe("<p>go [unpublished] now</p>");
+	});
+
+	it("keeps the text after a split URL ends, and resets at a non-text node", () => {
+		const html = serializedStateToHtml(
+			para([text("brainstorm://entity/x"), { type: "linebreak" }, text("kept")]),
+			site,
+		);
+		expect(html).toBe("<p>[unpublished]<br />kept</p>");
+	});
+
+	it("replaces link text that spells out the target id, in one run or several", () => {
+		const bold = (t: string) => ({ type: "text", text: t, format: 1 });
+		const outOfSet = "brainstorm://entity/secret-id-9";
+		const whole = para([{ type: "link", url: outOfSet, children: [text("ref secret-id-9")] }]);
+		expect(serializedStateToHtml(whole, site)).toBe("<p>[unpublished]</p>");
+		const split = para([
+			{ type: "link", url: outOfSet, children: [text("secret-"), bold("id"), text("-9")] },
+		]);
+		expect(serializedStateToHtml(split, site)).toBe("<p>[unpublished]</p>");
+		const inSet = para([
+			{
+				type: "link",
+				url: "brainstorm://entity/in-set-id-22",
+				children: [text("in-set"), bold("-id-22")],
+			},
+		]);
+		expect(serializedStateToHtml(inSet, site)).toBe(
+			'<p><a href="roadmap.html" rel="noreferrer">[unpublished]</a></p>',
+		);
+	});
+
+	it("leaves an out-of-set link as plain text: no anchor, no href, no id", () => {
+		const bold = (t: string) => ({ type: "text", text: t, format: 1 });
+		const state = para([
+			{
+				type: "link",
+				url: "brainstorm://entity/secret-id-9?block=b1#frag",
+				children: [text("the "), bold("terms")],
+			},
+		]);
+		const html = serializedStateToHtml(state, site);
+		expect(html).toBe("<p>the <strong>terms</strong></p>");
+		expect(html).not.toMatch(/<a\b|href|secret-id-9|brainstorm/);
 	});
 
 	it("drops every other brainstorm: URL in publishing mode", () => {
