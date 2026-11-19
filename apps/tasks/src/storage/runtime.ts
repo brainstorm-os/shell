@@ -204,6 +204,15 @@ export type TasksBrainstorm = {
 	 *  Present only with a live shell runtime; absent in preview. */
 	ydoc?: YDocBridge;
 	on(event: LifecycleEvent["type"], handler: LifecycleHandler): { unsubscribe(): void };
+	/** The provider half of app tools (doc 78) — register the handler the shell
+	 *  calls for a tool this app declares in `registrations.tools`. Absent in
+	 *  preview / older shells, where Tasks simply provides nothing. */
+	tools?: {
+		handle(
+			name: string,
+			handler: (args: unknown) => unknown | Promise<unknown>,
+		): { unsubscribe(): void };
+	};
 };
 
 declare global {

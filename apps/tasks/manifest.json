@@ -24,7 +24,8 @@
     "blocks.provide:io.brainstorm.tasks/inline-task",
     "properties.read",
     "properties.write",
-    "notifications.post"
+    "notifications.post",
+    "tools.provide"
   ],
   "registrations": {
     "entityTypes": [
@@ -97,6 +98,25 @@
     "widgets": [
       { "id": "open-tasks", "name": "Open Tasks", "size": "medium" },
       { "id": "task-stats", "name": "Task Stats", "size": "small" }
+    ],
+    "tools": [
+      {
+        "name": "create-task",
+        "title": "Create task",
+        "description": "Add a task named after this note to the Tasks inbox.",
+        "effect": "writes-vault",
+        "appliesTo": ["io.brainstorm.notes/Note/v1"],
+        "surfaces": ["menu"],
+        "input": [
+          {
+            "name": "source",
+            "description": "The note to create a task from.",
+            "required": true,
+            "valueType": "entityRef",
+            "allowedTypes": ["io.brainstorm.notes/Note/v1"]
+          }
+        ]
+      }
     ]
   }
 }

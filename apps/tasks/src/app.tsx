@@ -111,6 +111,7 @@ import { ActionId, bindShortcut } from "./shortcuts";
 import { PROJECT_TYPE, TASK_TYPE, createEntitiesRepository } from "./storage/entities-repository";
 import type { TasksRepository } from "./storage/repository";
 import { type TasksBrainstorm, getBrainstorm } from "./storage/runtime";
+import { CREATE_TASK_TOOL, runCreateTaskTool } from "./tools/create-task-tool";
 import { IntentVerb } from "./types/intent";
 import type { Project } from "./types/project";
 import { TaskSurface, UPCOMING_GROUPINGS, UpcomingGrouping } from "./types/surface";
@@ -1537,6 +1538,26 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 		});
 		return () => sub.unsubscribe();
 	}, [runtime, handleOpenIntent, handleComposeIntent, handleQuickLookIntent]);
+
+	// ── App-tool provider (Tool-10) ─────────────────────────────────────
+	// Tasks answers `create-task` for other apps. Registered only under the
+	// shell with a real repository: the standalone demo has no vault to write.
+	useEffect(() => {
+		const handle = runtime?.tools?.handle;
+		const entitiesSvc = runtime?.services.entities;
+		if (!handle || !entitiesSvc || !repository) return;
+		const sub = handle(CREATE_TASK_TOOL, (args) =>
+			runCreateTaskTool(args, {
+				getEntity: (id) => entitiesSvc.get(id),
+				createTask: (task) => repository.createTask(task),
+				newId: newEntityId,
+				now: nowAnchor,
+				untitledName: () => t("tasks.tool.untitled"),
+				describeSource: (title) => t("tasks.tool.createTask.fromSource", { title }),
+			}),
+		);
+		return () => sub.unsubscribe();
+	}, [runtime, repository, nowAnchor]);
 
 	// ── Entity-title hydration → repaint (assignee chips / group-by) ────
 	useEffect(() => {
