@@ -191,6 +191,16 @@ export type NotesBrainstorm = {
 		export?: {
 			printToPdf(input: { readonly html: string }): Promise<Uint8Array>;
 		};
+		/** Shell notification surface (`ui.notify`, cap `notifications.post`) —
+		 *  reports a finished website publish. Absent or denied, the outcome is
+		 *  still announced through the live region. */
+		ui?: {
+			notify?(notification: {
+				title: string;
+				body?: string;
+				kind?: "info" | "success" | "warning" | "error";
+			}): Promise<void> | void;
+		};
 		/** Vault image-icon store (B11.14 custom emoji). Default-granted
 		 *  `icons.read`/`icons.write`; the icon picker's Upload + Library tabs
 		 *  consume it. Absent on older shells — those tabs stay placeholders. */

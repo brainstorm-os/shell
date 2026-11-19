@@ -8,9 +8,15 @@
  * fetch, Files host) so it unit-tests against stubs without a shell.
  */
 
-import { type SiteArchiveInput, buildSiteArchive } from "@brainstorm-os/editor";
+import {
+	MAX_SITE_ASSET_BYTES,
+	type SiteArchive,
+	type SiteArchiveInput,
+	buildSiteArchive,
+} from "@brainstorm-os/editor";
 import {
 	type SaveDisposition,
+	SaveDispositionKind,
 	type SaveFileService,
 	requestSaveBytes,
 	suggestedFilename,
@@ -21,6 +27,32 @@ import type { SiteAsset } from "@brainstorm-os/sdk/site-export";
 
 const SITE_ARCHIVE_EXTENSION = "zip";
 const PUBLISHED_TOKEN_NAME = /^--(color|space|radius)-/;
+const BYTES_PER_MEGABYTE = 1024 * 1024;
+
+/** Values are the shell notification kinds, so a report posts as-is. */
+export const SiteExportTone = {
+	Success: "success",
+	Warning: "warning",
+	Error: "error",
+} as const;
+export type SiteExportTone = (typeof SiteExportTone)[keyof typeof SiteExportTone];
+
+/** What the user is told once the save dialog is behind them. */
+export type SiteExportReport = {
+	tone: SiteExportTone;
+	title: string;
+	/** What was left out, when anything was. */
+	detail?: string;
+};
+
+export type SiteExportStats = Pick<SiteArchive, "pageCount" | "truncated" | "skippedAssets">;
+
+export type SiteExportReportLabels = {
+	saved: (pageCount: number, file: string) => string;
+	pagesTruncated: (pageCount: number) => string;
+	imagesSkipped: (count: number, limitMegabytes: number) => string;
+	failed: string;
+};
 
 export type SiteExportLabels = {
 	/** The object-menu row. */
@@ -47,8 +79,31 @@ export type SiteExportInput = {
 	/** The current theme's flattened design tokens, read at publish time. */
 	readTokens: () => Record<string, string>;
 	labels: SiteExportLabels;
-	onResult?: (disposition: SaveDisposition) => void;
+	onResult?: (disposition: SaveDisposition, stats: SiteExportStats | null) => void;
 };
+
+/** The outcome in words, or `null` when there is nothing to say (cancelled).
+ *  A failure is described by a fixed sentence — the error itself can carry a
+ *  path or an id and is never shown. */
+export function siteExportReport(
+	disposition: SaveDisposition,
+	stats: SiteExportStats | null,
+	labels: SiteExportReportLabels,
+): SiteExportReport | null {
+	if (disposition.kind === SaveDispositionKind.Cancelled) return null;
+	if (disposition.kind === SaveDispositionKind.Failed || !stats) {
+		return { tone: SiteExportTone.Error, title: labels.failed };
+	}
+	const omissions = [
+		...(stats.truncated ? [labels.pagesTruncated(stats.pageCount)] : []),
+		...(stats.skippedAssets > 0
+			? [labels.imagesSkipped(stats.skippedAssets, MAX_SITE_ASSET_BYTES / BYTES_PER_MEGABYTE)]
+			: []),
+	];
+	const title = labels.saved(stats.pageCount, disposition.handle.displayName);
+	if (omissions.length === 0) return { tone: SiteExportTone.Success, title };
+	return { tone: SiteExportTone.Warning, title, detail: omissions.join(" ") };
+}
 
 /** The theme the app is painted with right now: the shell sets every design
  *  token as an inline custom property on the root element. */
@@ -73,6 +128,7 @@ export async function fetchVaultAsset(assetId: string): Promise<SiteAsset | null
 }
 
 export async function runSiteExport(input: SiteExportInput): Promise<void> {
+	let stats: SiteExportStats | null = null;
 	const disposition = await requestSaveBytes(input.files, {
 		title: input.labels.dialogTitle,
 		suggestedName: suggestedFilename(input.title, SITE_ARCHIVE_EXTENSION),
@@ -90,10 +146,11 @@ export async function runSiteExport(input: SiteExportInput): Promise<void> {
 					unpublished: input.labels.unpublished,
 				},
 			});
+			stats = archive;
 			return archive.bytes;
 		},
 	});
-	input.onResult?.(disposition);
+	input.onResult?.(disposition, stats);
 }
 
 export function buildSiteExportItems(input: SiteExportInput): ObjectMenuExtraItem[] {

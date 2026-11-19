@@ -121,12 +121,36 @@ function clampPercent(value: number): number {
 /** A vault URL typed (or auto-linked) as visible text carries the id as surely
  *  as an href does. */
 const VAULT_URL_IN_TEXT = /brainstorm:\/\/[^\s<>"')\]]*/gi;
+/** Shorter than any real entity id; below it a match is just a word. */
+const MIN_ENTITY_ID_CHARS = 8;
 
-function renderText(node: SerializedNode, ctx: RenderContext): string {
-	const raw = str(node.text);
-	const text = ctx.resolveEntityHref
-		? raw.replace(VAULT_URL_IN_TEXT, ctx.unpublishedLabel ?? "")
-		: raw;
+/** Scrubs vault URLs out of consecutive text runs as ONE string, so a URL
+ *  that formatting split across runs is still found whole. Returns each
+ *  run's remaining text; the stand-in lands in the run where the URL began. */
+function scrubVaultUrls(runs: readonly string[], standIn: string): string[] {
+	const joined = runs.join("");
+	const matches = [...joined.matchAll(VAULT_URL_IN_TEXT)].map((match) => ({
+		start: match.index,
+		end: match.index + match[0].length,
+	}));
+	if (matches.length === 0) return [...runs];
+	let offset = 0;
+	return runs.map((run) => {
+		const runStart = offset;
+		const runEnd = offset + run.length;
+		offset = runEnd;
+		let out = "";
+		let at = runStart;
+		for (const { start, end } of matches) {
+			if (end <= runStart || start >= runEnd) continue;
+			if (start >= runStart) out += `${joined.slice(at, start)}${standIn}`;
+			at = Math.min(runEnd, end);
+		}
+		return `${out}${joined.slice(at, runEnd)}`;
+	});
+}
+
+function formatText(text: string, node: SerializedNode): string {
 	if (text === "") return "";
 	const format = typeof node.format === "number" ? node.format : 0;
 	let html = escapeHtml(text);
@@ -138,10 +162,53 @@ function renderText(node: SerializedNode, ctx: RenderContext): string {
 	return html;
 }
 
+function isTextNode(node: SerializedNode): boolean {
+	const type = str(node.type);
+	return type === "text" || type === "code-highlight";
+}
+
+function plainText(node: SerializedNode): string {
+	return `${str(node.text)}${asNodes(node.children).map(plainText).join("")}`;
+}
+
 function renderChildren(node: SerializedNode, ctx: RenderContext): string {
-	return asNodes(node.children)
-		.map((child) => renderNode(child, ctx))
-		.join("");
+	const children = asNodes(node.children);
+	if (!ctx.resolveEntityHref) return children.map((child) => renderNode(child, ctx)).join("");
+	const standIn = ctx.unpublishedLabel ?? "";
+	let html = "";
+	let runs: SerializedNode[] = [];
+	const flushRuns = () => {
+		const texts = scrubVaultUrls(
+			runs.map((run) => str(run.text)),
+			standIn,
+		);
+		runs.forEach((run, index) => {
+			html += formatText(texts[index] ?? "", run);
+		});
+		runs = [];
+	};
+	for (const child of children) {
+		if (isTextNode(child)) {
+			runs.push(child);
+			continue;
+		}
+		flushRuns();
+		html += renderNode(child, ctx);
+	}
+	flushRuns();
+	return html;
+}
+
+/** The visible text of a vault link in publishing mode. Whatever the link
+ *  resolves to, text that spells out its target's id — in one run or split
+ *  across several — is replaced by the stand-in. */
+function renderVaultLinkText(node: SerializedNode, url: string, ctx: RenderContext): string {
+	const entityId = idAfterPrefix(url.trim(), ENTITY_URL_PREFIX);
+	const visible = plainText(node);
+	if (entityId && entityId.length >= MIN_ENTITY_ID_CHARS && visible.includes(entityId)) {
+		return escapeHtml(ctx.unpublishedLabel ?? "");
+	}
+	return renderChildren(node, ctx);
 }
 
 /** ` style="…"` for a block's stored background (B11.23), or "". */
@@ -169,15 +236,23 @@ function renderNode(node: SerializedNode, ctx: RenderContext): string {
 		case "link":
 		case "autolink": {
 			const href = linkHref(str(node.url), ctx);
-			if (!href && ctx.resolveEntityHref) return renderChildren(node, ctx);
+			const content = ctx.resolveEntityHref
+				? renderVaultLinkText(node, str(node.url), ctx)
+				: renderChildren(node, ctx);
+			if (!href && ctx.resolveEntityHref) return content;
 			const open = href ? `<a href="${href}" rel="noreferrer">` : "<a>";
-			return `${open}${renderChildren(node, ctx)}</a>`;
+			return `${open}${content}</a>`;
 		}
 		case "code":
 			return `<pre>${renderChildren(node, ctx)}</pre>`;
 		case "code-highlight":
 		case "text":
-			return renderText(node, ctx);
+			return formatText(
+				ctx.resolveEntityHref
+					? (scrubVaultUrls([str(node.text)], ctx.unpublishedLabel ?? "")[0] ?? "")
+					: str(node.text),
+				node,
+			);
 		case "linebreak":
 			return "<br />";
 		case "tab":

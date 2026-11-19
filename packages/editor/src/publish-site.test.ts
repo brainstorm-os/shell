@@ -280,6 +280,33 @@ describe("buildSiteArchive — what leaves the vault", () => {
 		expect(everything(archive.bytes)).not.toMatch(/asset-(one|two)/);
 	});
 
+	it("stops copying images at the size cap, fetches no more, and counts what it left out", async () => {
+		const { input, fetched } = harness({
+			root: { title: "Home", body: [[image("a1"), image("a2"), image("a3"), image("a4")]] },
+		});
+		const archive = await buildSiteArchive({
+			...input,
+			rootId: "root",
+			maxAssetBytes: PNG.length * 2 + 1,
+		});
+		expect(archive.skippedAssets).toBe(2);
+		expect(fetched).toEqual(["a1", "a2", "a3"]);
+		const site = unzip(archive.bytes);
+		expect([...site.keys()]).toEqual(["index.html", "styles.css", "assets/1.png", "assets/2.png"]);
+		expect(site.get("index.html")?.match(/<img/g)).toHaveLength(2);
+	});
+
+	it("reports nothing skipped when the images fit exactly", async () => {
+		const { input } = harness({ root: { title: "Home", body: [[image("a1"), image("a2")]] } });
+		const archive = await buildSiteArchive({
+			...input,
+			rootId: "root",
+			maxAssetBytes: PNG.length * 2,
+		});
+		expect(archive.skippedAssets).toBe(0);
+		expect(unzip(archive.bytes).has("assets/2.png")).toBe(true);
+	});
+
 	it("drops an image whose fetch fails instead of failing the site", async () => {
 		const { input } = harness({ root: { title: "Home", body: [[image("x")]] } });
 		const archive = await buildSiteArchive({

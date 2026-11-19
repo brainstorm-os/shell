@@ -737,6 +737,7 @@ export { type SerializeHtmlOptions, serializedStateToHtml } from "./serialize-ht
 export { serializedStateToMarkdown } from "./serialize-markdown";
 export { serializedStateFromDoc } from "./serialized-state-from-doc";
 export {
+	MAX_SITE_ASSET_BYTES,
 	MAX_SITE_PAGES,
 	type SiteArchive,
 	type SiteArchiveInput,
