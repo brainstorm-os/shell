@@ -185,6 +185,8 @@ export type UrlClassification =
  *  `https://foo.com`). Returns null when it still isn't a valid http(s)
  *  URL. */
 export function parseHttpUrl(raw: string): URL | null {
+	// Callers hand this persisted, peer-writable values; the type is a hope.
+	if (typeof raw !== "string") return null;
 	const trimmed = raw.trim();
 	if (trimmed.length === 0) return null;
 	const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
@@ -209,6 +211,7 @@ export function safeExternalHref(raw: string): string | null {
 /** True for a string that is *only* a single URL (the paste-to-bookmark
  *  trigger — pasting a sentence that contains a link must not convert). */
 export function isLoneUrl(raw: string): boolean {
+	if (typeof raw !== "string") return false;
 	const trimmed = raw.trim();
 	if (/\s/.test(trimmed)) return false;
 	return parseHttpUrl(trimmed) !== null;

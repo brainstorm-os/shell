@@ -54,6 +54,12 @@ const HINT_PLACEHOLDER: Partial<Record<EmbedProviderKind, EditorI18nKey>> = {
 	[EmbedKind.GoogleMaps]: "editor.bookmark.urlPlaceholder.googleMaps",
 };
 
+/** Yjs writes node fields directly, bypassing importJSON — a peer can put any
+ *  JSON value where the view expects a string. */
+function text(raw: unknown): string {
+	return typeof raw === "string" ? raw : "";
+}
+
 function coerceHint(raw: unknown): EmbedProviderKind | null {
 	return typeof raw === "string" && Object.hasOwn(EMBED_PROVIDERS, raw)
 		? (raw as EmbedProviderKind)
@@ -137,9 +143,9 @@ export class BookmarkNode extends DecoratorNode<JSX.Element> {
 		return (
 			<BookmarkView
 				nodeKey={this.getKey()}
-				url={this.__url}
-				title={this.__title}
-				description={this.__description}
+				url={text(this.__url)}
+				title={text(this.__title)}
+				description={text(this.__description)}
 				embedHint={coerceHint(this.__embedHint)}
 			/>
 		);

@@ -120,10 +120,16 @@ const ASPECT_ICON: Readonly<Record<EmbedAspect, () => ReactNode>> = {
 	[EmbedAspect.AudioList]: AudioIcon,
 };
 
-export function WebEmbedView({ url }: { url: string }): JSX.Element {
+export function WebEmbedView({ url: syncedUrl }: { url: string }): JSX.Element {
+	// Yjs writes `__url` straight onto the node, bypassing importJSON, so a
+	// peer can put any JSON value here; a throw would take the editor down.
+	const url = typeof syncedUrl === "string" ? syncedUrl : "";
 	const t = useEditorT();
 	const match = useMemo(() => classifyEmbed(url), [url]);
-	const [loaded, setLoaded] = useState(false);
+	// Lexical keys a decorator's portal by node key, so this component — and
+	// its state — survives a peer rewriting the node's URL. Consent therefore
+	// names the exact frame target it was given for, not just "this block".
+	const [consentedEmbedUrl, setConsentedEmbedUrl] = useState<string | null>(null);
 
 	if (!match) {
 		const href = safeExternalHref(url);
@@ -151,13 +157,13 @@ export function WebEmbedView({ url }: { url: string }): JSX.Element {
 	const frameHost = new URL(provider.frameOrigin).host;
 	const Glyph = ASPECT_ICON[match.aspect];
 
-	if (!loaded) {
+	if (consentedEmbedUrl !== match.embedUrl) {
 		return (
 			<div className="notes__embed" data-kind={match.kind} data-aspect={match.aspect}>
 				<button
 					type="button"
 					className="notes__embed-facade"
-					onClick={() => setLoaded(true)}
+					onClick={() => setConsentedEmbedUrl(match.embedUrl)}
 					aria-label={t("editor.embed.facade.load", { provider: name })}
 				>
 					<span className="notes__embed-facade-glyph" aria-hidden="true">
