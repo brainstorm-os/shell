@@ -182,7 +182,7 @@ function collectionExtraItem(
  *  (OQ-AS-1 — object + selection menus). `open` is excluded — it stays on the
  *  open-resolution path (the "Open with ▸" cascade above), never routed through
  *  the contributed-action surface. */
-const APP_TOOL_MENU_SURFACE: string = AppToolSurface.Menu;
+const APP_TOOL_MENU_SURFACE = AppToolSurface.Menu;
 
 const OBJECT_MENU_CONTRIBUTED_VERBS: readonly ContributedVerb[] = [
 	ContributedVerb.Process,
@@ -262,7 +262,9 @@ async function suggestAppTools(
 	const list = runtime?.services?.appTools?.list;
 	if (!list) return [];
 	try {
-		const input: { appliesTo?: string; surface?: string } = { surface: APP_TOOL_MENU_SURFACE };
+		const input: { appliesTo?: string; surface?: AppToolSurface } = {
+			surface: APP_TOOL_MENU_SURFACE,
+		};
 		if (target.entityType) input.appliesTo = target.entityType;
 		return [...(await list(input))].filter((tool) => menuCanInvoke(tool, canPrompt));
 	} catch {

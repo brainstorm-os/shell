@@ -17,6 +17,7 @@ import {
 	canPromptForTool,
 	initialToolArgDraft,
 	promptableInput,
+	toolArgsFromTarget,
 } from "./arg-prompt-logic";
 
 const input = (over: Partial<AppToolInput> & { name: string }): AppToolInput => ({
@@ -155,5 +156,42 @@ describe("buildToolArgs", () => {
 		if (!result.ok) return;
 		expect(Object.getPrototypeOf(result.args)).toBeNull();
 		expect(Object.isFrozen(result.args)).toBe(true);
+	});
+});
+
+describe("toolArgsFromTarget (Tool-10)", () => {
+	const NOTE = "io.brainstorm.notes/Note/v1";
+	const source = input({
+		name: "source",
+		required: true,
+		valueType: ValueType.EntityRef,
+		allowedTypes: [NOTE],
+	});
+
+	it("answers a tool whose only input is a ref the target fills", () => {
+		const args = toolArgsFromTarget([source], { entityId: "n1", entityType: NOTE });
+		expect(args).toEqual({ source: "n1" });
+		// The validator's own bag — null-prototype, exactly what the broker takes.
+		expect(Object.getPrototypeOf(args)).toBeNull();
+	});
+
+	it("does not answer when the target's type is not one the input allows", () => {
+		expect(toolArgsFromTarget([source], { entityId: "t1", entityType: "x/Task/v1" })).toBeNull();
+		// An id of UNKNOWN type never fills a constrained input.
+		expect(toolArgsFromTarget([source], { entityId: "n1" })).toBeNull();
+	});
+
+	it("does not answer when a human could add anything — optional inputs included", () => {
+		const tone = input({ name: "tone" });
+		const flag = input({ name: "urgent", valueType: ValueType.Boolean });
+		const target = { entityId: "n1", entityType: NOTE };
+		expect(toolArgsFromTarget([source, tone], target)).toBeNull();
+		expect(toolArgsFromTarget([source, flag], target)).toBeNull();
+		expect(toolArgsFromTarget([input({ name: "text", required: true })], target)).toBeNull();
+		expect(toolArgsFromTarget([], target)).toBeNull();
+	});
+
+	it("does not answer with an id the validator refuses", () => {
+		expect(toolArgsFromTarget([source], { entityId: "", entityType: NOTE })).toBeNull();
 	});
 });
