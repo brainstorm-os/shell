@@ -270,7 +270,7 @@ const inFlightChannels = new Set<string>();
 const lastRunAt = new Map<string, number>();
 const CHANNEL_CLOCK_MAX = 512;
 
-type ChannelMessage = {
+export type ChannelMessage = {
 	id: string;
 	body: string;
 	senderKind: string;
@@ -285,7 +285,7 @@ function str(value: unknown): string {
 	return typeof value === "string" ? value : "";
 }
 
-function readChannelMessages(repo: EntitiesRepository, channelId: string): ChannelMessage[] {
+export function readChannelMessages(repo: EntitiesRepository, channelId: string): ChannelMessage[] {
 	// Scoped to the channel in SQL — a vault-wide Message/v1 scan per run is
 	// O(all messages) on the main process.
 	const rows = repo.query({
@@ -316,7 +316,7 @@ function readChannelMessages(repo: EntitiesRepository, channelId: string): Chann
 }
 
 /** Reassemble a ledger grant row into the `service.verb[:scope]` wire form. */
-function grantString(grant: { capability: string; scope: string | null }): string {
+export function grantString(grant: { capability: string; scope: string | null }): string {
 	return grant.scope === null ? grant.capability : `${grant.capability}:${grant.scope}`;
 }
 

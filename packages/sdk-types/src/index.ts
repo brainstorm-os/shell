@@ -1687,6 +1687,11 @@ export type AgentProposalsService = {
 	approve(input: { messageId: string }): Promise<AgentProposalDecision>;
 	/** Discard it — settles the card, writes nothing to the vault. */
 	discard(input: { messageId: string }): Promise<AgentProposalDecision>;
+	/** Agent-13 — whether the built-in `@agent` can be invoked from this app
+	 *  right now, and why not when it cannot. Requires the scarce
+	 *  `agents.mention` (the same grant invoking it needs). Parse the reply with
+	 *  `readBuiltinAgentMentionTarget` — it is fail-closed. */
+	mentionTarget(): Promise<unknown>;
 };
 
 export type RosterService = {
@@ -2889,6 +2894,17 @@ export {
 	stripReservedProperties,
 } from "./agent-provenance";
 export type { AgentProvenance, AgentProvenanceRequest } from "./agent-provenance";
+export {
+	AGENT_INVOKER_PROPERTY_KEY,
+	AGENT_PROPOSAL_PREVIEW_PROPERTY_KEY,
+	BUILTIN_AGENT_APP_ID,
+	BUILTIN_AGENT_DISPLAY_NAME,
+	BUILTIN_AGENT_MENTION_REF,
+	BuiltinAgentUnavailableReason,
+	readAgentInvoker,
+	readBuiltinAgentMentionTarget,
+} from "./builtin-agent";
+export type { BuiltinAgentMentionTarget } from "./builtin-agent";
 
 // ─── Shared agent loop (11b.7 — Automations AIAgent + Agent app) ────────────
 export {

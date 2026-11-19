@@ -12,6 +12,7 @@ import {
 } from "@brainstorm-os/protocol/selective-sync-types";
 import { UPDATE_STATE_EVENT } from "@brainstorm-os/protocol/update-wire-types";
 import {
+	AGENT_PROPOSAL_PREVIEW_PROPERTY_KEY,
 	AGENT_TRACE_SERVICE,
 	ANTHROPIC_PROVIDER_ID,
 	APP_TAB_COMMAND_CHANNEL,
@@ -19,6 +20,7 @@ import {
 	ActionTrustTier,
 	AgentEventKind,
 	AgentRouting,
+	BUILTIN_AGENT_APP_ID,
 	GEMINI_PROVIDER_ID,
 	GLM_PROVIDER_ID,
 	INVITE_LINK_PREFIX,
@@ -65,10 +67,17 @@ import {
 	maybeRunAssignedAgent,
 	recordAssignmentRun,
 } from "./agents/assignment-runner";
+import {
+	type BuiltinAgentRunnerDeps,
+	maybeRunBuiltinAgent,
+	resolveBuiltinAgentMentionTarget,
+} from "./agents/builtin-agent-runner";
 import { ChannelProposalStatus } from "./agents/channel-proposals";
+import { ENVELOPE_PROTOCOL_VERSION } from "../ipc/envelope";
 import {
 	AGENTS_MENTION_CAPABILITY,
 	type MentionRunnerDeps,
+	grantString,
 	maybeRunMentionedAgents,
 } from "./agents/mention-runner";
 import { AgentTraceRecorder, makeBrokerTraceObserver } from "./agents/trace/agent-trace-recorder";
@@ -4329,6 +4338,27 @@ void app.whenReady().then(async () => {
 		// run + events for every channel mention turn.
 		trace: agentTraceRecorder,
 	};
+	// Agent-13 — `@agent` in a Chat channel: the installed Agent APP as the
+	// principal, on the invoker's device. Shares the actuation gate (verified
+	// caller holds `agents.mention`, author is this device's identity) with the
+	// team-agent runner above; "installed" is the registry's answer.
+	const builtinAgentDeps: BuiltinAgentRunnerDeps = {
+		getSession: agentMentionDeps.getSession,
+		getSelfPubkey: agentMentionDeps.getSelfPubkey,
+		callerMayMention: agentMentionDeps.callerMayMention,
+		isAgentInstalled: async () => {
+			const session = getActiveVaultSession();
+			if (!session) return false;
+			return (
+				new AppsRepository(await session.dataStores.open("registry")).getActive(
+					BUILTIN_AGENT_APP_ID,
+				) !== null
+			);
+		},
+		getServiceHandler: agentMentionDeps.getServiceHandler,
+		onWrote: agentMentionDeps.onWrote,
+		trace: agentTraceRecorder,
+	};
 	workers.broker.registerService(
 		HISTORY_SERVICE,
 		makeHistoryServiceHandler({
@@ -4376,6 +4406,8 @@ void app.whenReady().then(async () => {
 				// Agent-Teams-3 — fire-and-forget; a runner failure never breaks
 				// the create it piggybacks on (the runner swallows internally).
 				void maybeRunMentionedAgents(agentMentionDeps, result, envelope.app);
+				// Agent-13 — same posture for the built-in `@agent`.
+				void maybeRunBuiltinAgent(builtinAgentDeps, result, envelope.app);
 			}
 		}
 		return result;
@@ -4697,6 +4729,27 @@ void app.whenReady().then(async () => {
 					conversationId: channelId,
 					approved: decision === ChannelProposalStatus.Approved,
 					entityId: createdEntityId ?? null,
+				});
+			},
+			// Agent-13 — the composer's "can I offer @agent?" question.
+			resolveMentionTarget: (app) => resolveBuiltinAgentMentionTarget(builtinAgentDeps, app),
+			// Agent-13 — mirror a decided built-in card onto its synced preview,
+			// AS the Agent app through the real entities service (its own
+			// `entities.write` on Message/v1 is the ceiling), so the update reaches
+			// the other members of a shared channel like any message edit.
+			syncProposalPreview: async (messageId, preview) => {
+				const handler = workers?.broker.getServiceHandler("entities");
+				const session = getActiveVaultSession();
+				if (!handler || !session) return;
+				const ledger = await session.capabilityLedger();
+				await handler({
+					v: ENVELOPE_PROTOCOL_VERSION,
+					msg: `builtin-agent-preview-${messageId}`,
+					app: BUILTIN_AGENT_APP_ID,
+					service: "entities",
+					method: "update",
+					args: [{ id: messageId, patch: { [AGENT_PROPOSAL_PREVIEW_PROPERTY_KEY]: preview } }],
+					caps: ledger.listActive(BUILTIN_AGENT_APP_ID).map(grantString),
 				});
 			},
 		}),
