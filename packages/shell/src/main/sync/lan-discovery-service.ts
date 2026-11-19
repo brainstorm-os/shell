@@ -220,10 +220,13 @@ export class LanDiscoveryService {
 			// churning the instance name, which peers use as a de-dup key.
 			try {
 				await this.#publication.updateTxt(mint(this.#instance));
+				this.#armRotation();
 			} catch (error) {
+				// A refresh that failed leaves a stale or withdrawn record. Drop
+				// it and say so, rather than reporting an advert nobody can use.
 				this.#options.onError?.(error);
+				await this.#stopAdvert();
 			}
-			this.#armRotation();
 			return;
 		}
 		await this.#stopAdvert();

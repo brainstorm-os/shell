@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { isBindableAddress, isPrivateIpv4, rankLanInterfaces } from "./lan-address";
+import {
+	isBindableAddress,
+	isPrivateIpv4,
+	lanWsUrl,
+	parseCanonicalIpv4,
+	rankLanInterfaces,
+} from "./lan-address";
 
 describe("isBindableAddress", () => {
 	it.each(["10.0.0.1", "192.168.1.20", "172.16.5.5", "169.254.1.1", "127.0.0.1"])(
@@ -168,5 +174,59 @@ describe("rankLanInterfaces", () => {
 
 	it("an empty enumeration (an IPv6-only network) ranks to nothing", () => {
 		expect(rankLanInterfaces([])).toEqual([]);
+	});
+});
+
+describe("canonical IPv4 only", () => {
+	// `new URL("ws://010.0.0.1")` is 8.0.0.1: a private-looking string that
+	// dials a routable host. One spelling per address, or it is not an address.
+	it.each([
+		"010.0.0.1",
+		"10.0.0.01",
+		"0x0a.0.0.1",
+		"0xa.0.0.1",
+		"012.0.0.1",
+		"10.1",
+		"10.0.1",
+		"167772161",
+		"10.0.0.1.",
+		".10.0.0.1",
+		"10..0.1",
+		" 10.0.0.1",
+		"10.0.0.1 ",
+		"10.0.0.1\n",
+		"10.0.0.1e0",
+		"10.0.0.256",
+		"1０.0.0.1",
+		"",
+	])("refuses %j everywhere", (raw) => {
+		expect(parseCanonicalIpv4(raw)).toBeNull();
+		expect(isBindableAddress(raw)).toBe(false);
+		expect(isPrivateIpv4(raw)).toBe(false);
+		expect(lanWsUrl(raw, 5000)).toBeNull();
+	});
+
+	it("parses and re-serialises a canonical address to itself", () => {
+		for (const raw of ["10.0.0.1", "192.168.255.0", "172.31.9.200", "127.0.0.1"]) {
+			expect(parseCanonicalIpv4(raw)?.join(".")).toBe(raw);
+		}
+	});
+
+	it("refuses the cloud metadata address but keeps the rest of link-local", () => {
+		expect(isPrivateIpv4("169.254.169.254")).toBe(false);
+		expect(isBindableAddress("169.254.169.254")).toBe(false);
+		expect(lanWsUrl("169.254.169.254", 80)).toBeNull();
+		expect(isPrivateIpv4("169.254.20.3")).toBe(true);
+	});
+
+	it("builds the dial URL from the parsed octets, and WHATWG agrees on the host", () => {
+		const url = lanWsUrl("192.168.1.20", 51_820);
+		expect(url).toBe("ws://192.168.1.20:51820");
+		expect(new URL(url ?? "").hostname).toBe("192.168.1.20");
+		expect(lanWsUrl("8.8.8.8", 80)).toBeNull();
+		expect(lanWsUrl("10.0.0.1", 0)).toBeNull();
+		expect(lanWsUrl("10.0.0.1", 65_536)).toBeNull();
+		expect(lanWsUrl("127.0.0.1", 80)).toBeNull();
+		expect(lanWsUrl("127.0.0.1", 80, { allowLoopback: true })).toBe("ws://127.0.0.1:80");
 	});
 });

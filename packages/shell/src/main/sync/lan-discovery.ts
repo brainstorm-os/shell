@@ -29,7 +29,7 @@
  * for crypto imports and this module legitimately verifies a MAC.
  */
 
-import { isBindableAddress, isPrivateIpv4 } from "./lan-address";
+import { isPrivateIpv4, lanWsUrl } from "./lan-address";
 import {
 	LAN_DISCOVERY_TAG_CHARS,
 	type LanDiscoveryTagInput,
@@ -212,11 +212,18 @@ export function parseLanAdvert(args: {
 	});
 	if (!ok) return null;
 
+	const urls: string[] = [];
+	for (const address of addresses) {
+		const url = lanWsUrl(address, port);
+		if (!url) return null;
+		urls.push(url);
+	}
+
 	return {
 		instance,
 		addresses,
 		port,
-		urls: addresses.map((address) => `ws://${address}:${port}`),
+		urls,
 	};
 }
 
@@ -240,9 +247,7 @@ function parseAddressList(value: unknown): readonly string[] | null {
 		// advert), nothing routable, and NOT loopback even under a valid tag: a
 		// peer is never on our loopback, so such an advert can only point the
 		// dial at a local service.
-		// `isBindableAddress` supplies the strict four-octet literal check;
-		// `isPrivateIpv4` then removes the loopback it deliberately allows.
-		if (address !== part || !isBindableAddress(address) || !isPrivateIpv4(address)) return null;
+		if (address !== part || !isPrivateIpv4(address)) return null;
 		if (out.includes(address)) return null;
 		out.push(address);
 	}

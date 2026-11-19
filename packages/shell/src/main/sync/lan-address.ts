@@ -21,34 +21,79 @@
 /** A bindable local address: private IPv4 (RFC1918) or link-local. */
 export type LanInterface = { name: string; address: string };
 
+export type Ipv4Octets = readonly [number, number, number, number];
+
+const CANONICAL_OCTET = "(0|[1-9]\\d{0,2})";
+const CANONICAL_IPV4_RE = new RegExp(
+	`^${CANONICAL_OCTET}\\.${CANONICAL_OCTET}\\.${CANONICAL_OCTET}\\.${CANONICAL_OCTET}$`,
+);
+
 /**
- * May we bind here, or dial here? Private or loopback IPv4 literals only.
+ * Parse ONE spelling of an IPv4 address: four decimal octets, no leading
+ * zeros, no hex, no short forms, no whitespace.
  *
- * Loopback is allowed so tests can bind without touching a real interface;
- * everything else must satisfy `isPrivateIpv4`. Anything that is not a
- * four-octet literal — a hostname, `0`, `0x0`, `::0`, a trailing dot — is
- * refused, because those are exactly the forms that resolved to a wildcard.
+ * Every other spelling is refused rather than normalised, because the parsers
+ * downstream do not agree on what they mean: WHATWG URL parsing reads
+ * `010.0.0.1` as octal, so a string that passes a private-range check as
+ * "10.0.0.1" dials the routable `8.0.0.1`. The result is re-serialised and
+ * compared, so anything this returns round-trips byte for byte.
  */
-export function isBindableAddress(address: string): boolean {
-	const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(address.trim());
-	if (!m) return false;
-	const octets = m.slice(1, 5).map(Number);
-	if (octets.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return false;
-	if (octets[0] === 127) return true; // loopback — test/local host client
-	return isPrivateIpv4(address.trim());
+export function parseCanonicalIpv4(raw: string): Ipv4Octets | null {
+	if (typeof raw !== "string") return null;
+	const m = CANONICAL_IPV4_RE.exec(raw);
+	if (!m) return null;
+	const octets = [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])] as const;
+	if (octets.some((n) => n > 255)) return null;
+	return octets.join(".") === raw ? octets : null;
 }
 
-export function isPrivateIpv4(address: string): boolean {
-	const parts = address.split(".").map(Number);
-	if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
-		return false;
-	}
-	const [a, b] = parts as [number, number, number, number];
+function isPrivateOctets([a, b, c, d]: Ipv4Octets): boolean {
 	if (a === 10) return true;
 	if (a === 192 && b === 168) return true;
 	if (a === 172 && b >= 16 && b <= 31) return true;
-	if (a === 169 && b === 254) return true; // link-local
+	// Link-local stays: two machines cabled together with no DHCP is a real
+	// LAN, and ranking already puts it last. The one address refused outright
+	// is the cloud instance-metadata endpoint, which is never a peer and is
+	// the classic target of a steered request.
+	if (a === 169 && b === 254) return !(c === 169 && d === 254);
 	return false;
+}
+
+/**
+ * May we bind here, or dial here? Canonical private or loopback IPv4 only.
+ *
+ * Loopback is allowed so tests can bind without touching a real interface;
+ * everything else must satisfy `isPrivateIpv4`. A hostname, `0`, `0x0`, `::0`
+ * or a trailing dot is refused: those are exactly the forms that resolved to
+ * a wildcard.
+ */
+export function isBindableAddress(address: string): boolean {
+	const octets = parseCanonicalIpv4(address);
+	if (!octets) return false;
+	return octets[0] === 127 || isPrivateOctets(octets);
+}
+
+export function isPrivateIpv4(address: string): boolean {
+	const octets = parseCanonicalIpv4(address);
+	return octets !== null && isPrivateOctets(octets);
+}
+
+/**
+ * The dial URL for a LAN peer, or `null`. The single place an address string
+ * becomes a `ws://` URL: built from the PARSED octets, never from the input,
+ * so what was validated and what is dialled cannot differ.
+ */
+export function lanWsUrl(
+	address: string,
+	port: number,
+	opts: { allowLoopback?: boolean } = {},
+): string | null {
+	const octets = parseCanonicalIpv4(address);
+	if (!octets) return null;
+	const loopback = octets[0] === 127;
+	if (loopback ? opts.allowLoopback !== true : !isPrivateOctets(octets)) return null;
+	if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) return null;
+	return `ws://${octets.join(".")}:${port}`;
 }
 
 /**

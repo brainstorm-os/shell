@@ -24,13 +24,14 @@ const fake = vi.hoisted(() => {
 		published: [] as {
 			opts: PublishOptions;
 			stopped: boolean;
-			records: () => { type: string; data?: unknown }[];
+			records: (() => { type: string; data?: unknown }[]) | undefined;
 			handlers: Map<string, (...args: unknown[]) => void>;
 		}[],
 		browserHandlers: new Map<string, (...args: unknown[]) => void>(),
 		onUp: null as ((service: unknown) => void) | null,
 		browserStopped: 0,
 		failConstruct: false,
+		recordsHook: true,
 	};
 	class Bonjour {
 		constructor() {
@@ -41,7 +42,7 @@ const fake = vi.hoisted(() => {
 				opts,
 				stopped: false,
 				handlers: new Map<string, (...args: unknown[]) => void>(),
-				records: () => [
+				records: (() => [
 					{ type: "PTR", data: "x" },
 					{ type: "SRV", data: { port: opts.port, target: opts.host } },
 					{ type: "TXT", data: opts.txt },
@@ -50,7 +51,7 @@ const fake = vi.hoisted(() => {
 					{ type: "A", data: "203.0.113.7" },
 					{ type: "AAAA", data: "2001:db8::1" },
 					{ type: "AAAA", data: "fe80::1" },
-				],
+				]) as (() => { type: string; data?: unknown }[]) | undefined,
 				stop(callback?: () => void) {
 					service.stopped = true;
 					callback?.();
@@ -59,6 +60,7 @@ const fake = vi.hoisted(() => {
 					service.handlers.set(event, listener);
 				},
 			};
+			if (!state.recordsHook) service.records = undefined;
 			state.published.push(service);
 			return service;
 		}
@@ -100,6 +102,7 @@ beforeEach(() => {
 	fake.state.onUp = null;
 	fake.state.browserStopped = 0;
 	fake.state.failConstruct = false;
+	fake.state.recordsHook = true;
 });
 
 async function backend() {
@@ -123,7 +126,7 @@ describe("createLanMdnsBackend — what the advert discloses", () => {
 
 	it("keeps address records to the addresses we chose to advertise", async () => {
 		await (await backend()).publish(ADVERT);
-		const records = fake.state.published[0]?.records() ?? [];
+		const records = fake.state.published[0]?.records?.() ?? [];
 		expect(records.filter((r) => r.type === "A").map((r) => r.data)).toEqual(["192.168.1.10"]);
 		expect(records.some((r) => r.type === "AAAA")).toBe(false);
 		expect(records.map((r) => r.type)).toEqual(["PTR", "SRV", "TXT", "A"]);
@@ -150,6 +153,34 @@ describe("createLanMdnsBackend — what the advert discloses", () => {
 	});
 });
 
+describe("createLanMdnsBackend — the address restriction fails closed", () => {
+	it("refuses to advertise when the library no longer exposes the records hook", async () => {
+		fake.state.recordsHook = false;
+		const onError = vi.fn();
+		const built = await createLanMdnsBackend({ onError });
+		await expect(built?.publish(ADVERT)).rejects.toThrow(/records hook/);
+		expect(fake.state.published[0]?.records?.()).toEqual([]);
+		// Whatever was started is withdrawn before it can announce.
+		expect(fake.state.published.every((service) => service.stopped)).toBe(true);
+	});
+
+	it("still browses, which discloses nothing", async () => {
+		fake.state.recordsHook = false;
+		const built = await createLanMdnsBackend();
+		expect(() => built?.browse("brainstorm-sync", () => undefined)).not.toThrow();
+		expect(fake.state.onUp).not.toBeNull();
+	});
+
+	it("a refused rotation withdraws the advert instead of leaving the old tag up", async () => {
+		const onError = vi.fn();
+		const built = await createLanMdnsBackend({ onError });
+		const publication = await built?.publish(ADVERT);
+		fake.state.recordsHook = false;
+		await expect(publication?.updateTxt({ v: "2", t: "second" })).rejects.toThrow(/records hook/);
+		expect(fake.state.published.every((service) => service.stopped)).toBe(true);
+	});
+});
+
 describe("createLanMdnsBackend — rotation reaches the wire", () => {
 	it("re-announces the SAME name with the new TXT, withdrawing the old record first", async () => {
 		const publication = await (await backend()).publish(ADVERT);
@@ -162,7 +193,7 @@ describe("createLanMdnsBackend — rotation reaches the wire", () => {
 			port: 51_820,
 			txt: { v: "2", t: "second" },
 		});
-		expect(fake.state.published[1]?.records().filter((r) => r.type === "A")).toHaveLength(1);
+		expect(fake.state.published[1]?.records?.().filter((r) => r.type === "A")).toHaveLength(1);
 		await publication.stop();
 		expect(fake.state.published[1]?.stopped).toBe(true);
 	});

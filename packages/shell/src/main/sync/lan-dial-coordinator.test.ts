@@ -43,6 +43,13 @@ describe("parseLanPeerAddress", () => {
 		["user:pw@192.168.1.20:80", "credentials in the address"],
 		["192.168.1.20:80/path", "a path"],
 		["x".repeat(200), "oversized"],
+		["010.0.0.1:80", "leading zero: URL parsing reads it as octal 8.0.0.1"],
+		["0x0a.0.0.1:80", "hex octet"],
+		["10.1:80", "short form"],
+		["167772161:80", "integer form"],
+		["169.254.169.254:80", "the cloud metadata address"],
+		["192.168.1.20:080", "non-canonical port"],
+		["192.168.1.20 :80", "inner whitespace"],
 	])("refuses %s (%s)", (raw) => {
 		expect(parseLanPeerAddress(raw)).toBeNull();
 	});
