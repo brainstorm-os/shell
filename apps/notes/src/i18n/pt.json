@@ -95,6 +95,7 @@
   "notes.publish.failed": "Não foi possível publicar o site. Nada foi salvo.",
   "notes.publish.confirmTitle": "Publicar “{title}” como site",
   "notes.publish.subPagesLegend": "Subpáginas a incluir",
+  "notes.publish.linkedPagesLegend": "Páginas vinculadas. Elas não fazem parte da árvore desta página e só são publicadas se você as marcar.",
   "notes.publish.confirmAction": "Publicar",
   "notes.publish.imagesWithheld.one": "1 imagem de uma página compartilhada foi omitida: uma imagem só é publicada a partir de uma página que mais ninguém pode editar.",
   "notes.publish.imagesWithheld.other": "{count} imagens de páginas compartilhadas foram omitidas: uma imagem só é publicada a partir de uma página que mais ninguém pode editar.",

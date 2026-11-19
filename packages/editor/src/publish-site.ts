@@ -74,7 +74,11 @@ export type SitePlan = {
 	readonly rootId: string;
 	/** The root first, then every sub-page that belongs, in reading order. */
 	readonly pages: ReadonlyArray<{ readonly id: string; readonly title: string }>;
-	/** True when the page cap cut the tree short. */
+	/** Pages the tree links to but does not own, shared with exactly the
+	 *  people the root is. Offered to the user, never published unless they
+	 *  ask: a link is something anyone who can edit the page can write. */
+	readonly linkedPages: ReadonlyArray<{ readonly id: string; readonly title: string }>;
+	/** True when the page cap cut either list short. */
 	readonly truncated: boolean;
 	readonly bodies: ReadonlyMap<string, SiteBodyState | null>;
 	readonly soloPageIds: ReadonlySet<string>;
@@ -87,8 +91,8 @@ export type SiteArchiveLabels = SiteLabels & {
 
 export type SiteArchiveInput = {
 	readonly plan: SitePlan;
-	/** The pages the user confirmed. Ids outside the plan are ignored; the
-	 *  root is always published. */
+	/** The pages the user confirmed, from either list of the plan. Ids outside
+	 *  the plan are ignored; the root is always published. */
 	readonly confirmedIds: readonly string[];
 	/** Bytes + served MIME of one vault asset, or `null` when unavailable. */
 	readonly fetchAsset: (assetId: string) => Promise<SiteAsset | null>;
@@ -158,7 +162,8 @@ export async function planSite(input: SitePlanInput): Promise<SitePlan> {
 	const pages: Array<{ id: string; title: string }> = [];
 	const bodies = new Map<string, SiteBodyState | null>();
 	const soloPageIds = new Set<string>();
-	const considered = new Set<string>([input.rootId]);
+	const owned = new Set<string>([input.rootId]);
+	const linkedIds = new Set<string>();
 	const queue: string[] = [input.rootId];
 	let truncated = false;
 
@@ -183,15 +188,40 @@ export async function planSite(input: SitePlanInput): Promise<SitePlan> {
 		if (!rootAccess) continue;
 
 		for (const childId of subPageIds(body)) {
-			if (considered.has(childId)) continue;
-			considered.add(childId);
-			if (input.getPage(childId)?.parentId !== id) continue;
+			if (owned.has(childId)) continue;
+			if (input.getPage(childId)?.parentId !== id) {
+				linkedIds.add(childId);
+				continue;
+			}
 			const childAccess = await access(childId);
 			if (childAccess?.scope !== rootAccess.scope) continue;
+			owned.add(childId);
 			queue.push(childId);
 		}
 	}
-	return { rootId: input.rootId, pages, truncated, bodies, soloPageIds };
+
+	const linkedPages: Array<{ id: string; title: string }> = [];
+	for (const id of linkedIds) {
+		if (owned.has(id) || !rootAccess) continue;
+		const page = input.getPage(id);
+		if (!page) continue;
+		if (pages.length + linkedPages.length >= maxPages) {
+			truncated = true;
+			break;
+		}
+		const linkedAccess = await access(id);
+		if (linkedAccess?.scope !== rootAccess.scope) continue;
+		let body: SiteBodyState | null;
+		try {
+			body = await loadBody(input.transport, id);
+		} catch {
+			continue;
+		}
+		linkedPages.push({ id, title: page.title });
+		bodies.set(id, body);
+		if (rootAccess.solo) soloPageIds.add(id);
+	}
+	return { rootId: input.rootId, pages, linkedPages, truncated, bodies, soloPageIds };
 }
 
 function dataImageBytes(url: string): number {
@@ -203,7 +233,7 @@ function dataImageBytes(url: string): number {
 export async function buildSiteArchive(input: SiteArchiveInput): Promise<SiteArchive> {
 	const { plan } = input;
 	const confirmed = new Set(input.confirmedIds);
-	const pages: SitePage[] = plan.pages
+	const pages: SitePage[] = [...plan.pages, ...plan.linkedPages]
 		.filter((page) => page.id === plan.rootId || confirmed.has(page.id))
 		.map((page) => ({ ...page, state: plan.bodies.get(page.id) ?? null }));
 

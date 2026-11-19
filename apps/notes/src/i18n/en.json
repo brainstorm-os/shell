@@ -95,6 +95,7 @@
   "notes.publish.failed": "The website could not be published. Nothing was saved.",
   "notes.publish.confirmTitle": "Publish “{title}” as a website",
   "notes.publish.subPagesLegend": "Sub-pages to include",
+  "notes.publish.linkedPagesLegend": "Linked pages. These are not part of this page's tree and are published only if you tick them.",
   "notes.publish.confirmAction": "Publish",
   "notes.publish.imagesWithheld.one": "1 image on a shared page was left out: an image is only published from a page nobody else can edit.",
   "notes.publish.imagesWithheld.other": "{count} images on shared pages were left out: an image is only published from a page nobody else can edit.",

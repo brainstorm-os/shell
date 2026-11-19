@@ -95,6 +95,7 @@
   "notes.publish.failed": "Impossibile pubblicare il sito web. Non è stato salvato nulla.",
   "notes.publish.confirmTitle": "Pubblica «{title}» come sito web",
   "notes.publish.subPagesLegend": "Sottopagine da includere",
+  "notes.publish.linkedPagesLegend": "Pagine collegate. Non fanno parte dell'albero di questa pagina e vengono pubblicate solo se le selezioni.",
   "notes.publish.confirmAction": "Pubblica",
   "notes.publish.imagesWithheld.one": "1 immagine di una pagina condivisa è stata esclusa: un'immagine viene pubblicata solo da una pagina che nessun altro può modificare.",
   "notes.publish.imagesWithheld.other": "{count} immagini di pagine condivise sono state escluse: un'immagine viene pubblicata solo da una pagina che nessun altro può modificare.",

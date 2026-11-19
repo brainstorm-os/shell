@@ -957,6 +957,7 @@ export function NotesApp() {
 				unpublished: t("notes.publish.unpublished"),
 				confirmTitle: t("notes.publish.confirmTitle", { title: headerTitle }),
 				subPagesLegend: t("notes.publish.subPagesLegend"),
+				linkedPagesLegend: t("notes.publish.linkedPagesLegend"),
 				formatLegend: t("notes.export.formatLegend"),
 				confirmAction: t("notes.publish.confirmAction"),
 				cancel: t("notes.export.cancel"),
