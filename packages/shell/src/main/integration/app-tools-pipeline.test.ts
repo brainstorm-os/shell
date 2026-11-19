@@ -156,10 +156,13 @@ async function setup() {
 	const approvalHost = new ToolApprovalHost();
 	const prompts: ToolApprovalRequest[] = [];
 	const dashboard = { answer: true };
+	/** Something that happens in the vault while the prompt is on screen. */
+	const onPrompt: { run: (() => void) | null } = { run: null };
 	approvalHost.setDashboard({
 		send: (channel, request) => {
 			expect(channel).toBe(TOOL_APPROVAL_PROMPT_CHANNEL);
 			prompts.push(request);
+			onPrompt.run?.();
 			queueMicrotask(() =>
 				approvalHost.handleReply({ requestId: request.requestId, accept: dashboard.answer }),
 			);
@@ -270,6 +273,7 @@ async function setup() {
 		attachTasks,
 		prompts,
 		dashboard,
+		onPrompt,
 		provider,
 		providerCalls,
 		audit,
@@ -356,7 +360,8 @@ describe("app-tools pipeline — Tasks provides, Notes consumes (Tool-10)", () =
 	it("END TO END: Notes calls → the shell asks → approved → the task lands in the vault", async () => {
 		const reply = await env.callTool(NOTES, { tool: TOOL_ID, args: { source: "n1" } });
 		if (!reply.ok) throw new Error(`refused: ${reply.error.kind} ${reply.error.message}`);
-		expect(reply.value).toEqual({ value: { taskId: "task-made-1", name: "Plan the offsite" } });
+		// The answer names what was made and carries nothing read from the note.
+		expect(reply.value).toEqual({ value: { taskId: "task-made-1" } });
 
 		// The SHELL asked, once, about a first use — as a human's click, not an agent's.
 		expect(env.prompts).toHaveLength(1);
@@ -469,6 +474,56 @@ describe("app-tools pipeline — Tasks provides, Notes consumes (Tool-10)", () =
 		expect(env.providerCalls).toEqual([]);
 		expect(env.prompts).toEqual([]);
 		expect(env.tasksInVault()).toEqual([]);
+	});
+
+	it("a caller with the tool grant but NO read grant on notes learns nothing through Tasks", async () => {
+		// The confused deputy the review demonstrated: Tasks may read every note,
+		// so a caller that may not could ask Tasks to read one for it.
+		const SNOOP = "io.example.snoop";
+		env.ledger.grant({
+			appId: SNOOP,
+			capability: "tools.call",
+			scope: `${TASKS}/${CREATE_TASK_TOOL}`,
+			grantedVia: GrantedVia.Install,
+		});
+		const real = refusal(await env.callTool(SNOOP, { tool: TOOL_ID, args: { source: "n1" } }));
+		const missing = refusal(
+			await env.callTool(SNOOP, { tool: TOOL_ID, args: { source: "no-such-entity" } }),
+		);
+		expect(real.kind).toBe("Denied");
+		// Indistinguishable from an id that does not exist.
+		expect(real).toEqual(missing);
+		expect(JSON.stringify(real)).not.toContain("offsite");
+		expect(env.providerCalls).toEqual([]);
+		expect(env.prompts).toEqual([]);
+		expect(env.tasksInVault()).toEqual([]);
+		expect(env.audit.at(-2)).toMatchObject({ outcome: "refused", reason: "entity-read" });
+
+		// With a read grant for notes, the same caller is an ordinary one.
+		env.ledger.grant({
+			appId: SNOOP,
+			capability: "entities.read",
+			scope: NOTE_TYPE,
+			grantedVia: GrantedVia.Install,
+		});
+		const allowed = await env.callTool(SNOOP, { tool: TOOL_ID, args: { source: "n1" } });
+		expect(allowed.ok && allowed.value).toEqual({ value: { taskId: "task-made-1" } });
+	});
+
+	it("a note locked WHILE the approval prompt is open is not handed over", async () => {
+		env.onPrompt.run = () => {
+			const row = env.entities.get("n1");
+			if (!row) throw new Error("no n1");
+			env.entities.update("n1", { ...row.properties, locked: true }, Date.now());
+		};
+		const reply = await env.callTool(NOTES, { tool: TOOL_ID, args: { source: "n1" } });
+		expect(env.prompts).toHaveLength(1);
+		expect(refusal(reply).kind).toBe("Denied");
+		expect(env.providerCalls).toEqual([]);
+		expect(env.tasksInVault()).toEqual([]);
+		expect(env.audit.at(-1)).toMatchObject({ outcome: "refused", reason: "locked-object" });
+		// Approved by a human, but nothing ran — so nothing is baselined.
+		expect(env.approvals.get(NOTES, TOOL_ID)).toBeNull();
 	});
 
 	it("the argument that is CHECKED is the argument that is FORWARDED", async () => {

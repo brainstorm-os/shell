@@ -274,11 +274,25 @@ describe("appToolFingerprint (Tool-5)", () => {
 		}
 	});
 
-	it("ignores applicability and registration time, which the user never read", () => {
+	it("ignores registration time, which the user never read", () => {
 		const original = appToolFingerprint(base);
+		expect(appToolFingerprint({ ...(base as object), registeredAt: 999 } as never)).toBe(original);
+	});
+
+	it("DOES change when applicability widens — the objects it may be offered on are part of what was approved", () => {
+		const scoped = { ...(base as object), appliesTo: ["a/Note/v1"] } as never;
+		const original = appToolFingerprint(scoped);
 		expect(
-			appToolFingerprint({ ...(base as object), appliesTo: ["x"], registeredAt: 999 } as never),
-		).toBe(original);
+			appToolFingerprint({ ...(base as object), appliesTo: ["a/Note/v1", "b/Secret/v1"] } as never),
+		).not.toBe(original);
+		// Empty means ANY type — the widest widening there is.
+		expect(appToolFingerprint({ ...(base as object), appliesTo: [] } as never)).not.toBe(original);
+		// Order is not a change.
+		expect(
+			appToolFingerprint({ ...(base as object), appliesTo: ["b/Secret/v1", "a/Note/v1"] } as never),
+		).toBe(
+			appToolFingerprint({ ...(base as object), appliesTo: ["a/Note/v1", "b/Secret/v1"] } as never),
+		);
 	});
 
 	it("DOES change when a tool becomes agent-invocable", () => {

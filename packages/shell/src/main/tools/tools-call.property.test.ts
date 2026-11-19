@@ -64,6 +64,7 @@ const declaration: AppToolRecord = {
 
 const GRANTS: ReadonlyArray<[string, string]> = [
 	[CALLER, toolsCallCapability(PROVIDER, "create-task")],
+	[CALLER, `entities.read:${NOTE_TYPE}`],
 	[PROVIDER, TOOLS_PROVIDE_CAPABILITY],
 	[PROVIDER, "entities.write:brainstorm/Task/v1"],
 ];
