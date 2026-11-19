@@ -25,6 +25,8 @@ import { serializedStateToHtml } from "./serialize-html";
 import { serializedStateFromDoc } from "./serialized-state-from-doc";
 
 export const MAX_SITE_PAGES = 200;
+/** Every copied image is held in memory until the archive is written. */
+export const MAX_SITE_ASSET_BYTES = 100 * 1024 * 1024;
 const SUB_PAGE_NODE_TYPE = "page-ref";
 
 export type SiteArchiveLabels = SiteLabels & {
@@ -45,6 +47,7 @@ export type SiteArchiveInput = {
 	readonly tokens: Readonly<Record<string, string>>;
 	readonly labels: SiteArchiveLabels;
 	readonly maxPages?: number;
+	readonly maxAssetBytes?: number;
 	readonly modifiedAt?: Date;
 };
 
@@ -53,6 +56,8 @@ export type SiteArchive = {
 	readonly pageCount: number;
 	/** True when the page cap cut the tree short. */
 	readonly truncated: boolean;
+	/** Images left out because the copied assets reached the size cap. */
+	readonly skippedAssets: number;
 };
 
 async function loadBody(
@@ -116,13 +121,26 @@ export async function buildSiteArchive(input: SiteArchiveInput): Promise<SiteArc
 		}
 	}
 
+	const maxAssetBytes = Math.max(0, input.maxAssetBytes ?? MAX_SITE_ASSET_BYTES);
 	const assets = new Map<string, SiteAsset>();
-	for (const page of pages) {
-		for (const assetId of collectAssetIds(page.state)) {
-			if (assets.has(assetId)) continue;
-			const asset = await input.fetchAsset(assetId).catch(() => null);
-			if (asset) assets.set(assetId, asset);
+	const assetIds = new Set(pages.flatMap((page) => collectAssetIds(page.state)));
+	let assetBytes = 0;
+	let skippedAssets = 0;
+	for (const assetId of assetIds) {
+		// Once one image does not fit, the rest are not fetched at all: each
+		// fetch buffers a whole file just to learn its size.
+		if (skippedAssets > 0) {
+			skippedAssets += 1;
+			continue;
 		}
+		const asset = await input.fetchAsset(assetId).catch(() => null);
+		if (!asset) continue;
+		if (assetBytes + asset.bytes.length > maxAssetBytes) {
+			skippedAssets += 1;
+			continue;
+		}
+		assetBytes += asset.bytes.length;
+		assets.set(assetId, asset);
 	}
 
 	const { files } = assembleSite({
@@ -143,5 +161,6 @@ export async function buildSiteArchive(input: SiteArchiveInput): Promise<SiteArc
 		bytes: zipStore(files, input.modifiedAt ? { modifiedAt: input.modifiedAt } : {}),
 		pageCount: pages.length,
 		truncated,
+		skippedAssets,
 	};
 }
