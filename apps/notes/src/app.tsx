@@ -31,10 +31,11 @@ import type {
 	ValueType,
 } from "@brainstorm-os/sdk-types";
 import { VersionCause, VersionPropertyChangeKind } from "@brainstorm-os/sdk-types";
-import { LiveRegion } from "@brainstorm-os/sdk/a11y";
+import { KbnAnnouncePoliteness, LiveRegion, announce } from "@brainstorm-os/sdk/a11y";
 import { CoverPicker, type CoverPickerService } from "@brainstorm-os/sdk/cover-picker";
 import { EmptyState } from "@brainstorm-os/sdk/empty-state";
 import { copyEntityBody, hasBodyDocTransport } from "@brainstorm-os/sdk/entity-body-copy";
+import { SaveDispositionKind } from "@brainstorm-os/sdk/export-file";
 import { Icon as IconGlyph, IconName } from "@brainstorm-os/sdk/icon";
 import { recallLastViewed, rememberLastViewed } from "@brainstorm-os/sdk/last-viewed";
 import { LockButton } from "@brainstorm-os/sdk/lock-button";
@@ -66,7 +67,7 @@ import type { OutlineEntry } from "./editor/outline";
 import { queuePendingEntityLinks } from "./editor/pending-link";
 import type { TransclusionEditHost } from "./editor/transclusion-edit-host";
 import { useNotesT } from "./i18n-hooks";
-import { t } from "./i18n/t";
+import { t, tCount } from "./i18n/t";
 import { ActionId } from "./keyboard/action-ids";
 import { matchesActionChord, useShortcut } from "./keyboard/use-shortcut";
 import { decideInsertIntent, refusalNoticeKey } from "./logic/insert-request";
@@ -98,7 +99,13 @@ import { NotesList } from "./ui/notes-list";
 import { noteObjectMenuContext } from "./ui/object-menu-context";
 import { OutlinePanel } from "./ui/outline-panel";
 import { NotesRightPanel, RightTab } from "./ui/right-panel-tabs";
-import { buildSiteExportItems, fetchVaultAsset, readThemeTokens } from "./ui/site-export";
+import {
+	SiteExportTone,
+	buildSiteExportItems,
+	fetchVaultAsset,
+	readThemeTokens,
+	siteExportReport,
+} from "./ui/site-export";
 
 const NAV_PREF_KEY = "notes.navOpen";
 const PROPS_PREF_KEY = "notes.propsOpen";
@@ -935,6 +942,31 @@ export function NotesApp() {
 				pages: t("notes.publish.pages"),
 				untitled: t("notes.list.untitled"),
 				unpublished: t("notes.publish.unpublished"),
+			},
+			onResult: (disposition, stats) => {
+				if (disposition.kind === SaveDispositionKind.Failed) {
+					console.warn("[notes/publish] publish website failed:", disposition.error);
+				}
+				const report = siteExportReport(disposition, stats, {
+					saved: (count, file) => tCount("notes.publish.saved", count, { file }),
+					pagesTruncated: (count) => t("notes.publish.pagesTruncated", { count }),
+					imagesSkipped: (count, limit) => tCount("notes.publish.imagesSkipped", count, { limit }),
+					failed: t("notes.publish.failed"),
+				});
+				if (!report) return;
+				announce([report.title, report.detail].filter(Boolean).join(" "), {
+					politeness:
+						report.tone === SiteExportTone.Error
+							? KbnAnnouncePoliteness.Assertive
+							: KbnAnnouncePoliteness.Polite,
+				});
+				void Promise.resolve(
+					runtime?.services.ui?.notify?.({
+						title: report.title,
+						...(report.detail ? { body: report.detail } : {}),
+						kind: report.tone,
+					}),
+				).catch(() => {});
 			},
 		});
 	}, [runtime, publishRootId, headerTitle]);

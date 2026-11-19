@@ -19,7 +19,8 @@
     "entities.write:*",
     "intents.dispatch:open",
     "files.write",
-    "sharing.share"
+    "sharing.share",
+    "notifications.post"
   ],
   "registrations": {
     "entityTypes": [

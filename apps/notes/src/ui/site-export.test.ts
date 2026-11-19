@@ -4,10 +4,12 @@ import { IconName } from "@brainstorm-os/sdk/icon";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	type SiteExportInput,
+	SiteExportTone,
 	buildSiteExportItems,
 	fetchVaultAsset,
 	readThemeTokens,
 	runSiteExport,
+	siteExportReport,
 } from "./site-export";
 
 const LABELS = {
@@ -84,6 +86,7 @@ describe("runSiteExport", () => {
 		expect(archive).toContain("--color-text-primary: #123456;");
 		expect(onResult).toHaveBeenCalledWith(
 			expect.objectContaining({ kind: SaveDispositionKind.Saved }),
+			expect.objectContaining({ pageCount: 1, truncated: false, skippedAssets: 0 }),
 		);
 	});
 
@@ -98,7 +101,7 @@ describe("runSiteExport", () => {
 		expect(loadDoc).not.toHaveBeenCalled();
 		expect(readTokens).not.toHaveBeenCalled();
 		expect(writes).toEqual([]);
-		expect(onResult).toHaveBeenCalledWith({ kind: SaveDispositionKind.Cancelled });
+		expect(onResult).toHaveBeenCalledWith({ kind: SaveDispositionKind.Cancelled }, null);
 	});
 
 	it("reports a failed build instead of writing a partial file", async () => {
@@ -108,7 +111,56 @@ describe("runSiteExport", () => {
 		expect(writes).toEqual([]);
 		expect(onResult).toHaveBeenCalledWith(
 			expect.objectContaining({ kind: SaveDispositionKind.Failed }),
+			null,
 		);
+	});
+});
+
+describe("siteExportReport", () => {
+	const labels = {
+		saved: (count: number, file: string) => `Published ${count} pages to ${file}.`,
+		pagesTruncated: (count: number) => `Only the first ${count} pages were published.`,
+		imagesSkipped: (count: number, limit: number) => `${count} images left out (${limit} MB).`,
+		failed: "The website could not be published.",
+	};
+	const saved = {
+		kind: SaveDispositionKind.Saved,
+		handle: { handleId: "h", displayName: "handbook.zip" },
+	} as const;
+	const stats = { pageCount: 3, truncated: false, skippedAssets: 0 };
+
+	it("names the page count and the file on success", () => {
+		expect(siteExportReport(saved, stats, labels)).toEqual({
+			tone: SiteExportTone.Success,
+			title: "Published 3 pages to handbook.zip.",
+		});
+	});
+
+	it("says explicitly when pages or images were left out", () => {
+		expect(
+			siteExportReport(saved, { pageCount: 200, truncated: true, skippedAssets: 0 }, labels),
+		).toEqual({
+			tone: SiteExportTone.Warning,
+			title: "Published 200 pages to handbook.zip.",
+			detail: "Only the first 200 pages were published.",
+		});
+		expect(
+			siteExportReport(saved, { pageCount: 200, truncated: true, skippedAssets: 4 }, labels)?.detail,
+		).toBe("Only the first 200 pages were published. 4 images left out (100 MB).");
+	});
+
+	it("never shows the error behind a failure", () => {
+		const error = new Error("ENOENT /Users/me/vault/secret-entity-id");
+		const report = siteExportReport({ kind: SaveDispositionKind.Failed, error }, null, labels);
+		expect(report).toEqual({
+			tone: SiteExportTone.Error,
+			title: "The website could not be published.",
+		});
+		expect(JSON.stringify(report)).not.toMatch(/ENOENT|secret/);
+	});
+
+	it("says nothing when the dialog was cancelled", () => {
+		expect(siteExportReport({ kind: SaveDispositionKind.Cancelled }, null, labels)).toBeNull();
 	});
 });
 
