@@ -160,6 +160,12 @@ export function LanSyncControl({ transportKind }: { transportKind?: SyncTranspor
 				</div>
 			)}
 
+			{hostMode === LanHostMode.WhenVaultOpen && peering && !peering.listenerUrl && (
+				<p className="sync-section__tooltip" role="status" data-testid="lan-no-address">
+					{t("shell.settings.sync.lan.noAddress")}
+				</p>
+			)}
+
 			{peering && (
 				<>
 					<div className="sync-section__row">
