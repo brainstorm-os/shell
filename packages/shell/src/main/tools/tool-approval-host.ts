@@ -40,6 +40,8 @@ export type ToolApprovalRequest = {
 	requestId: string;
 	/** Who wants to run it — an app id, or an agent fingerprint. */
 	callerAppId: string;
+	/** The caller's registry name, resolved by the shell from the verified id. */
+	callerLabel: string;
 	toolId: string;
 	toolTitle: string;
 	toolDescription: string;
@@ -88,6 +90,7 @@ export class ToolApprovalHost {
 	 *  no dashboard, a timeout, a dropped renderer, a malformed reply. */
 	async request(input: {
 		callerAppId: string;
+		callerLabel: string;
 		tool: AppToolRecord;
 		providerLabel: string;
 		reason: ToolApprovalReason;
@@ -112,6 +115,7 @@ export class ToolApprovalHost {
 			dashboard.send(TOOL_APPROVAL_PROMPT_CHANNEL, {
 				requestId,
 				callerAppId: input.callerAppId,
+				callerLabel: input.callerLabel,
 				toolId: input.tool.id,
 				toolTitle: input.tool.title,
 				toolDescription: input.tool.description,

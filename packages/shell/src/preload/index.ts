@@ -332,6 +332,7 @@ const TOOL_APPROVAL_REPLY_CHANNEL = "tools:approval-reply";
 export type ToolApprovalPromptRequest = {
 	requestId: string;
 	callerAppId: string;
+	callerLabel: string;
 	toolId: string;
 	toolTitle: string;
 	toolDescription: string;

@@ -516,6 +516,7 @@ export async function handleToolsCall(
 		const accepted = await approver
 			.request({
 				callerAppId: envelope.app,
+				callerLabel: (await options.resolveAppLabel?.(envelope.app)) ?? envelope.app,
 				tool,
 				providerLabel: (await options.resolveAppLabel?.(tool.appId)) ?? tool.appId,
 				reason: approvalReasonFor(approval),

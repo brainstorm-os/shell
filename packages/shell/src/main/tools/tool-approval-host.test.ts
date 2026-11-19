@@ -45,6 +45,7 @@ const ask = (
 ) =>
 	host.request({
 		callerAppId: "io.brainstorm.notes",
+		callerLabel: "Notes",
 		tool: TOOL,
 		providerLabel: "Provider",
 		reason: ToolApprovalReason.FirstUse,

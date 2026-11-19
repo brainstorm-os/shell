@@ -71,13 +71,13 @@ export function ToolApprovalPromptHost() {
 							: t("tools.approval.body", {
 									tool: request.toolTitle,
 									provider: request.providerLabel,
-									caller: request.callerAppId,
+									caller: request.callerLabel,
 								})}
 					</p>
 					{/* Provider-authored text, rendered as data. */}
 					<p className="capability-prompt__capability">{request.toolDescription}</p>
 					<div className="capability-prompt__actions">
-						<Button ref={declineRef} onClick={() => respond(false)}>
+						<Button ref={declineRef} variant={ButtonVariant.Neutral} onClick={() => respond(false)}>
 							{t("tools.approval.decline")}
 						</Button>
 						<Button variant={ButtonVariant.Primary} onClick={() => respond(true)}>

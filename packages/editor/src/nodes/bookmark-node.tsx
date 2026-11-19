@@ -20,7 +20,7 @@ import {
 	type NodeKey,
 	type SerializedLexicalNode,
 } from "lexical";
-import { type JSX, useCallback, useState } from "react";
+import { type JSX, useCallback, useEffect, useRef, useState } from "react";
 import { type EditorI18nKey, useEditorT } from "../i18n";
 import { GlobeIcon } from "../icons";
 import {
@@ -173,6 +173,12 @@ function BookmarkView({
 	const [draftUrl, setDraftUrl] = useState(url);
 	const [draftTitle, setDraftTitle] = useState(title);
 	const [draftDesc, setDraftDesc] = useState(description);
+	const urlInputRef = useRef<HTMLInputElement | null>(null);
+	// Focus has to be taken: the caret is still in the document when the card
+	// mounts, so without this the pasted link was typed into the note instead.
+	useEffect(() => {
+		if (editing) urlInputRef.current?.focus();
+	}, [editing]);
 	const embeddable = classifyEmbed(url);
 	const href = safeExternalHref(url);
 	const urlPlaceholder = t(
@@ -207,8 +213,15 @@ function BookmarkView({
 
 	if (editing) {
 		return (
-			<div className="notes__bookmark notes__bookmark--editing">
+			<form
+				className="notes__bookmark notes__bookmark--editing"
+				onSubmit={(event) => {
+					event.preventDefault();
+					commit();
+				}}
+			>
 				<input
+					ref={urlInputRef}
 					className="notes__bookmark-input"
 					type="url"
 					value={draftUrl}
@@ -235,18 +248,14 @@ function BookmarkView({
 					</>
 				)}
 				<div className="notes__bookmark-actions">
-					<button
-						type="button"
-						className="notes__bookmark-btn notes__bookmark-btn--primary"
-						onClick={commit}
-					>
+					<button type="submit" className="notes__bookmark-btn notes__bookmark-btn--primary">
 						{t("editor.bookmark.save")}
 					</button>
 					<button type="button" className="notes__bookmark-btn" onClick={() => setEditing(false)}>
 						{t("editor.bookmark.cancel")}
 					</button>
 				</div>
-			</div>
+			</form>
 		);
 	}
 
