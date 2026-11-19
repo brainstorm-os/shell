@@ -40,7 +40,7 @@ jobs:
           # ad-hoc defaults (13.11). Diverges from ci.yml's test matrix by design.
           - os: macos
             arch: universal
-            runner: macos-14
+            runner: macos-15
             rust-target: aarch64-apple-darwin
             rust-extra: x86_64-apple-darwin
             napi-script: build:darwin-arm64
