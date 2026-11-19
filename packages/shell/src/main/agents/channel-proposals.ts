@@ -63,6 +63,11 @@ export type ChannelProposal = {
 	 *  ONLY identity that may decide it. Host-written inside the reserved
 	 *  property, so neither an app nor a synced projection can set it. */
 	invokedBy?: string;
+	/** The channel the draft was STAGED in, recorded host-side at staging. The
+	 *  card message's own `conversation` is an ordinary property — sync or any
+	 *  Message writer can re-point it — so the lock check and the created
+	 *  object's provenance read the channel from HERE, never from the row. */
+	channelId?: string;
 };
 
 /** The kinds a CHANNEL proposal may carry.
@@ -153,6 +158,7 @@ export function readChannelProposal(properties: Record<string, unknown>): Channe
 	const createdEntityId = typeof raw.createdEntityId === "string" ? raw.createdEntityId : undefined;
 	const decidedAt = typeof raw.decidedAt === "number" ? raw.decidedAt : undefined;
 	const invokedBy = typeof raw.invokedBy === "string" && raw.invokedBy ? raw.invokedBy : undefined;
+	const channelId = typeof raw.channelId === "string" && raw.channelId ? raw.channelId : undefined;
 
 	return {
 		artifact: { id, kind: kind as ProposeKind, entityType, fields, summary },
@@ -161,16 +167,18 @@ export function readChannelProposal(properties: Record<string, unknown>): Channe
 		...(createdEntityId ? { createdEntityId } : {}),
 		...(decidedAt !== undefined ? { decidedAt } : {}),
 		...(invokedBy ? { invokedBy } : {}),
+		...(channelId ? { channelId } : {}),
 	};
 }
 
 /** The property bag for a freshly-staged proposal message. */
 export function buildProposalProperty(
 	artifact: ProposedArtifact,
-	invokedBy?: string,
+	binding: { invokedBy?: string; channelId?: string } = {},
 ): Record<string, unknown> {
 	return {
-		...(invokedBy ? { invokedBy } : {}),
+		...(binding.invokedBy ? { invokedBy: binding.invokedBy } : {}),
+		...(binding.channelId ? { channelId: binding.channelId } : {}),
 		artifact: {
 			id: artifact.id,
 			kind: artifact.kind,
@@ -206,6 +214,7 @@ export function settledProposalProperty(
 		// The invoker binding outlives the decision: a settled card still says
 		// whose it was.
 		...(proposal.invokedBy ? { invokedBy: proposal.invokedBy } : {}),
+		...(proposal.channelId ? { channelId: proposal.channelId } : {}),
 	};
 }
 
