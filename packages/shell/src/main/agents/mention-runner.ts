@@ -191,7 +191,7 @@ const CONTEXT_MARKER_INERT = "CHANNEL-CONTEXT";
  *  (and any renderer) breaks a line on U+2028/U+2029/NEL/VT/FF as surely as on
  *  `\n`, so a splitter that knows only `\n` leaves an attacker five ways to
  *  start a line the system never prefixed. */
-const LINE_TERMINATORS = /\r\n|[\n\r\u000b\u000c\u0085\u2028\u2029]/g;
+const LINE_TERMINATORS = /\r\n|[\n\r\v\f\u0085\u2028\u2029]/g;
 
 /** Control characters that are not line breaks (C0 minus tab, DEL, C1), plus
  *  the invisible format characters — zero-width and bidi overrides — that let

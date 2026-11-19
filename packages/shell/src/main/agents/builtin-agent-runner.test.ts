@@ -599,7 +599,7 @@ describe("@agent in Chat (Agent-13)", () => {
 			.map((m) => m.content)
 			.join("\n");
 	/** Split the way a model does: on EVERY Unicode line terminator. */
-	const allLines = (text: string) => text.split(/\r\n|[\n\r\u000b\u000c\u0085\u2028\u2029]/);
+	const allLines = (text: string) => text.split(/\r\n|[\n\r\v\f\u0085\u2028\u2029]/);
 
 	it("SECURITY (R1): a synced `seq` cannot evict real turns from the context or pin the reply", async () => {
 		// Six rows that arrived EARLY but claim an enormous seq and a far-future

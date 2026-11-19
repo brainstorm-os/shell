@@ -22,7 +22,6 @@ import {
 	type RosterMember,
 	type RosterRole,
 	SenderKind,
-	readAgentInvoker,
 } from "@brainstorm-os/sdk-types";
 import { parseAttachments } from "@brainstorm-os/sdk/composer-context";
 import { readPinned } from "./pins";
@@ -84,8 +83,9 @@ export type ChatMessage = {
 	 *  someone else's `@agent` invocation (or is only a synced preview of one).
 	 *  It renders with its actions disabled and a line saying whose it is. */
 	proposalReadOnly?: boolean;
-	/** Agent-13 — who invoked the built-in agent for this row. Display-only. */
-	invoker?: { pubkey: string; name: string };
+	/** Agent-13 — set on a row that presents as the built-in agent: whether
+	 *  this device's host vouches for it. Never derived from synced fields. */
+	agentTrust?: AgentRowTrust;
 };
 
 /** One run of consecutive messages from the same author on the same day, within
@@ -191,35 +191,63 @@ export type ToMessageContext = {
 	selfPubkey?: string;
 };
 
-/**
- * Agent-13 — resolve the card on a row the built-in agent posted.
- *
- * Two sources, in order of authority:
- *   1. the RESERVED `agentProposal` on a row whose host-written author is the
- *      Agent app — present only on the device that ran the invocation, and
- *      decidable only by the invoker it names;
- *   2. the synced, display-only preview — what every other member sees. Always
- *      read-only. It is honoured only on a row that presents as the built-in
- *      agent, so an arbitrary message cannot grow a card.
- */
-function builtinAgentCard(
-	entity: EntityLike,
-	selfPubkey: string | undefined,
-): { proposal: ChannelProposal; readOnly: boolean } | null {
-	if (entity.ownerAppId === BUILTIN_AGENT_APP_ID) {
-		const proposal = readChannelProposal(entity.properties);
-		if (proposal?.invokedBy) {
-			return { proposal, readOnly: !selfPubkey || proposal.invokedBy !== selfPubkey };
-		}
-	}
-	const sender = entity.properties.sender;
-	const presentsAsAgent =
+/** Agent-13 — how far a row that presents as the built-in agent is trusted. */
+export enum AgentRowTrust {
+	/** Written on THIS device by the Agent app (the host-written author says
+	 *  so): the run happened here, for this device's own identity. */
+	Vouched = "vouched",
+	/** Everything about it is another member's synced data. It may well be
+	 *  their agent's honest reply — nothing here can tell — so it is labelled
+	 *  as shown from another device and never attributed to the real agent. */
+	Unverified = "unverified",
+}
+
+/** The author key an UNVERIFIED agent-presenting row is filed under, so it can
+ *  never share a header (or a colour) with the real agent's replies. */
+export const UNVERIFIED_AGENT_REF = `unverified:${BUILTIN_AGENT_MENTION_REF}`;
+
+function presentsAsBuiltinAgent(properties: Record<string, unknown>): boolean {
+	const sender = properties.sender;
+	return (
 		!!sender &&
 		typeof sender === "object" &&
-		(sender as Record<string, unknown>).personRef === BUILTIN_AGENT_MENTION_REF;
-	if (!presentsAsAgent) return null;
-	const preview = readProposalPreview(entity.properties);
-	return preview ? { proposal: preview, readOnly: true } : null;
+		(sender as Record<string, unknown>).personRef === BUILTIN_AGENT_MENTION_REF
+	);
+}
+
+/**
+ * Agent-13 — classify a row that presents as the built-in agent, and resolve
+ * its card.
+ *
+ * The ONLY trust signal is the host-written author. `sender`, `agentInvoker`
+ * and the proposal preview are ordinary synced properties: any member of a
+ * shared channel can write all three, so on their own they once painted a
+ * convincing "Agent · asked by <victim> · approved" card. Now:
+ *   · VOUCHED (author is this device's Agent app) — the card comes from the
+ *     reserved `agentProposal` alone, decidable only by the invoker it names;
+ *   · UNVERIFIED (anything else) — the synced preview renders read-only under
+ *     an explicit "from another member's device, not verified" label, with no
+ *     invoker name and no outcome stated as fact.
+ */
+function builtinAgentRow(
+	entity: EntityLike,
+	selfPubkey: string | undefined,
+): { trust: AgentRowTrust; proposal: ChannelProposal | null; readOnly: boolean } | null {
+	if (!presentsAsBuiltinAgent(entity.properties)) return null;
+	if (entity.ownerAppId === BUILTIN_AGENT_APP_ID) {
+		const proposal = readChannelProposal(entity.properties);
+		const card = proposal?.invokedBy ? proposal : null;
+		return {
+			trust: AgentRowTrust.Vouched,
+			proposal: card,
+			readOnly: !!card && (!selfPubkey || card.invokedBy !== selfPubkey),
+		};
+	}
+	return {
+		trust: AgentRowTrust.Unverified,
+		proposal: readProposalPreview(entity.properties),
+		readOnly: true,
+	};
 }
 
 /**
@@ -240,22 +268,22 @@ export function toMessage(entity: EntityLike, context?: ToMessageContext): ChatM
 	const trusted = context?.trustedAgents;
 	const teamProposal =
 		trusted?.has(entity.ownerAppId ?? "") === true ? readChannelProposal(entity.properties) : null;
-	const builtin = teamProposal ? null : builtinAgentCard(entity, context?.selfPubkey);
+	const builtin = teamProposal ? null : builtinAgentRow(entity, context?.selfPubkey);
 	const proposal = teamProposal ?? builtin?.proposal ?? null;
-	const invoker = readAgentInvoker(entity.properties);
+	const unverified = builtin?.trust === AgentRowTrust.Unverified;
 	return {
 		id: entity.id,
 		channelId: str(entity.properties.conversation),
 		body: str(entity.properties.body),
 		...(richBody ? { richBody } : {}),
-		authorRef: author.authorRef,
+		authorRef: unverified ? UNVERIFIED_AGENT_REF : author.authorRef,
 		authorName: author.authorName,
 		createdAt: str(entity.properties.createdAt),
 		seq: num(entity.properties.seq) ?? 0,
 		attachments: parseAttachments(entity.properties.attachments),
 		...(proposal ? { proposal } : {}),
 		...(builtin?.readOnly ? { proposalReadOnly: true } : {}),
-		...(invoker ? { invoker: { pubkey: invoker.pubkey, name: invoker.displayName } } : {}),
+		...(builtin ? { agentTrust: builtin.trust } : {}),
 	};
 }
 
