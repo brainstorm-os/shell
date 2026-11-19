@@ -107,3 +107,132 @@ describe("serializedStateToHtml", () => {
 		).toBe("<p>@A &amp; B</p>");
 	});
 });
+
+describe("serializedStateToHtml — publishing mode (IE-12)", () => {
+	const published = new Map([["in-1", "roadmap.html"]]);
+	const site = {
+		resolveEntityHref: (id: string) => published.get(id) ?? null,
+		resolveAssetSrc: (id: string) => (id === "asset-in" ? "assets/1.png" : null),
+		unpublishedLabel: "[unpublished]",
+	};
+	const para = (children: unknown[]) => doc([{ type: "paragraph", children }]);
+
+	it("rewrites an entity link to its published page", () => {
+		const state = para([
+			{ type: "link", url: "brainstorm://entity/in-1", children: [text("the plan")] },
+		]);
+		expect(serializedStateToHtml(state, site)).toBe(
+			'<p><a href="roadmap.html" rel="noreferrer">the plan</a></p>',
+		);
+	});
+
+	it("drops the link to an unpublished entity and never emits its id", () => {
+		const state = para([
+			{ type: "link", url: "brainstorm://entity/secret-id-9", children: [text("see this")] },
+		]);
+		const html = serializedStateToHtml(state, site);
+		expect(html).toBe("<p>see this</p>");
+		expect(html).not.toContain("secret-id-9");
+		expect(html).not.toContain("brainstorm:");
+	});
+
+	it.each(["mention", "page-ref", "transclusion", "inline-transclusion"])(
+		"renders an in-set %s as a link and an out-of-set one as the neutral stand-in",
+		(type) => {
+			const inSet = para([{ type, entityId: "in-1", label: "Roadmap" }]);
+			expect(serializedStateToHtml(inSet, site)).toBe('<p><a href="roadmap.html">Roadmap</a></p>');
+			const outOfSet = para([{ type, entityId: "secret-id-9", label: "Layoff plan Q3" }]);
+			const html = serializedStateToHtml(outOfSet, site);
+			expect(html).toBe("<p>[unpublished]</p>");
+			expect(html).not.toContain("Layoff");
+			expect(html).not.toContain("secret-id-9");
+		},
+	);
+
+	it("emits nothing for an out-of-set reference when no stand-in is given", () => {
+		const state = para([{ type: "mention", entityId: "x", label: "Hidden" }]);
+		expect(serializedStateToHtml(state, { resolveEntityHref: () => null })).toBe("<p></p>");
+	});
+
+	it("scrubs a vault URL that appears as visible text", () => {
+		const state = para([
+			{
+				type: "autolink",
+				url: "brainstorm://entity/secret-id-9",
+				children: [text("brainstorm://entity/secret-id-9")],
+			},
+			text(" and brainstorm://asset/secret-asset?x=1 too"),
+		]);
+		const html = serializedStateToHtml(state, site);
+		expect(html).not.toContain("secret-id-9");
+		expect(html).not.toContain("secret-asset");
+		expect(html).not.toContain("brainstorm:");
+	});
+
+	it("drops every other brainstorm: URL in publishing mode", () => {
+		const state = para([
+			{ type: "link", url: "brainstorm://app/notes?open=secret", children: [text("x")] },
+		]);
+		expect(serializedStateToHtml(state, site)).toBe("<p>x</p>");
+	});
+
+	it("escapes a resolver result and a hostile label", () => {
+		const state = para([{ type: "mention", entityId: "e", label: '<img src=x onerror="1">' }]);
+		const html = serializedStateToHtml(state, { resolveEntityHref: () => 'a".html' });
+		expect(html).toBe('<p><a href="a&quot;.html">&lt;img src=x onerror=&quot;1&quot;&gt;</a></p>');
+	});
+
+	it("points a copied asset at its file and drops an image that was not copied", () => {
+		const kept = doc([{ type: "image-block", src: "brainstorm://asset/asset-in", alt: "a" }]);
+		expect(serializedStateToHtml(kept, site)).toBe(
+			'<figure><img src="assets/1.png" alt="a" /></figure>',
+		);
+		const dropped = doc([{ type: "image-block", src: "brainstorm://asset/asset-out", alt: "a" }]);
+		expect(serializedStateToHtml(dropped, site)).toBe("");
+	});
+
+	it("keeps raster data: images only when asked, and never an SVG one", () => {
+		const png = "data:image/png;base64,iVBORw0KGgo=";
+		const image = (src: string) => doc([{ type: "image", src, altText: "" }]);
+		expect(serializedStateToHtml(image(png))).toBe("");
+		expect(serializedStateToHtml(image(png), { allowDataImages: true })).toBe(
+			`<img src="${png}" alt="" />`,
+		);
+		const svg = "data:image/svg+xml;base64,PHN2Zz48c2NyaXB0Pg==";
+		expect(serializedStateToHtml(image(svg), { allowDataImages: true })).toBe("");
+		const smuggled = 'data:image/png;base64,AAAA" onerror="alert(1)';
+		expect(serializedStateToHtml(image(smuggled), { allowDataImages: true })).toBe("");
+	});
+});
+
+describe("serializedStateToHtml — structure beyond the v1 vocabulary", () => {
+	it("renders the title node, rules and tables", () => {
+		expect(serializedStateToHtml(doc([{ type: "title", children: [text("T")] }]))).toBe("<h1>T</h1>");
+		expect(serializedStateToHtml(doc([{ type: "horizontalrule" }]))).toBe("<hr />");
+		const table = {
+			type: "table",
+			children: [
+				{
+					type: "tablerow",
+					children: [
+						{ type: "tablecell", headerState: 1, children: [text("H")] },
+						{ type: "tablecell", headerState: 0, children: [text("<c>")] },
+					],
+				},
+			],
+		};
+		expect(serializedStateToHtml(doc([table]))).toBe(
+			"<table><tr><th>H</th><td>&lt;c&gt;</td></tr></table>",
+		);
+	});
+
+	it("keeps the content of a container it has no form for", () => {
+		const callout = { type: "callout", children: [{ type: "paragraph", children: [text("hi")] }] };
+		expect(serializedStateToHtml(doc([callout]))).toBe("<div><p>hi</p></div>");
+	});
+
+	it("renders a mention's label as text outside publishing mode", () => {
+		const state = doc([{ type: "paragraph", children: [{ type: "mention", label: "A & B" }] }]);
+		expect(serializedStateToHtml(state)).toBe("<p>A &amp; B</p>");
+	});
+});

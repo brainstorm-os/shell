@@ -724,9 +724,16 @@ export {
 	TextFormat,
 	renderEditorState,
 } from "./preview";
-export { serializedStateToHtml } from "./serialize-html";
+export { type SerializeHtmlOptions, serializedStateToHtml } from "./serialize-html";
 export { serializedStateToMarkdown } from "./serialize-markdown";
 export { serializedStateFromDoc } from "./serialized-state-from-doc";
+export {
+	MAX_SITE_PAGES,
+	type SiteArchive,
+	type SiteArchiveInput,
+	type SiteArchiveLabels,
+	buildSiteArchive,
+} from "./publish-site";
 export { baselineTheme, mergeTheme, richTextTheme } from "./theme";
 export {
 	blockParentOf,
