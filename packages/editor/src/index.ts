@@ -742,7 +742,12 @@ export {
 	type SiteArchive,
 	type SiteArchiveInput,
 	type SiteArchiveLabels,
+	type SitePageAccess,
+	type SitePageInfo,
+	type SitePlan,
+	type SitePlanInput,
 	buildSiteArchive,
+	planSite,
 } from "./publish-site";
 export { baselineTheme, mergeTheme, richTextTheme } from "./theme";
 export {

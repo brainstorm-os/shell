@@ -233,7 +233,7 @@ describe("serializedStateToHtml — publishing mode (IE-12)", () => {
 		const bold = (t: string) => ({ type: "text", text: t, format: 1 });
 		const outOfSet = "brainstorm://entity/secret-id-9";
 		const whole = para([{ type: "link", url: outOfSet, children: [text("ref secret-id-9")] }]);
-		expect(serializedStateToHtml(whole, site)).toBe("<p>[unpublished]</p>");
+		expect(serializedStateToHtml(whole, site)).toBe("<p>ref [unpublished]</p>");
 		const split = para([
 			{ type: "link", url: outOfSet, children: [text("secret-"), bold("id"), text("-9")] },
 		]);
@@ -297,6 +297,159 @@ describe("serializedStateToHtml — publishing mode (IE-12)", () => {
 		expect(serializedStateToHtml(image(svg), { allowDataImages: true })).toBe("");
 		const smuggled = 'data:image/png;base64,AAAA" onerror="alert(1)';
 		expect(serializedStateToHtml(image(smuggled), { allowDataImages: true })).toBe("");
+	});
+});
+
+describe("serializedStateToHtml — publishing mode, every emitted string (IE-12)", () => {
+	const SECRET = "secret-entity-id-9";
+	const URL = `brainstorm://entity/${SECRET}`;
+	const site = {
+		resolveEntityHref: (id: string) => (id === "published-id-1" ? "page.html" : null),
+		resolveEntityLabel: (id: string) => (id === "published-id-1" ? "Current title" : null),
+		resolveAssetSrc: (id: string) => (id === "asset-in" ? "assets/1.png" : null),
+		unpublishedLabel: "[x]",
+		allowDataImages: true,
+	};
+	/** A mention elsewhere in the body makes SECRET an id the body references. */
+	const reference = { type: "mention", entityId: SECRET, label: "Hidden" };
+	const leaks: Array<[string, unknown]> = [
+		["an unknown leaf's text", { type: "equation", text: `see ${URL}` }],
+		["an unknown leaf's bare id", { type: "equation", text: `id ${SECRET}` }],
+		[
+			"a tab pane title",
+			{ type: "tabs", children: [{ type: "tab-pane", title: URL, children: [] }] },
+		],
+		[
+			"a tab pane title with a bare id",
+			{ type: "tabs", children: [{ type: "tab-pane", title: SECRET, children: [] }] },
+		],
+		["an image alt", { type: "image", src: "brainstorm://asset/asset-in", altText: URL }],
+		[
+			"an image caption",
+			{ type: "image", src: "brainstorm://asset/asset-in", altText: "", caption: SECRET },
+		],
+		[
+			"an image-block alt and caption",
+			{ type: "image-block", src: "brainstorm://asset/asset-in", alt: SECRET, caption: URL },
+		],
+		["an inline-image alt", { type: "inline-image", src: "brainstorm://asset/asset-in", alt: URL }],
+		["a bookmark title", { type: "bookmark", url: "https://example.com/a", title: URL }],
+		["a bookmark url", { type: "bookmark", url: `https://example.com/?next=${URL}` }],
+		["a bookmark url carrying the id", { type: "bookmark", url: `https://example.com/${SECRET}` }],
+		["a date-mention label", { type: "date-mention", iso: "2026-01-01", label: URL }],
+		["a link href query", { type: "link", url: `https://example.com/?next=${URL}`, children: [] }],
+		[
+			"a percent-encoded link href",
+			{
+				type: "link",
+				url: `https://example.com/?n=${encodeURIComponent(encodeURIComponent(URL))}`,
+				children: [],
+			},
+		],
+		["a relative href", { type: "link", url: `./${URL}`, children: [] }],
+		["a rooted href", { type: "link", url: `/${URL}`, children: [] }],
+		["a fragment href", { type: "link", url: `#${URL}`, children: [] }],
+		["a mixed-case href", { type: "link", url: "./BrainStorm://entity/x", children: [] }],
+		[
+			"an href carrying only the id",
+			{ type: "link", url: `https://x.example/${SECRET}`, children: [] },
+		],
+		["a published mention's label", { type: "mention", entityId: "published-id-1", label: URL }],
+		["a remote image", { type: "image", src: `https://example.com/${SECRET}.png`, altText: "" }],
+	];
+
+	it.each(leaks)("keeps a vault URL and a referenced id out of %s", (_where, node) => {
+		const html = serializedStateToHtml(
+			doc([{ type: "paragraph", children: [reference] }, node as never]),
+			site,
+		);
+		expect(html.toLowerCase()).not.toContain("brainstorm:");
+		expect(html).not.toContain(SECRET);
+		expect(html).not.toContain("Hidden");
+	});
+
+	it("drops the href but keeps the text of a link that names the vault", () => {
+		const state = doc([
+			{
+				type: "paragraph",
+				children: [{ type: "link", url: `./${URL}`, children: [text("read me")] }],
+			},
+		]);
+		expect(serializedStateToHtml(state, site)).toBe("<p>read me</p>");
+	});
+
+	it("shows a published reference under the page's current title, not its stored label", () => {
+		const state = doc([
+			{
+				type: "paragraph",
+				children: [{ type: "page-ref", entityId: "published-id-1", label: "Stale or planted" }],
+			},
+		]);
+		expect(serializedStateToHtml(state, site)).toBe('<p><a href="page.html">Current title</a></p>');
+	});
+
+	it("emits no remote or relative image source — only a copied asset or inline data", () => {
+		const image = (src: string) => ({ type: "image", src, altText: "a" });
+		const html = serializedStateToHtml(
+			doc([
+				image("https://tracker.example/p.gif"),
+				image("http://tracker.example/p.gif"),
+				image("//tracker.example/p.gif"),
+				image("/abs/p.gif"),
+				image("./rel/p.gif"),
+				{ type: "image-block", src: "https://tracker.example/b.png" },
+				{ type: "inline-image", src: "https://tracker.example/i.png" },
+				image("brainstorm://asset/asset-in"),
+				image("data:image/png;base64,AAAA"),
+			]),
+			site,
+		);
+		expect(html).toBe(
+			'<img src="assets/1.png" alt="a" /><img src="data:image/png;base64,AAAA" alt="a" />',
+		);
+	});
+
+	it("still keeps a remote image in a plain single-note export", () => {
+		expect(serializedStateToHtml(doc([{ type: "image", src: "https://x/y.png", altText: "" }]))).toBe(
+			'<img src="https://x/y.png" alt="" />',
+		);
+	});
+});
+
+describe("serializedStateToHtml — hostile nesting", () => {
+	const nest = (depth: number, type: string) => {
+		let node: Record<string, unknown> = { type: "paragraph", children: [text("deep <b>")] };
+		for (let level = 0; level < depth; level += 1) node = { type, children: [node] };
+		return node;
+	};
+
+	it.each(["quote", "list", "callout", "link"])(
+		"flattens 20,000 nested %s nodes to text instead of overflowing the stack",
+		(type) => {
+			const html = serializedStateToHtml(doc([nest(20_000, type)]));
+			expect(html).toContain("deep &lt;b&gt;");
+			expect(html.length).toBeLessThan(4_000);
+		},
+	);
+
+	it("survives the same depth in publishing mode and still scrubs what it flattens", () => {
+		const deep = nest(20_000, "quote");
+		const leaf = { type: "paragraph", children: [text("brainstorm://entity/deep-secret-id")] };
+		let node: Record<string, unknown> = leaf;
+		for (let level = 0; level < 200; level += 1) node = { type: "quote", children: [node] };
+		const html = serializedStateToHtml(doc([deep, node]), {
+			resolveEntityHref: () => null,
+			unpublishedLabel: "[x]",
+		});
+		expect(html).toContain("deep &lt;b&gt;");
+		expect(html).not.toContain("deep-secret-id");
+		expect(html).not.toContain("brainstorm:");
+	});
+
+	it("renders ordinary nesting unchanged", () => {
+		expect(serializedStateToHtml(doc([nest(10, "quote")]))).toBe(
+			`${"<blockquote>".repeat(10)}<p>deep &lt;b&gt;</p>${"</blockquote>".repeat(10)}`,
+		);
 	});
 });
 

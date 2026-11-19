@@ -70,6 +70,7 @@ import { getBrainstorm } from "../store/runtime";
 import { getYDocResolverApi } from "../store/ydoc-resolver";
 import { AddPropertyTargetKind, addPropertyStore } from "./add-property-store";
 import { copyBlockLink } from "./block-link";
+import { getHostNoteId } from "./host-note";
 import { $createCheckboxFieldNode } from "./nodes/checkbox-field-node";
 import { $createDateFieldNode } from "./nodes/date-field-node";
 import { $createEquationNode } from "./nodes/equation-node";
@@ -78,7 +79,7 @@ import { $createPageRefNode } from "./nodes/page-ref-node";
 import { $createSelectFieldNode } from "./nodes/select-field-node";
 import { $createTableOfContentsNode } from "./nodes/toc-node";
 import { deriveSnippetName, templatesToSnippetOptions } from "./template-snippet";
-import { turnBlocksIntoPage } from "./turn-into-page";
+import { subPageProperties, turnBlocksIntoPage } from "./turn-into-page";
 
 /** The Notes entity type — a child sub-page is just another Note. Keep
  *  in sync with the same constant in mention-node.tsx. */
@@ -464,7 +465,7 @@ const TURN_INTO_PAGE_ACTION: BlockCommand = {
 	description: t("notes.action.turnIntoPage.description"),
 	icon: <TurnIntoPageIcon />,
 	keywords: ["page", "subpage", "sub-page", "turn", "convert", "extract", "move"],
-	run: ({ editor, blockKeys }) => runTurnIntoPage(editor, blockKeys),
+	run: ({ editor, blockKeys, documentId }) => runTurnIntoPage(editor, blockKeys, documentId),
 };
 
 const sharedActions = createStandardBlockActions(editorT);
@@ -646,6 +647,7 @@ function firstBlockText(editor: LexicalEditor, blockKeys: ReadonlySet<NodeKey>):
 async function runTurnIntoPage(
 	editor: LexicalEditor,
 	blockKeys: ReadonlySet<NodeKey> | undefined,
+	documentId: string | undefined,
 ): Promise<void> {
 	if (!blockKeys || blockKeys.size === 0 || !editor.isEditable()) return;
 	const entities = getBrainstorm()?.services.entities;
@@ -663,10 +665,16 @@ async function runTurnIntoPage(
 			whenLoaded: resolver.whenLoaded,
 			plant: plantSerializedStateIntoDoc,
 			newId: newNoteId,
+			...parentIdOf(editor, documentId),
 		});
 	} catch (error) {
 		console.warn("[notes/turn-into-page] failed — the document is unchanged:", error);
 	}
+}
+
+function parentIdOf(editor: LexicalEditor, documentId: string | undefined): { parentId?: string } {
+	const parentId = documentId ?? getHostNoteId(editor);
+	return parentId ? { parentId } : {};
 }
 
 function insertSubPage(editor: LexicalEditor): void {
@@ -719,7 +727,7 @@ function insertSubPage(editor: LexicalEditor): void {
 	// default it to a fresh `Date.now()` on every list parse → churn).
 	const now = Date.now();
 	void entities
-		.create(NOTE_ENTITY_TYPE, { title, createdAt: now, updatedAt: now }, id)
+		.create(NOTE_ENTITY_TYPE, subPageProperties(title, now, getHostNoteId(editor)), id)
 		.catch((error) => {
 			console.warn("[notes/subpage] entities.create failed:", error);
 			// The page-ref was inserted synchronously but its target was never

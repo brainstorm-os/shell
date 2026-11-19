@@ -34,6 +34,8 @@ export type SiteFile = {
 
 export type SiteLinkResolvers = {
 	resolveEntityHref(entityId: string): string | null;
+	/** The published page's current title, or `null` outside the set. */
+	resolveEntityLabel(entityId: string): string | null;
 	resolveAssetSrc(assetId: string): string | null;
 };
 
@@ -90,19 +92,19 @@ function assetIdFromSrc(src: unknown): string | null {
 	return ASSET_ID.test(id) ? id : null;
 }
 
-function walkAssetIds(node: SiteNode, into: Set<string>): void {
-	const id = assetIdFromSrc(node.src);
-	if (id) into.add(id);
-	if (Array.isArray(node.children)) {
-		for (const child of node.children as SiteNode[]) walkAssetIds(child, into);
-	}
-}
-
 /** The vault assets a body shows, in first-seen order — what a caller should
  *  fetch for a page it is about to publish, and nothing more. */
 export function collectAssetIds(state: SiteBodyState | null): string[] {
 	const ids = new Set<string>();
-	if (state?.root) walkAssetIds(state.root, ids);
+	const pending: SiteNode[] = state?.root ? [state.root] : [];
+	for (let node = pending.pop(); node; node = pending.pop()) {
+		const id = assetIdFromSrc(node.src);
+		if (id) ids.add(id);
+		const children = Array.isArray(node.children) ? (node.children as SiteNode[]) : [];
+		for (let index = children.length - 1; index >= 0; index -= 1) {
+			pending.push(children[index] as SiteNode);
+		}
+	}
 	return [...ids];
 }
 
@@ -152,12 +154,14 @@ export function assembleSite(input: AssembleSiteInput): { files: SiteFile[] } {
 	if (!seen.has(input.homeId)) throw new Error("site-export: the home page is not in the site");
 
 	const paths = planPagePaths(pages, input.homeId);
+	const titles = new Map(pages.map((page) => [page.id, page.title]));
 	const siteTitle = input.siteTitle.trim() || input.labels.untitled;
 
 	const assetPaths = new Map<string, string>();
 	const assetFiles: SiteFile[] = [];
 	const links: SiteLinkResolvers = {
 		resolveEntityHref: (entityId) => paths.get(entityId) ?? null,
+		resolveEntityLabel: (entityId) => titles.get(entityId) ?? null,
 		resolveAssetSrc: (assetId) => {
 			const known = assetPaths.get(assetId);
 			if (known) return known;

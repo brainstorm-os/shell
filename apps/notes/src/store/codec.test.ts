@@ -95,3 +95,15 @@ describe("codec body↔bodyLegacy conflict resolution", () => {
 		}
 	});
 });
+
+describe("codec parent page (IE-12 site membership)", () => {
+	it("reads the page a sub-page was created under", () => {
+		expect(parseStoredNote({ ...base, parentPageId: "n_parent" })?.parentPageId).toBe("n_parent");
+	});
+
+	it("ignores an absent, empty or non-string parent", () => {
+		for (const parentPageId of [undefined, "", 7, null, { id: "n_parent" }]) {
+			expect(parseStoredNote({ ...base, parentPageId })?.parentPageId).toBeUndefined();
+		}
+	});
+});

@@ -6,10 +6,53 @@
  */
 
 const TOKEN_NAME = /^--[a-z0-9]+(-[a-z0-9]+)*$/;
-/** A value that could end the declaration, open a rule, or reach outside the
- *  site (`url(…)`, an escape that spells one). */
-// biome-ignore lint/suspicious/noControlCharactersInRegex: rejecting controls is the point
-const UNSAFE_TOKEN_VALUE = /[;{}<>\\@\u0000-\u001f]|url\s*\(|expression\s*\(|\/\*/i;
+/** The characters a colour or a length is written with. No quote, colon,
+ *  semicolon, brace, backslash or `@`: nothing that can end the declaration,
+ *  spell a URL, or escape its way to one. */
+const TOKEN_VALUE_CHARS = /^[A-Za-z0-9#%.,()/+*\s-]+$/;
+const FUNCTION_NAME = /([A-Za-z-][A-Za-z0-9-]*)\(/g;
+/** Colour and arithmetic forms only — none of them can name a resource. */
+const ALLOWED_FUNCTIONS: ReadonlySet<string> = new Set([
+	"rgb",
+	"rgba",
+	"hsl",
+	"hsla",
+	"hwb",
+	"lab",
+	"lch",
+	"oklab",
+	"oklch",
+	"color",
+	"color-mix",
+	"var",
+	"calc",
+	"min",
+	"max",
+	"clamp",
+]);
+
+function parenthesesBalance(value: string): boolean {
+	let open = 0;
+	for (const char of value) {
+		if (char === "(") open += 1;
+		if (char === ")") open -= 1;
+		if (open < 0) return false;
+	}
+	return open === 0;
+}
+
+/** True for a plain colour / length value: allow-listed characters and
+ *  functions, balanced parentheses, no `//` and no comment opener. */
+export function isSafeTokenValue(value: string): boolean {
+	const trimmed = value.trim();
+	if (trimmed.length === 0 || !TOKEN_VALUE_CHARS.test(trimmed)) return false;
+	if (trimmed.includes("//") || trimmed.includes("/*")) return false;
+	if (!parenthesesBalance(trimmed)) return false;
+	const withoutNames = trimmed.replace(FUNCTION_NAME, (_match, name: string) =>
+		ALLOWED_FUNCTIONS.has(name.toLowerCase()) ? "" : "(",
+	);
+	return !withoutNames.includes("(");
+}
 
 const BASE_CSS = `*, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -49,7 +92,7 @@ hr { border: 0; border-top: 1px solid var(--color-border-subtle, #e5e5e5); margi
 
 export function themeToCss(tokens: Readonly<Record<string, string>>): string {
 	const lines = Object.entries(tokens)
-		.filter(([name, value]) => TOKEN_NAME.test(name) && !UNSAFE_TOKEN_VALUE.test(value))
+		.filter(([name, value]) => TOKEN_NAME.test(name) && isSafeTokenValue(value))
 		.map(([name, value]) => `\t${name}: ${value.trim()};`);
 	return `:root {\n${lines.join("\n")}\n}\n${BASE_CSS}`;
 }

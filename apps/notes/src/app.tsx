@@ -930,9 +930,21 @@ export function NotesApp() {
 			title: headerTitle,
 			files,
 			transport: entities,
+			// Membership reads the LIVE notes map at publish time: a page deleted
+			// since the menu opened is left out, and a sub-page counts only by
+			// the parent its own record names.
 			getPage: (id) => {
 				const page = notesRef.current.get(id);
-				return page ? { title: page.title } : null;
+				return page ? { title: page.title, parentId: page.parentPageId ?? null } : null;
+			},
+			pageAccess: async (id) => {
+				const sharing = runtime?.services.sharing;
+				if (!sharing) return null;
+				const writers = (await sharing.access(id))
+					.filter((member) => member.active)
+					.map((member) => member.pubkey)
+					.sort();
+				return { scope: writers.join(","), solo: writers.length <= 1 };
 			},
 			fetchAsset: fetchVaultAsset,
 			readTokens: () => readThemeTokens(document.documentElement.style),
@@ -943,6 +955,11 @@ export function NotesApp() {
 				pages: t("notes.publish.pages"),
 				untitled: t("notes.list.untitled"),
 				unpublished: t("notes.publish.unpublished"),
+				confirmTitle: t("notes.publish.confirmTitle", { title: headerTitle }),
+				subPagesLegend: t("notes.publish.subPagesLegend"),
+				formatLegend: t("notes.export.formatLegend"),
+				confirmAction: t("notes.publish.confirmAction"),
+				cancel: t("notes.export.cancel"),
 			},
 			onResult: (disposition, stats) => {
 				if (disposition.kind === SaveDispositionKind.Failed) {
@@ -952,6 +969,7 @@ export function NotesApp() {
 					saved: (count, file) => tCount("notes.publish.saved", count, { file }),
 					pagesTruncated: (count) => t("notes.publish.pagesTruncated", { count }),
 					imagesSkipped: (count, limit) => tCount("notes.publish.imagesSkipped", count, { limit }),
+					imagesWithheld: (count) => tCount("notes.publish.imagesWithheld", count),
 					failed: t("notes.publish.failed"),
 				});
 				if (!report) return;

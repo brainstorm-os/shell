@@ -12,7 +12,10 @@ import {
 	MAX_SITE_ASSET_BYTES,
 	type SiteArchive,
 	type SiteArchiveInput,
+	type SitePlan,
+	type SitePlanInput,
 	buildSiteArchive,
+	planSite,
 } from "@brainstorm-os/editor";
 import {
 	type SaveDisposition,
@@ -21,6 +24,7 @@ import {
 	requestSaveBytes,
 	suggestedFilename,
 } from "@brainstorm-os/sdk/export-file";
+import { ExportOptionKind, openExportPopover } from "@brainstorm-os/sdk/export-popover";
 import { IconName } from "@brainstorm-os/sdk/icon";
 import type { ObjectMenuExtraItem } from "@brainstorm-os/sdk/object-menu";
 import type { SiteAsset } from "@brainstorm-os/sdk/site-export";
@@ -28,6 +32,8 @@ import type { SiteAsset } from "@brainstorm-os/sdk/site-export";
 const SITE_ARCHIVE_EXTENSION = "zip";
 const PUBLISHED_TOKEN_NAME = /^--(color|space|radius)-/;
 const BYTES_PER_MEGABYTE = 1024 * 1024;
+const SUB_PAGES_OPTION_ID = "sub-pages";
+const CONFIRM_POPOVER_TEST_ID = "notes-publish-site";
 
 /** Values are the shell notification kinds, so a report posts as-is. */
 export const SiteExportTone = {
@@ -45,12 +51,16 @@ export type SiteExportReport = {
 	detail?: string;
 };
 
-export type SiteExportStats = Pick<SiteArchive, "pageCount" | "truncated" | "skippedAssets">;
+export type SiteExportStats = Pick<
+	SiteArchive,
+	"pageCount" | "truncated" | "skippedAssets" | "withheldAssets"
+>;
 
 export type SiteExportReportLabels = {
 	saved: (pageCount: number, file: string) => string;
 	pagesTruncated: (pageCount: number) => string;
 	imagesSkipped: (count: number, limitMegabytes: number) => string;
+	imagesWithheld: (count: number) => string;
 	failed: string;
 };
 
@@ -67,14 +77,24 @@ export type SiteExportLabels = {
 	untitled: string;
 	/** Stands in for a reference to a page outside the site. */
 	unpublished: string;
+	/** Title of the confirmation popover; names the page being published. */
+	confirmTitle: string;
+	/** Legend over the list of sub-pages to include. */
+	subPagesLegend: string;
+	/** Legend over the (single) output format. */
+	formatLegend: string;
+	/** The confirmation's primary button. */
+	confirmAction: string;
+	cancel: string;
 };
 
 export type SiteExportInput = {
 	rootId: string;
 	title: string;
 	files: SaveFileService;
-	getPage: SiteArchiveInput["getPage"];
-	transport: SiteArchiveInput["transport"];
+	getPage: SitePlanInput["getPage"];
+	pageAccess: SitePlanInput["pageAccess"];
+	transport: SitePlanInput["transport"];
 	fetchAsset: SiteArchiveInput["fetchAsset"];
 	/** The current theme's flattened design tokens, read at publish time. */
 	readTokens: () => Record<string, string>;
@@ -99,6 +119,7 @@ export function siteExportReport(
 		...(stats.skippedAssets > 0
 			? [labels.imagesSkipped(stats.skippedAssets, MAX_SITE_ASSET_BYTES / BYTES_PER_MEGABYTE)]
 			: []),
+		...(stats.withheldAssets > 0 ? [labels.imagesWithheld(stats.withheldAssets)] : []),
 	];
 	const title = labels.saved(stats.pageCount, disposition.handle.displayName);
 	if (omissions.length === 0) return { tone: SiteExportTone.Success, title };
@@ -127,7 +148,11 @@ export async function fetchVaultAsset(assetId: string): Promise<SiteAsset | null
 	return bytes.length > 0 && mime.length > 0 ? { bytes, mime } : null;
 }
 
-export async function runSiteExport(input: SiteExportInput): Promise<void> {
+async function saveSite(
+	input: SiteExportInput,
+	plan: SitePlan,
+	confirmedIds: readonly string[],
+): Promise<void> {
 	let stats: SiteExportStats | null = null;
 	const disposition = await requestSaveBytes(input.files, {
 		title: input.labels.dialogTitle,
@@ -135,9 +160,8 @@ export async function runSiteExport(input: SiteExportInput): Promise<void> {
 		filters: [{ name: input.labels.filterName, extensions: [SITE_ARCHIVE_EXTENSION] }],
 		encode: async () => {
 			const archive = await buildSiteArchive({
-				rootId: input.rootId,
-				getPage: input.getPage,
-				transport: input.transport,
+				plan,
+				confirmedIds,
 				fetchAsset: input.fetchAsset,
 				tokens: input.readTokens(),
 				labels: {
@@ -153,13 +177,69 @@ export async function runSiteExport(input: SiteExportInput): Promise<void> {
 	input.onResult?.(disposition, stats);
 }
 
+/** Work out which pages belong to the site, show that exact list, and only
+ *  on confirmation ask where to save. Nothing is published that the user did
+ *  not see ticked. */
+export async function openSiteExport(input: SiteExportInput): Promise<void> {
+	let plan: SitePlan;
+	try {
+		plan = await planSite({
+			rootId: input.rootId,
+			getPage: input.getPage,
+			pageAccess: input.pageAccess,
+			transport: input.transport,
+		});
+	} catch (error) {
+		input.onResult?.({ kind: SaveDispositionKind.Failed, error }, null);
+		return;
+	}
+	const subPages = plan.pages.filter((page) => page.id !== plan.rootId);
+	openExportPopover({
+		testId: CONFIRM_POPOVER_TEST_ID,
+		spec: {
+			formats: [
+				{
+					id: SITE_ARCHIVE_EXTENSION,
+					label: input.labels.filterName,
+					...(subPages.length > 0
+						? {
+								options: [
+									{
+										kind: ExportOptionKind.Checklist,
+										id: SUB_PAGES_OPTION_ID,
+										label: input.labels.subPagesLegend,
+										choices: subPages.map((page) => ({
+											value: page.id,
+											label: page.title.trim() || input.labels.untitled,
+										})),
+										default: subPages.map((page) => page.id),
+									},
+								],
+							}
+						: {}),
+				},
+			],
+		},
+		labels: {
+			title: input.labels.confirmTitle,
+			formatLegend: input.labels.formatLegend,
+			exportAction: input.labels.confirmAction,
+			cancel: input.labels.cancel,
+		},
+		onExport: ({ values }) => {
+			const ticked = values[SUB_PAGES_OPTION_ID];
+			return saveSite(input, plan, Array.isArray(ticked) ? ticked : []);
+		},
+	});
+}
+
 export function buildSiteExportItems(input: SiteExportInput): ObjectMenuExtraItem[] {
 	return [
 		{
 			id: "publish-website",
 			label: input.labels.action,
 			icon: IconName.OpenExternal,
-			run: () => void runSiteExport(input),
+			run: () => void openSiteExport(input),
 		},
 	];
 }

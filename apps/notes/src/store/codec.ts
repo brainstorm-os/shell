@@ -56,6 +56,10 @@ export function parseStoredNote(value: unknown): StoredNote | null {
 	const bodyRefs = coerceNoteReferences((raw as { bodyRefs?: unknown }).bodyRefs);
 	if (bodyRefs) note.bodyRefs = bodyRefs;
 	if ((raw as { locked?: unknown }).locked === true) note.locked = true;
+	const parentPageId = (raw as { parentPageId?: unknown }).parentPageId;
+	if (typeof parentPageId === "string" && parentPageId.length > 0) {
+		note.parentPageId = parentPageId;
+	}
 	return note;
 }
 
