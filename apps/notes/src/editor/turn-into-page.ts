@@ -53,7 +53,19 @@ export type TurnIntoPageDeps = {
 	plant: (doc: Doc, state: SerializedEditorState) => void;
 	newId: () => string;
 	now?: () => number;
+	/** The note the blocks are leaving — recorded on the new page as its parent. */
+	parentId?: string;
 };
+
+/** A new sub-page's first properties. The parent is written on the sub-page's
+ *  own record, never inferred from the link left behind in the parent. */
+export function subPageProperties(
+	title: string,
+	now: number,
+	parentId: string | undefined,
+): Record<string, unknown> {
+	return { title, createdAt: now, updatedAt: now, ...(parentId ? { parentPageId: parentId } : {}) };
+}
 
 export type PageSnapshot = {
 	/** Selected blocks, document order (a list item stays a list item). */
@@ -189,7 +201,7 @@ export async function turnBlocksIntoPage(
 	if (!snapshot) return null;
 	const id = deps.newId();
 	const now = (deps.now ?? Date.now)();
-	await deps.create(PAGE_ENTITY_TYPE, { title: snapshot.title, createdAt: now, updatedAt: now }, id);
+	await deps.create(PAGE_ENTITY_TYPE, subPageProperties(snapshot.title, now, deps.parentId), id);
 	await plantPage(id, snapshot, deps);
 	if (!replaceBlocksWithPageRef(editor, snapshot, id)) {
 		console.warn("[notes/turn-into-page] blocks changed while the page was written — kept both.");

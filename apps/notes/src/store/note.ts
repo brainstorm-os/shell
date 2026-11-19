@@ -48,6 +48,12 @@ export type StoredNote = {
 	 *  gates the in-app editor surface, it is not an access-control boundary
 	 *  (any collaborator can toggle it). Absent / `false` reads as unlocked. */
 	locked?: boolean;
+	/** The page this one was created under as a sub-page
+	 *  (`properties.parentPageId`). Written once, on the sub-page's OWN record,
+	 *  when it is created — so it cannot be forged by editing the parent's body.
+	 *  Website publishing (IE-12) admits a sub-page only when this agrees with
+	 *  the parent's `page-ref`. Absent on pages created before it existed. */
+	parentPageId?: string;
 	createdAt: number;
 	updatedAt: number;
 };
