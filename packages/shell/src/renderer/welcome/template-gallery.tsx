@@ -46,7 +46,7 @@ export function TemplateGallery({
 			<h2 className="welcome__templates-heading" id="welcome-templates-heading">
 				{t("shell.welcome.templates.heading")}
 			</h2>
-			<p className="welcome__hint welcome__hint--sub">{t("shell.welcome.templates.hint")}</p>
+			<p className="welcome__hint">{t("shell.welcome.templates.hint")}</p>
 			<ul className="welcome__templates-grid" data-testid="welcome-templates">
 				{templates.map((template) => {
 					const selected = template.id === selectedId;

@@ -3311,6 +3311,23 @@ void app.whenReady().then(async () => {
 	// well-formed pair. Scoped to the fresh-vault open (the same
 	// `ensureRootFolder().created` signal as the welcome seed) so an existing
 	// vault's chosen appearance is never overwritten.
+	// A vault this build just created has no earlier version to compare
+	// against, so "What's new" has nothing to say to it. Without the stamp the
+	// popover read the missing marker as "every release unseen" and a first-time
+	// user's first sight of their dashboard was the full release history.
+	const stampChangelogSeenOnFreshVault = async (): Promise<void> => {
+		const session = getActiveVaultSession();
+		if (!session) return;
+		try {
+			const { loadBundledChangelog } = await import("./ipc/help-handlers");
+			const newest = loadBundledChangelog().releases[0];
+			if (!newest) return;
+			(await session.dashboardStore()).setLastSeenChangelogVersion(newest.version);
+		} catch (error) {
+			console.warn(`[brainstorm] changelog stamp failed: ${(error as Error).message}`);
+		}
+	};
+
 	const seedNewVaultDefaults = async (): Promise<void> => {
 		const session = getActiveVaultSession();
 		if (!session) return;
@@ -3614,6 +3631,7 @@ void app.whenReady().then(async () => {
 		}
 		const freshVault = await ensureRootFolder();
 		if (freshVault) {
+			await stampChangelogSeenOnFreshVault();
 			await seedWelcomeOnFreshVault();
 			await seedNewVaultDefaults();
 			// The welcome seed creates entities through the privileged in-process

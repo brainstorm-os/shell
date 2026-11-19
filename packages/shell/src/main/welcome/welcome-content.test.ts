@@ -16,6 +16,21 @@ describe("buildWelcomeStarterSet", () => {
 		expect(buildWelcomeStarterSet(NOW)).toEqual(buildWelcomeStarterSet(NOW));
 	});
 
+	it("gives the journal entry the snippet and word count its preview reads", () => {
+		const journal = buildWelcomeStarterSet(NOW).find(
+			(e) => e.type === WelcomeEntityType.JournalEntry,
+		);
+		expect(journal?.properties.body).toBe(
+			"Your first journal entry. Today you opened Brainstorm for the first time. A good first step: Take the product tour.",
+		);
+		expect(journal?.properties.wordCount).toBe(20);
+	});
+
+	it("points the starter bookmark at the project's own docs site", () => {
+		const bookmark = buildWelcomeStarterSet(NOW).find((e) => e.type === WelcomeEntityType.Bookmark);
+		expect(bookmark?.properties.url).toBe("https://docs.getbrainstorm.online");
+	});
+
 	it("seed version is a positive integer", () => {
 		expect(Number.isInteger(WELCOME_SEED_VERSION)).toBe(true);
 		expect(WELCOME_SEED_VERSION).toBeGreaterThan(0);

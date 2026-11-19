@@ -132,7 +132,7 @@
   "brainstorm.files.empty.body": "Drag files in, or create a folder to get started.",
   "brainstorm.files.empty.newFolder": "New folder",
   "brainstorm.files.empty.searchTitle": "No matches",
-  "brainstorm.files.empty.searchBody": "No entities in this scope match {query}.",
+  "brainstorm.files.empty.searchBody": "Nothing in this scope matches {query}.",
   "brainstorm.files.inspector.tabsRegion": "Inspector tabs",
   "brainstorm.files.inspector.tabPreview": "Preview",
   "brainstorm.files.inspector.tabProperties": "Properties",

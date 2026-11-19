@@ -132,7 +132,7 @@
   "brainstorm.files.empty.body": "Arrastre archivos aquí o cree una carpeta para empezar.",
   "brainstorm.files.empty.newFolder": "Nueva carpeta",
   "brainstorm.files.empty.searchTitle": "Sin coincidencias",
-  "brainstorm.files.empty.searchBody": "Ninguna entidad en este ámbito coincide con {query}.",
+  "brainstorm.files.empty.searchBody": "Ningún objeto en este ámbito coincide con {query}.",
   "brainstorm.files.inspector.tabsRegion": "Pestañas del inspector",
   "brainstorm.files.inspector.tabPreview": "Vista previa",
   "brainstorm.files.inspector.tabProperties": "Propiedades",

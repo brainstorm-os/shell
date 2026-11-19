@@ -14,6 +14,8 @@
   "channel.empty.blurb": "Sag Hallo, um das Gespräch in #{name} zu beginnen.",
   "channel.none.title": "Wähle einen Kanal",
   "channel.none.blurb": "Wähle links einen Kanal oder erstelle einen, um zu chatten.",
+  "channel.first.title": "Erstelle deinen ersten Kanal",
+  "channel.first.blurb": "Ein Kanal hält ein Gespräch an einem Ort. Erstelle einen, um zu chatten.",
   "composer.placeholder": "Nachricht an #{name}…",
   "composer.send": "Senden",
   "composer.attach.button": "Kontext hinzufügen",

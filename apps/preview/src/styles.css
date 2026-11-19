@@ -86,7 +86,7 @@ button {
 	min-height: 0;
 	display: flex;
 	flex-direction: column;
-	background: var(--bg-elev);
+	background: var(--bg);
 	border-right: var(--border-width) solid var(--color-border-subtle);
 	overflow: hidden;
 }

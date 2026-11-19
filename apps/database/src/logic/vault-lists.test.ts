@@ -272,7 +272,7 @@ describe("buildVaultLists", () => {
 			links: [],
 		};
 		const { lists } = buildVaultLists(one, NOW);
-		expect(lists[0]?.description).toBe("1 item · brainstorm/Doc/v1");
+		expect(lists[0]?.description).toBe("1 item");
 	});
 });
 
@@ -374,7 +374,7 @@ describe("curated People list (9.12.13(b))", () => {
 			(l) => l.source?.kind === ListSourceKind.ByType && l.source.types[0] === "brainstorm/Person/v1",
 		);
 		expect(people?.name).toBe("People");
-		expect(people?.description).toBe("2 contacts · brainstorm/Person/v1");
+		expect(people?.description).toBe("2 contacts");
 		expect(people?.views).toHaveLength(3);
 		expect(people?.defaultViewId).toBe(people?.views[0]);
 
@@ -439,7 +439,7 @@ describe("curated Tasks list (9.14.4)", () => {
 			(l) => l.source?.kind === ListSourceKind.ByType && l.source.types[0] === "brainstorm/Task/v1",
 		);
 		expect(tasks?.name).toBe("Tasks");
-		expect(tasks?.description).toBe("2 tasks · brainstorm/Task/v1");
+		expect(tasks?.description).toBe("2 tasks");
 		expect(tasks?.views).toHaveLength(3);
 		expect(tasks?.defaultViewId).toBe(tasks?.views[0]);
 
@@ -499,6 +499,6 @@ describe("curated Tasks list (9.14.4)", () => {
 			links: [],
 		};
 		const tasks = buildVaultLists(one, NOW).lists[0];
-		expect(tasks?.description).toBe("1 task · brainstorm/Task/v1");
+		expect(tasks?.description).toBe("1 task");
 	});
 });

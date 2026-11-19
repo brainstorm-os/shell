@@ -932,8 +932,8 @@ export function ChatApp(): ReactElement {
 						<div className="chat__placeholder" data-testid="no-channel">
 							<EmptyState
 								icon={IconName.Chat}
-								title={t("channel.none.title")}
-								hint={t("channel.none.blurb")}
+								title={t(channels.length === 0 ? "channel.first.title" : "channel.none.title")}
+								hint={t(channels.length === 0 ? "channel.first.blurb" : "channel.none.blurb")}
 								action={
 									<button
 										type="button"

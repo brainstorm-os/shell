@@ -117,6 +117,19 @@ function submit(): void {
 }
 
 describe("Welcome — template gallery", () => {
+	it("drops the brand hero on the Start step so the actions stay above the fold", async () => {
+		await act(async () => {
+			root.render(<Welcome />);
+		});
+		await flush();
+		expect(host.querySelector(".welcome__brand")).not.toBeNull();
+		act(() => root.unmount());
+		root = createRoot(host);
+		await enterCreateMode();
+		expect(host.querySelector(".welcome__brand")).toBeNull();
+		expect(host.querySelector(".welcome__step-title")).not.toBeNull();
+	});
+
 	it("renders a card per template once the list loads", async () => {
 		await enterCreateMode();
 		expect(host.querySelector('[data-testid="welcome-templates"]')).not.toBeNull();
