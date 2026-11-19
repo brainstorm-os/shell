@@ -65,7 +65,7 @@ import {
 } from "./logic/book-open";
 import { makePositionPersister, removeBookEntity, writeBookPatch } from "./logic/book-writes";
 import { parseEpub } from "./logic/epub-parser";
-import { booksFromEntities } from "./logic/library";
+import { type LiveProgress, booksFromEntities, withLiveProgress } from "./logic/library";
 import { type PdfInfo, pdfEnrichmentPatch } from "./logic/pdf-metadata";
 import { SAMPLE_BOOK_CONTENT, sampleBook } from "./logic/sample-book";
 import { type TocEntry, tocFromContent, tocFromPdfOutline } from "./logic/toc";
@@ -283,6 +283,7 @@ export function BooksApp(): ReactElement {
 	const [openNonce, setOpenNonce] = useState(0);
 	const [status, setStatus] = useState<ReaderStatus>(ReaderStatus.Idle);
 	const [toc, setToc] = useState<readonly TocEntry[]>([]);
+	const [liveProgress, setLiveProgress] = useState<LiveProgress | null>(null);
 	const [showLibrary, setShowLibrary] = useState(true);
 	const libraryAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !showLibrary });
 	const [showInspector, setShowInspector] = useState(readInspectorPref);
@@ -380,10 +381,13 @@ export function BooksApp(): ReactElement {
 	);
 
 	const isSample = selectedId === SAMPLE_BOOK_ID;
+	const shelf = useMemo(() => withLiveProgress(books, liveProgress), [books, liveProgress]);
 	const selectedBook = useMemo(() => {
-		if (isSample) return sample.current;
-		return selectedId ? (books.find((b) => b.id === selectedId) ?? null) : null;
-	}, [isSample, selectedId, books]);
+		if (isSample) {
+			return sample.current ? (withLiveProgress([sample.current], liveProgress)[0] ?? null) : null;
+		}
+		return selectedId ? (shelf.find((b) => b.id === selectedId) ?? null) : null;
+	}, [isSample, selectedId, shelf, liveProgress]);
 	// PRES-3 — who's-here on the open book (vault rows only; not the sample).
 	const bookPeers = usePresence(
 		isSample ? null : (selectedBook?.id ?? null),
@@ -461,6 +465,7 @@ export function BooksApp(): ReactElement {
 		if (!stage || !controls) return undefined;
 
 		setToc([]);
+		setLiveProgress(null);
 
 		if (selectedId === null) {
 			stage.replaceChildren();
@@ -468,9 +473,14 @@ export function BooksApp(): ReactElement {
 			return undefined;
 		}
 
+		const reportProgress = (progress: number): void => {
+			if (seq === openSeqRef.current) setLiveProgress({ bookId: selectedId, progress });
+		};
+
 		if (selectedId === SAMPLE_BOOK_ID) {
 			const handle = mountReader(stage, controls, SAMPLE_BOOK_CONTENT, {
 				bookId: SAMPLE_BOOK_ID,
+				onProgressChange: reportProgress,
 			});
 			readerRef.current = { dispose: handle.dispose, goTo: handle.goTo };
 			setToc(tocFromContent(SAMPLE_BOOK_CONTENT));
@@ -522,6 +532,7 @@ export function BooksApp(): ReactElement {
 						bookId: book.id,
 						initialPosition: book.reading.position,
 						onPositionChange: persist,
+						onProgressChange: reportProgress,
 					});
 					readerRef.current = { dispose: handle.dispose, goTo: handle.goTo };
 					setToc(tocFromContent(content));
@@ -543,6 +554,7 @@ export function BooksApp(): ReactElement {
 				const handle = mountPdfReader(stage, controls, title, port, {
 					initialPosition: book.reading.position,
 					onPositionChange: persist,
+					onProgressChange: reportProgress,
 					onOpenLink: (url) => {
 						// Route page links through the `open` intent so web URLs land
 						// in the browser app (the registered `https` opener) — Books
@@ -880,7 +892,7 @@ export function BooksApp(): ReactElement {
 				data-inspector-open={selectedBook && subject && showInspector ? "true" : "false"}
 			>
 				<LibraryPanel
-					books={books}
+					books={shelf}
 					selectedId={selectedId}
 					open={libraryAutoHide.visible}
 					autoHide={libraryAutoHide.panelProps}

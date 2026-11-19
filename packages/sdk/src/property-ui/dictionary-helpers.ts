@@ -106,10 +106,13 @@ export function chipColours(source: DictionaryItem | string | undefined): {
 	// is the interpolation boundary; a bad accent must never reach
 	// `color-mix(...)` (CSS-injection / `url(...)` exfil surface).
 	if (!accent || !HEX.test(accent)) {
+		// Not the raised surface: on a light page that is a white pill on a
+		// near-white row, and an uncoloured value read as plain text with stray
+		// padding. A tint of the text colour holds on every theme.
 		return {
-			background: "var(--bg-elev)",
+			background: "color-mix(in srgb, var(--text-dim) 14%, var(--bg))",
 			foreground: "var(--text)",
-			border: "var(--border)",
+			border: "var(--border-strong)",
 		};
 	}
 	return {

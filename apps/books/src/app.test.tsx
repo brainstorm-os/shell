@@ -182,6 +182,23 @@ describe("BooksApp shelf", () => {
 		expect(el.querySelector(".books__page")?.textContent).toContain("Anchor");
 	});
 
+	// The inspector read the stored fraction as a bare number ("45") while the
+	// footer showed the live one ("23% read"); both now come from the reader.
+	it("shows the reader's live progress in the inspector, as a percentage", async () => {
+		const el = await renderApp();
+		const footer = /(\d+)%/.exec(el.querySelector(".books__progress")?.textContent ?? "")?.[1];
+		expect(footer).toBeDefined();
+		expect(Number(footer)).toBeGreaterThan(0);
+		expect(el.querySelector(".bs-cell-progress-text")?.textContent).toBe(`${footer}%`);
+	});
+
+	it("carries no Pages row for a reflowable book — the footer owns the page count", async () => {
+		const el = await renderApp();
+		const labels = [...el.querySelectorAll(".bs-props__row-label")].map((n) => n.textContent);
+		expect(labels).toContain("Progress");
+		expect(labels).not.toContain("Pages");
+	});
+
 	// F-487 — the shared `.bs-props` inspector is `position: fixed`, so it
 	// takes no layout space. Books centres a full-bleed reading measure under
 	// it, so with the panel open every line ran on underneath: paragraphs read

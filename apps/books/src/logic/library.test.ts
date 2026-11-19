@@ -11,6 +11,7 @@ import {
 	filterLibrary,
 	isInProgress,
 	sortLibrary,
+	withLiveProgress,
 } from "./library";
 
 const SECTION_LABELS: LibrarySectionLabels = {
@@ -183,5 +184,24 @@ describe("booksFromEntities", () => {
 		expect(books.map((b) => b.id)).toEqual(["b1"]);
 		expect(books[0]?.name).toBe("Deep Work");
 		expect(books[0]?.format).toBe(BookFormat.Pdf);
+	});
+});
+
+// The footer measures progress against the LIVE pagination; the stored
+// fraction was measured against whatever viewport last turned a page. Shown
+// side by side they disagreed ("45%" in the row, "23% read" in the footer).
+describe("withLiveProgress", () => {
+	const shelf = [reading("a", "A", 0.45, 10), reading("b", "B", 0.8, 20)];
+
+	it("shows the open book at the reader's live progress", () => {
+		const out = withLiveProgress(shelf, { bookId: "a", progress: 0.23 });
+		expect(out.map((b) => b.reading.progress)).toEqual([0.23, 0.8]);
+		expect(out[0]?.reading.lastReadAt).toBe(10);
+	});
+
+	it("returns the same list when nothing is live or nothing differs", () => {
+		expect(withLiveProgress(shelf, null)).toBe(shelf);
+		expect(withLiveProgress(shelf, { bookId: "a", progress: 0.45 })).toBe(shelf);
+		expect(withLiveProgress(shelf, { bookId: "zzz", progress: 0.1 })).toBe(shelf);
 	});
 });

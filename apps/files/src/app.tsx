@@ -59,7 +59,7 @@ import { hasActiveFilters } from "./logic/filters";
 import { buildPreviewSiblings } from "./logic/preview-siblings";
 import { ScopeFlipAction, SearchScope, flipScope } from "./logic/search";
 import type { SmartFolder } from "./logic/smart-folders";
-import { SortDirection, SortKey } from "./logic/sort";
+import { SortKey } from "./logic/sort";
 import { ActionId, chordFor } from "./shortcuts";
 import { type FilesStore, useFilesStore } from "./store/use-files-store";
 import { type Entity, FILE_TYPE, FOLDER_TYPE, readName } from "./types/entity";
@@ -765,11 +765,7 @@ export function FilesApp() {
 								<span className="bs-select__value toolbar__sort-label">
 									{t("brainstorm.files.sort.label")}: {sortLabel(store.sortKey)}
 								</span>
-								<Icon
-									name={store.sortDirection === SortDirection.Asc ? IconName.CaretUp : IconName.CaretDown}
-									size={12}
-									className="bs-select__caret"
-								/>
+								<Icon name={IconName.CaretDown} size={12} className="bs-select__caret" />
 							</button>
 							<SelectMenu<ViewMode>
 								className="view-switch"

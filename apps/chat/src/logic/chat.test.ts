@@ -6,7 +6,7 @@ import {
 	RosterRole,
 	SenderKind,
 } from "@brainstorm-os/sdk-types";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
 	AUTHOR_COLORS,
 	CHANNEL_TYPE,
@@ -187,14 +187,14 @@ describe("groupMessages", () => {
 					ref: "p1",
 					name: "Mira",
 					body: "a",
-					createdAt: "2026-06-20T23:59:00Z",
+					createdAt: new Date(2026, 5, 20, 23, 59, 0).toISOString(),
 					seq: 0,
 				}),
 				message("m2", "c", {
 					ref: "p1",
 					name: "Mira",
 					body: "b",
-					createdAt: "2026-06-21T00:00:30Z",
+					createdAt: new Date(2026, 5, 21, 0, 0, 30).toISOString(),
 					seq: 1,
 				}),
 			],
@@ -204,6 +204,54 @@ describe("groupMessages", () => {
 		expect(groups).toHaveLength(2);
 		expect(groups[0]?.dayKey).toBe("2026-06-20");
 		expect(groups[1]?.dayKey).toBe("2026-06-21");
+	});
+});
+
+describe("day grouping follows the local calendar day", () => {
+	const color = (ref: string) => `color-${ref}`;
+	const savedTz = process.env.TZ;
+	beforeAll(() => {
+		process.env.TZ = "Europe/Berlin";
+	});
+	afterAll(() => {
+		if (savedTz === undefined) Reflect.deleteProperty(process.env, "TZ");
+		else process.env.TZ = savedTz;
+	});
+
+	it("keys a just-after-local-midnight message to the new day", () => {
+		expect(new Date("2026-08-01T22:53:00.000Z").getHours()).toBe(0);
+		expect(dayKey("2026-08-01T20:11:00.000Z")).toBe("2026-08-01");
+		expect(dayKey("2026-08-01T22:53:00.000Z")).toBe("2026-08-02");
+	});
+
+	it("splits a group at local midnight even inside one UTC day", () => {
+		const rows = channelMessages(
+			[
+				message("m1", "c", {
+					ref: "p1",
+					name: "Mira",
+					body: "late",
+					createdAt: "2026-08-01T21:58:00.000Z",
+					seq: 0,
+				}),
+				message("m2", "c", {
+					ref: "p1",
+					name: "Mira",
+					body: "after midnight",
+					createdAt: "2026-08-01T22:01:00.000Z",
+					seq: 1,
+				}),
+			],
+			"c",
+		);
+		expect(groupMessages(rows, color).map((g) => g.dayKey)).toEqual(["2026-08-01", "2026-08-02"]);
+	});
+
+	it("keeps one local day together across a UTC date change", () => {
+		process.env.TZ = "America/Los_Angeles";
+		expect(dayKey("2026-08-01T23:30:00.000Z")).toBe("2026-08-01");
+		expect(dayKey("2026-08-02T00:30:00.000Z")).toBe("2026-08-01");
+		process.env.TZ = "Europe/Berlin";
 	});
 });
 
@@ -316,8 +364,8 @@ describe("initials", () => {
 });
 
 describe("dayKey", () => {
-	it("returns the UTC date portion of an ISO stamp", () => {
-		expect(dayKey("2026-06-20T10:00:00.000Z")).toBe("2026-06-20");
+	it("returns the local calendar date of an ISO stamp", () => {
+		expect(dayKey(new Date(2026, 5, 20, 10, 0, 0).toISOString())).toBe("2026-06-20");
 		expect(dayKey("nope")).toBe("nope");
 	});
 });

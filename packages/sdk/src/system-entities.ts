@@ -98,15 +98,24 @@ function pluralize(word: string): string {
 /** The parsed, title-cased name segment of a type id, or null when the id
  *  yields nothing usable. Drops a trailing `vN` version segment only when
  *  one is actually present (so a version-less `brainstorm/Task` keeps
- *  `Task`, not the `brainstorm` namespace) and normalises `_`/`-` to
- *  spaces. Shared by the singular and pluralised display names. */
+ *  `Task`, not the `brainstorm` namespace), normalises `_`/`-` to spaces
+ *  and splits camel case into sentence-cased words (`MailAccount` →
+ *  `Mail account`); an acronym run keeps its capitals (`PDFFile` →
+ *  `PDF file`, `UserID` → `User ID`). Shared by the singular and pluralised
+ *  display names. */
 function typeNameSegment(typeId: string): string | null {
 	const parts = typeId.split("/").filter((p) => p.length > 0);
 	const last = parts[parts.length - 1];
 	const hasVersion = last !== undefined && /^v\d+$/i.test(last);
 	let name = hasVersion ? parts[parts.length - 2] : last;
 	if (!name) return null;
-	name = name.replace(/[_-]+/g, " ").trim();
+	name = name
+		.replace(/[_-]+/g, " ")
+		.replace(/(?<=[a-z0-9])[A-Z]/g, (ch, at: number, all: string) =>
+			/[a-z]/.test(all.charAt(at + 1)) ? ` ${ch.toLowerCase()}` : ` ${ch}`,
+		)
+		.replace(/(?<=[A-Z])[A-Z](?=[a-z])/g, (ch) => ` ${ch.toLowerCase()}`)
+		.trim();
 	if (!name) return null;
 	return name.charAt(0).toUpperCase() + name.slice(1);
 }

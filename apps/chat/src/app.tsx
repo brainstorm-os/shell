@@ -865,7 +865,9 @@ export function ChatApp(): ReactElement {
 						aria-haspopup="menu"
 						onClick={openMore}
 					>
-						<Icon name={IconName.More} size={18} />
+						<span className="bs-object-menu__more-dot" />
+						<span className="bs-object-menu__more-dot" />
+						<span className="bs-object-menu__more-dot" />
 					</button>
 				</div>
 			</header>
@@ -1280,7 +1282,9 @@ function MessageView({
 														openMessageMenu({ x: r.right, y: r.bottom + 4 }, m, el);
 													}}
 												>
-													<Icon name={IconName.More} size={14} />
+													<span className="bs-object-menu__more-dot" />
+													<span className="bs-object-menu__more-dot" />
+													<span className="bs-object-menu__more-dot" />
 												</button>
 											) : null}
 											{m.richBody ? (

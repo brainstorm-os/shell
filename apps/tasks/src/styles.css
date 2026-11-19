@@ -1436,7 +1436,9 @@ body.is-resizing .tasks-resize {
 	height: 20px;
 	margin-top: var(--space-0_5);
 	border-radius: 50%;
-	border: 1.5px solid var(--border-strong);
+	/* The ring IS the control. A divider-strength border left it near-invisible
+	 * on dark themes; the tertiary ink holds the 3:1 a control boundary needs. */
+	border: 1.5px solid var(--text-faint);
 	background: transparent;
 	color: transparent;
 	display: inline-flex;

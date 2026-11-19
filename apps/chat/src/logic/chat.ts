@@ -240,10 +240,16 @@ export function nextSeq(messages: readonly ChatMessage[]): number {
 
 // ─────────────────────────────── grouping ───────────────────────────────
 
-/** `YYYY-MM-DD` (UTC) of an ISO timestamp; "" when unparseable. */
+/** `YYYY-MM-DD` of an ISO timestamp in the viewer's LOCAL calendar — the same
+ *  zone the message time renders in, so a divider can never disagree with the
+ *  stamps beneath it. An unparseable stamp is returned as-is. */
 export function dayKey(iso: string): string {
-	const idx = iso.indexOf("T");
-	return idx > 0 ? iso.slice(0, idx) : iso;
+	const ms = Date.parse(iso);
+	if (!Number.isFinite(ms)) return iso;
+	const d = new Date(ms);
+	const month = String(d.getMonth() + 1).padStart(2, "0");
+	const day = String(d.getDate()).padStart(2, "0");
+	return `${d.getFullYear()}-${month}-${day}`;
 }
 
 /** Messages within this many ms by the same author collapse into one group. */

@@ -499,9 +499,17 @@ body[data-nav-open="false"] .sidebar:not([data-bs-autohide]) {
 	padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
 	border: var(--border-width) solid var(--color-glass-border, var(--border));
 	border-radius: var(--radius-full);
-	background: var(--color-glass-background-strong);
+	/* Opaque, like the shared popover panel: the bar floats over tiles with no
+	 * scrim, and the glass fill let their titles read through its labels. */
+	background: var(--color-background-elevated);
 	box-shadow: var(--shadow-xl);
-	backdrop-filter: blur(12px);
+}
+
+/* The bar overlays the list's last visible row; while it is up the scroller
+ * gains the bar's footprint (bottom offset + 46px pill + breathing room) so
+ * the final row can scroll clear of it. */
+.content-list:has(~ .files-bulkbar) {
+	padding-bottom: calc(var(--space-4) * 2 + 46px);
 }
 
 .files-bulkbar__count {
@@ -615,9 +623,16 @@ body[data-nav-open="false"] .sidebar:not([data-bs-autohide]) {
 	color: var(--accent);
 }
 
+/* The Filter toggle wears the `.bs-select` field face, like Sort-by and the
+ * view picker beside it: as a transparent `.bs-btn--secondary` with dim ink it
+ * read as a disabled control next to two white fields. Pressed (filter row
+ * open) borrows the face's own open-state edge. */
 .toolbar__filter {
 	flex-shrink: 0;
-	gap: var(--space-1);
+}
+
+.toolbar__filter[aria-pressed="true"] {
+	border-color: var(--color-accent-default);
 }
 
 /* Property-filter row + the Duplicates summary (9.8.16) — a second band
@@ -1678,8 +1693,9 @@ body:not([data-inspector="open"]) .inspector {
  * picker are the SAME `.bs-select` face (one boxed trigger face per
  * toolbar; chrome from `@brainstorm-os/sdk/select-menu.css`). The sort button
  * keeps its own popover (direction + group-by + layout controls, not a plain
- * option list) — only its face is the shared one; its caret shows the current
- * sort direction instead of the dropdown caret. */
+ * option list) — only its face is the shared one, dropdown caret included
+ * (a direction caret pointed UP on a closed menu beside the view picker's
+ * down caret; the direction is drawn on the menu's own direction row). */
 
 .toolbar__sort-label {
 	max-width: 220px;
@@ -1689,6 +1705,28 @@ body:not([data-inspector="open"]) .inspector {
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-0_5);
+}
+
+/* The view-options menu is longer than the shared small panel's 480px cap
+ * (sort + direction + group + tile size + columns), so it always scrolls —
+ * and macOS overlay scrollbars hide the only cue, leaving a row sliced by the
+ * panel edge. Let the panel use the height the window has, and paint scroll
+ * shadows: the opaque covers ride the content (`local`) and slide off the
+ * edge shadows (`scroll`) whenever more rows lie beyond that edge. */
+.bs-popover__panel:has(.sort-menu__items) {
+	max-height: 80vh;
+}
+
+.bs-popover__body:has(> .sort-menu__items) {
+	background:
+		linear-gradient(var(--color-background-elevated) 40%, transparent) top / 100% var(--space-6)
+		no-repeat local,
+		linear-gradient(transparent, var(--color-background-elevated) 60%) bottom / 100% var(--space-6)
+		no-repeat local,
+		linear-gradient(var(--color-border-strong), transparent) top / 100% var(--space-2) no-repeat
+		scroll,
+		linear-gradient(transparent, var(--color-border-strong)) bottom / 100% var(--space-2) no-repeat
+		scroll;
 }
 
 .sort-menu__item {

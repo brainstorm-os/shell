@@ -1269,6 +1269,12 @@ body.is-booting *::after {
 	text-overflow: ellipsis;
 	max-width: min(440px, 60vw);
 }
+/* In a header the ⋯ sits in a row of full-strength icon buttons, so the
+ * shared 0.55 resting dim (right for a list row, where it is secondary chrome)
+ * made an enabled menu read as disabled — whose own face is 0.35. */
+:root .app-header .bs-object-menu__more:not(:disabled):not([aria-disabled="true"]) {
+	opacity: 1;
+}
 :root .app-header button,
 :root .app-header a,
 :root .app-header input,

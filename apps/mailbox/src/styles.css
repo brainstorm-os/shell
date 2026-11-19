@@ -131,9 +131,13 @@ body {
 	color: var(--text-faint, var(--text));
 }
 
+/* The label is an email address: upper-cased and tracked it both stops
+ * reading as one and overflows the rail ("MARCUS.FIXTURE@EXAM…"). */
 .mb-rail__heading-label {
 	flex: 1;
 	min-width: 0;
+	text-transform: none;
+	letter-spacing: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;

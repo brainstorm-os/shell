@@ -22,7 +22,7 @@ import { BrowserApp } from "./app";
 import { type HistoryVisit, historyRecordToProperties } from "./logic/history";
 import { PERSIST_DEBOUNCE_MS, sessionRecordToProperties } from "./logic/persistence";
 import type { EntityRecord } from "./runtime";
-import type { BrowsingSessionRecord } from "./types/browsing-session";
+import { type BrowsingSessionRecord, NEW_TAB_URL } from "./types/browsing-session";
 
 const popupStateListeners = vi.hoisted(() => [] as Array<(open: boolean) => void>);
 vi.mock("@brainstorm-os/sdk/menus", async (importOriginal) => ({
@@ -324,6 +324,38 @@ describe("BrowsingSession/v1 restore", () => {
 		// Every open is chased by a bounds push — without it the host mounts
 		// the view 0×0 (SetBounds for a not-yet-open tab is dropped).
 		expect(webView.bounds.some((b) => b.tabId === restoredOpen?.tabId)).toBe(true);
+	});
+
+	it("shows the start page when the restored ACTIVE tab is a blank new tab", async () => {
+		const stored = storedRecord();
+		const record: BrowsingSessionRecord = {
+			...stored,
+			tabs: [
+				...stored.tabs,
+				{
+					id: "old-3",
+					url: NEW_TAB_URL,
+					title: "",
+					faviconUrl: null,
+					pinned: false,
+					history: [],
+					historyIndex: -1,
+				},
+			],
+			activeTabId: "old-3",
+		};
+		install([{ ...sessionRow(), properties: sessionRecordToProperties(record) }]);
+		await render(<BrowserApp />);
+		await act(async () => {});
+
+		expect(tabTitles()).toEqual(["Tab A", "Tab B", "New tab"]);
+		expect(container.querySelector(".browser-start")).not.toBeNull();
+		const restoredOpen = webView.opened.at(-1);
+		expect(restoredOpen?.url).toBe(NEW_TAB_URL);
+		// The native view composites above the chrome, so it must be parked or
+		// it covers the start page.
+		const lastBounds = webView.bounds.filter((b) => b.tabId === restoredOpen?.tabId).at(-1);
+		expect(lastBounds?.rect).toEqual({ x: 0, y: 0, width: 0, height: 0 });
 	});
 
 	it("keeps a fresh session when nothing was stored", async () => {

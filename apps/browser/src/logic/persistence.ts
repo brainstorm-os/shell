@@ -16,7 +16,7 @@
 
 import { sanitizeInlineText } from "@brainstorm-os/sdk/sanitize-text";
 import type { BrowsingSessionRecord, TabSnapshot } from "../types/browsing-session";
-import { MAX_RECENTLY_CLOSED } from "../types/browsing-session";
+import { MAX_RECENTLY_CLOSED, NEW_TAB_URL } from "../types/browsing-session";
 import { isWebUrl } from "./external-open";
 
 /** Per-tab history bound in the persisted record — a long-lived tab's
@@ -86,7 +86,11 @@ function parseTab(input: unknown): TabSnapshot | null {
 			: currentEntry !== undefined && isWebUrl(currentEntry)
 				? Math.max(history.indexOf(currentEntry), 0)
 				: history.length - 1;
-	const url = isWebUrl(raw.url) ? raw.url : (history[historyIndex] ?? "");
+	// A tab with nothing web to restore IS a blank new tab: the chrome keys the
+	// start page (and parking the native view under it) on `NEW_TAB_URL`, so an
+	// empty string here restored a tab that showed neither a page nor the start
+	// page.
+	const url = isWebUrl(raw.url) ? raw.url : (history[historyIndex] ?? NEW_TAB_URL);
 	return {
 		id: raw.id,
 		url,

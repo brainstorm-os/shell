@@ -834,7 +834,9 @@ body {
 	height: 24px;
 	opacity: 0;
 	background: var(--bg-elev);
-	border: 1px solid var(--border-subtle);
+	border: 1px solid var(--border-strong);
+	color: var(--text);
+	gap: var(--space-0_5);
 }
 
 .chat__line-wrap:hover .chat__line-more,

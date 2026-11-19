@@ -146,6 +146,27 @@ export function continueReading(books: readonly Book[]): Book[] {
 	return sortLibrary(books.filter(isInProgress), LibrarySort.Recent);
 }
 
+/** The open book's progress as its mounted reader currently measures it. */
+export type LiveProgress = { bookId: string; progress: number };
+
+/** Overlay the open reader's live progress onto the shelf. Progress is
+ *  measured to the END of the visible page, so it depends on the pagination
+ *  (viewport × typography) — the stored fraction is only true for the layout
+ *  that last turned a page. Every surface that shows the open book's progress
+ *  reads through this, so they cannot disagree with the reader footer. */
+export function withLiveProgress(
+	books: readonly Book[],
+	live: LiveProgress | null,
+): readonly Book[] {
+	if (live === null) return books;
+	const index = books.findIndex((b) => b.id === live.bookId);
+	const book = books[index];
+	if (!book || book.reading.progress === live.progress) return books;
+	const next = [...books];
+	next[index] = { ...book, reading: { ...book.reading, progress: live.progress } };
+	return next;
+}
+
 /** The persistence seam for per-book reading state. The reader calls
  *  `saveReadingPosition` whenever the parked locator changes; the preview
  *  drop leaves it unset (in-memory only), and 9.21.2 wires it to a

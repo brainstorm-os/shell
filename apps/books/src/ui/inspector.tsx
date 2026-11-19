@@ -56,7 +56,7 @@ export function BookInspector({
 	onClose,
 }: BookInspectorProps): ReactElement {
 	const values = bookToValues(book);
-	const rows: PropertiesPanelRow[] = bookPropertyDefs().map((def) => {
+	const rows: PropertiesPanelRow[] = bookPropertyDefs(book.format).map((def) => {
 		const locked = readOnly || READONLY_BOOK_PROP_KEYS.has(def.key);
 		const row: PropertiesPanelRow = { def, value: values[def.key], readOnly: locked };
 		if (!locked) {

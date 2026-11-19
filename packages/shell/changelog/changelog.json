@@ -3,6 +3,287 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.15.1",
+      "date": "2026-11-19",
+      "icon": "🧽",
+      "title": "A smoother first day, and a pass over every app",
+      "summary": "A fix-and-polish release. A new vault now opens on its dashboard, the emoji picker works again in the installed app, and every app was reviewed screen by screen in light and dark.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Your first day"
+        },
+        {
+          "kind": "p",
+          "text": "We walked through the app the way a new person does, from the welcome screen to every app's first open, and fixed what got in the way."
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "A new vault opens on your dashboard.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " It used to open on the full release history, which says nothing to someone who just arrived. "
+            },
+            {
+              "text": "What's new",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " still appears after an update."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Create vault is always in view.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Choosing a starting point no longer pushes the button below the bottom of the window."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "The starter journal entry reads as an entry.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Journal no longer shows "
+            },
+            {
+              "text": "0 words",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " and "
+            },
+            {
+              "text": "No entry yet",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " next to text that is plainly there."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "The starter bookmark opens our documentation.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " It pointed at the wrong address."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Chat",
+              "marks": ["bold"]
+            },
+            {
+              "text": " tells you to start your first channel when there are none, in place of asking you to pick one."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Fixes"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Icon picker.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Emoji show as emoji again in the installed app, where every one was a broken image. The "
+            },
+            {
+              "text": "Upload",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " tab is a real drop zone, and it and "
+            },
+            {
+              "text": "Library",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " are there in every app."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Chat.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Day dividers follow your local time. A message sent just after midnight used to sit under the previous day."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Books.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " The library, the properties panel and the reader footer agree on how far you have read, and the panel no longer covers the next-page button."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Browser.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " A blank tab restored from your last session shows the start page, where it used to show nothing."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Split view.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Each pane leaves room for the window buttons only on its own edge, so the right pane's header is no longer short of space."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Polish"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Database.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Number columns line up from header to total, values without a colour are visible as chips in light themes, and list names read as words: "
+            },
+            {
+              "text": "Code files",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ", not CodeFiles."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Files.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Filter, Sort and View share one look, the sort menu no longer cuts off its last row, and the selection bar stays clear of the files beneath it."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Tasks.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " The checkbox ring is easy to see in dark themes."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Every app.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " The "
+            },
+            {
+              "text": "⋯",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " menu in the header looks as available as it is, sidebars in Chat and Preview match the rest, and several messages now say "
+            },
+            {
+              "text": "objects",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " where they said entities."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Mailbox and Journal.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " An account's address is shown as written, and an entry with no text says so."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.15.0",
       "date": "2026-10-19",
       "icon": "🧭",
