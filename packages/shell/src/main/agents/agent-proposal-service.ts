@@ -194,7 +194,12 @@ export async function decideChannelProposal(
 	// there is no approval — never a write with the attribution silently missing.
 	const approver = options.getSelfPubkey() ?? "";
 	if (!approver) throw makeError("Unavailable", "agent-proposals: no session identity");
-	const channelId =
+	// The channel is the one RECORDED AT STAGING inside the reserved property.
+	// The row's own `conversation` is ordinary synced data: re-pointing it used
+	// to walk an approval past a locked channel and stamp the attacker's value
+	// into the created object's provenance. It is consulted only for a team
+	// card staged before the binding existed.
+	const rowChannelId =
 		typeof row.properties.conversation === "string" ? row.properties.conversation : "";
 
 	// The proposer is the message's HOST-WRITTEN author. Two kinds exist:
@@ -206,6 +211,10 @@ export async function decideChannelProposal(
 	//     a row as itself but cannot write the reserved property, and a row that
 	//     arrives over sync carries neither.
 	const builtin = row.createdBy === BUILTIN_AGENT_APP_ID;
+	// A built-in card always records its channel; one that does not was not
+	// staged by the runner. Fail closed.
+	if (builtin && !proposal.channelId) return { ok: false, reason: "not-a-proposal" };
+	const channelId = proposal.channelId ?? rowChannelId;
 	let proposer: string;
 	if (builtin) {
 		// INVOKER-ONLY, for approve and discard alike. A card with no invoker is

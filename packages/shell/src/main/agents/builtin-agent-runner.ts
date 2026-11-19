@@ -78,11 +78,12 @@ import {
 	MENTION_MESSAGE_CHARS_MAX,
 	MENTION_PROPOSALS_MAX,
 	MENTION_TRANSCRIPT_CHARS_MAX,
-	MENTION_TRANSCRIPT_LIMIT,
+	boundContext,
 	escapeChannelBody,
 	grantString,
 	proposalMessageBody,
 	readChannelMessages,
+	replySeqAfter,
 	speakerLabel,
 } from "./mention-runner";
 import type { AgentTraceRecorder } from "./trace/agent-trace-recorder";
@@ -119,7 +120,6 @@ export const BUILTIN_GENERATE_FAILED_REPLY =
  *  can occur inside one — see {@link quoteUntrusted}. */
 export const CHANNEL_CONTEXT_OPEN = "<<<CHANNEL_CONTEXT";
 export const CHANNEL_CONTEXT_CLOSE = "CHANNEL_CONTEXT>>>";
-const CONTEXT_MARKER_WORD = "CHANNEL_CONTEXT";
 const QUOTE_PREFIX = "> ";
 
 /** The heading of the one instruction-bearing message. */
@@ -131,10 +131,11 @@ export const REQUEST_HEADING = "REQUEST (from the person who invoked you):";
  * the block early nor produce an unquoted line that reads as a fresh turn.
  */
 export function quoteUntrusted(text: string): string {
+	// `escapeChannelBody` canonicalises first — every Unicode line terminator
+	// becomes `\n`, controls and invisible characters are dropped — so `\n` is
+	// the only line break left to prefix.
 	return escapeChannelBody(text)
-		.split(CONTEXT_MARKER_WORD)
-		.join("CHANNEL-CONTEXT")
-		.split(/\r\n|\r|\n/)
+		.split("\n")
 		.map((line) => `${QUOTE_PREFIX}${line}`)
 		.join("\n");
 }
@@ -171,9 +172,12 @@ export function projectInvocation(
 	}
 	// The request is the invoker's own text, but it is escaped all the same so
 	// the structural claim — one block, one request — holds for every input.
+	// A line of the request that reads exactly as the heading would be a second
+	// "request" — it is the invoker's own text, but one heading is the claim.
 	const body = escapeChannelBody(request.slice(0, MENTION_MESSAGE_CHARS_MAX))
-		.split(CONTEXT_MARKER_WORD)
-		.join("CHANNEL-CONTEXT");
+		.split("\n")
+		.map((line) => (line.trim() === REQUEST_HEADING ? `${QUOTE_PREFIX}${line}` : line))
+		.join("\n");
 	out.push({ role: MessageRole.User, content: `${REQUEST_HEADING}\n${body}` });
 	return out;
 }
@@ -260,9 +264,14 @@ function str(value: unknown): string {
 	return typeof value === "string" ? value : "";
 }
 
+/** The channel was locked between the run starting and a write. */
+class ChannelLockedError extends Error {}
+
 type Invocation = {
 	channelId: string;
 	messageId: string;
+	/** The invoking message's `seq` — local state, written on this device. */
+	seq: unknown;
 	request: string;
 	invokerPubkey: string;
 	invokerName: string;
@@ -321,7 +330,10 @@ async function runBuiltinAgent(
 	}
 
 	const messages = readChannelMessages(repo, channelId);
-	let rowSeq = Math.min(Math.max(messages[messages.length - 1]?.seq ?? 0, 0) + 1, MENTION_MAX_SEQ);
+	// The reply sits directly after the invoking turn, whose `seq` this device
+	// wrote a moment ago — never after the channel's largest `seq`, which a
+	// peer chooses.
+	let rowSeq = replySeqAfter(invocation.seq, messages.length);
 	let envelopeSeq = 0;
 	const envelope = (service: string, method: string, arg: unknown): Envelope => {
 		envelopeSeq += 1;
@@ -350,6 +362,9 @@ async function runBuiltinAgent(
 		reserved: Record<string, unknown> = {},
 	): Promise<string | null> => {
 		const now = clock();
+		// Re-read the lock at EVERY write: a run spans model calls, and a channel
+		// locked while the model was thinking must not receive the answer.
+		if (isLockedProperties(repo.get(channelId)?.properties)) throw new ChannelLockedError();
 		const created = (await entitiesHandler(
 			envelope("entities", "create", {
 				type: MESSAGE_TYPE_URL,
@@ -390,8 +405,11 @@ async function runBuiltinAgent(
 			if ((await post(body)) !== null) return true;
 			await fail("entities.create", "no-row");
 			return false;
-		} catch {
-			await refuse("entities.create", `entities.write:${MESSAGE_TYPE_URL}`);
+		} catch (error) {
+			await refuse(
+				"entities.create",
+				error instanceof ChannelLockedError ? "locked" : `entities.write:${MESSAGE_TYPE_URL}`,
+			);
 			return false;
 		}
 	};
@@ -415,8 +433,9 @@ async function runBuiltinAgent(
 	// Reading the thread is a read of other people's messages, so it rides the
 	// Agent app's own grant; without it the agent answers from the request alone.
 	const mayReadThread = ledger.has(BUILTIN_AGENT_APP_ID, `entities.read:${MESSAGE_TYPE_URL}`);
+	// Newest by LOCAL arrival, each author held to a share of the window.
 	const context: ChannelMessage[] = mayReadThread
-		? messages.filter((m) => m.id !== invocation.messageId).slice(-MENTION_TRANSCRIPT_LIMIT)
+		? boundContext(messages.filter((m) => m.id !== invocation.messageId))
 		: [];
 
 	const staged: ProposedArtifact[] = [];
@@ -480,7 +499,12 @@ async function runBuiltinAgent(
 						ChannelProposalStatus.Pending,
 					),
 				},
-				{ [CHANNEL_PROPOSAL_PROPERTY_KEY]: buildProposalProperty(artifact, invokerPubkey) },
+				{
+					[CHANNEL_PROPOSAL_PROPERTY_KEY]: buildProposalProperty(artifact, {
+						invokedBy: invokerPubkey,
+						channelId,
+					}),
+				},
 			);
 			if (id) stagedCount += 1;
 		} catch {
@@ -545,6 +569,7 @@ export async function maybeRunBuiltinAgent(
 			await runBuiltinAgent(deps, session, {
 				channelId,
 				messageId,
+				seq: properties.seq,
 				request: str(properties.body),
 				invokerPubkey: self,
 				invokerName: targets.authorName,

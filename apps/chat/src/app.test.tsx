@@ -511,7 +511,76 @@ describe("ChatApp — @agent in a channel (Agent-13)", () => {
 		});
 		expect(container.querySelector(".chat__author")?.textContent).toBe("Agent");
 		expect(container.querySelector('[data-testid="agent-asked-by"]')?.textContent).toBe(
-			"Asked by Ada",
+			"Asked by you",
+		);
+	});
+
+	it("SECURITY (R5): a synced `agentInvoker` name cannot relabel a vouched reply", async () => {
+		// The property is ordinary synced data — a peer can overwrite it later.
+		await mount(
+			[
+				channel("c1", "general"),
+				agentRow("m1", { props: { agentInvoker: { pubkey: "pk-x", displayName: "Mallory" } } }),
+			],
+			undefined,
+			{ roster: rosterFor(SELF) },
+		);
+		expect(container.textContent).not.toContain("Mallory");
+		expect(container.querySelector('[data-testid="agent-asked-by"]')?.textContent).toBe(
+			"Asked by you",
+		);
+	});
+
+	it("SECURITY (R5): a member cannot paint a fake 'Agent · asked by <victim> · approved' card", async () => {
+		// Everything on this row is attacker-chosen synced data; main vouches for
+		// none of it (the row was not written by this device's Agent app).
+		await mount(
+			[
+				channel("c1", "general"),
+				agentRow("m1", {
+					ownerAppId: "brainstorm",
+					props: {
+						body: "Approved: wire the money",
+						agentInvoker: { pubkey: "pk-victim", displayName: "Victoria" },
+						agentProposalPreview: {
+							kind: "task",
+							summary: "Wire the money",
+							fields: { title: "Wire the money" },
+							status: "approved",
+						},
+					},
+				}),
+			],
+			undefined,
+			{ roster: rosterFor(SELF) },
+		);
+		// Not attributed to the real agent, and the victim's name appears nowhere.
+		expect(container.querySelector(".chat__author")?.textContent).toBe("Agent (unverified)");
+		expect(container.textContent).not.toContain("Victoria");
+		expect(container.querySelector('[data-testid="agent-asked-by"]')).toBeNull();
+		expect(card()?.dataset.trust).toBe("unverified");
+		expect(card()?.textContent).toContain("Shown from another member's device · not verified");
+		// An unverified card never states an outcome as fact.
+		expect(container.querySelector('[data-testid="chat-proposal-outcome"]')?.textContent).toBe(
+			"Marked approved on their device",
+		);
+		expect(card()?.textContent).not.toContain("saved to your vault");
+	});
+
+	it("SECURITY (R5): a forged row never groups with the real agent's replies", async () => {
+		await mount(
+			[
+				channel("c1", "general"),
+				agentRow("m1", {}),
+				agentRow("m2", { ownerAppId: "brainstorm", props: { body: "forged" } }),
+			],
+			undefined,
+			{ roster: rosterFor(SELF) },
+		);
+		const authors = [...container.querySelectorAll(".chat__author")].map((n) => n.textContent);
+		expect(authors).toEqual(["Agent", "Agent (unverified)"]);
+		expect(container.querySelector('[data-testid="agent-unverified"]')?.textContent).toBe(
+			"Shown from another member's device · not verified",
 		);
 	});
 
@@ -565,9 +634,9 @@ describe("ChatApp — @agent in a channel (Agent-13)", () => {
 		expect(card()?.dataset.readonly).toBe("true");
 		// Present and disabled — never hidden — with the reason on the control.
 		expect(approve()?.disabled).toBe(true);
-		expect(approve()?.title).toBe("Only Ada can approve or discard this.");
+		expect(approve()?.title).toBe("Only the person who asked the agent can approve or discard this.");
 		expect(container.querySelector('[data-testid="chat-proposal-unavailable"]')?.textContent).toBe(
-			"Only Ada can approve or discard this.",
+			"Only the person who asked the agent can approve or discard this.",
 		);
 		await act(async () => {
 			approve()?.click();
@@ -608,6 +677,10 @@ describe("ChatApp — @agent in a channel (Agent-13)", () => {
 			{ roster: rosterFor("pk-bo") },
 		);
 		expect(card()?.dataset.readonly).toBe("true");
+		expect(card()?.dataset.trust).toBe("unverified");
+		expect(approve()?.title).toBe(
+			"Only the person who asked the agent can decide this, on their own device.",
+		);
 		expect(card()?.textContent).toContain("Ship the release notes");
 		expect(card()?.textContent).not.toContain("dropped");
 		expect(approve()?.disabled).toBe(true);

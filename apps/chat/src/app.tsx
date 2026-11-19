@@ -12,6 +12,7 @@ import { useVaultEntities } from "@brainstorm-os/react-yjs";
 import { openEntity } from "@brainstorm-os/sdk";
 import {
 	AttachmentKind,
+	BUILTIN_AGENT_MENTION_REF,
 	IconKind,
 	type MessageAttachment,
 	type RosterMember,
@@ -66,11 +67,13 @@ import {
 	resolveAgentMentionTarget,
 } from "./logic/agent-mention";
 import {
+	AgentRowTrust,
 	CHANNEL_TYPE,
 	type ChatChannel,
 	type ChatMessage,
 	MESSAGE_TYPE,
 	type PanelMember,
+	UNVERIFIED_AGENT_REF,
 	authorColor,
 	buildChannelProperties,
 	buildMessageProperties,
@@ -146,6 +149,17 @@ function shareDialogLabels(): ShareDialogLabels {
 		loadFailed: t("share.loadFailed"),
 		done: t("share.done"),
 	};
+}
+
+/** Agent-13 — the header name for a row that presents as the built-in agent.
+ *  Never the row's own (synced) display name: the vouched agent is named by
+ *  this app, and an unverified one is labelled as exactly that. */
+function agentAuthorLabel(authorRef: string): string | null {
+	if (authorRef === BUILTIN_AGENT_MENTION_REF) return t("agent.name");
+	if (authorRef === UNVERIFIED_AGENT_REF) {
+		return t("agent.unverifiedAuthor", { name: t("agent.name") });
+	}
+	return null;
 }
 
 export function ChatApp(): ReactElement {
@@ -1261,7 +1275,7 @@ function MessageView({
 							<div className="chat__group-body">
 								<header className="chat__group-head">
 									<span className="chat__author" style={{ color: g.color }}>
-										{g.authorName}
+										{agentAuthorLabel(g.authorRef) ?? g.authorName}
 									</span>
 									<time className="chat__time" dateTime={first?.createdAt}>
 										{formatTime(first?.createdAt ?? "", absoluteTimestamps)}
@@ -1308,9 +1322,14 @@ function MessageView({
 													<span className="bs-object-menu__more-dot" />
 												</button>
 											) : null}
-											{m.invoker && !m.proposal ? (
+											{m.agentTrust === AgentRowTrust.Vouched && !m.proposal ? (
 												<span className="chat__line-invoker" data-testid="agent-asked-by">
-													{t("agent.askedBy", { name: m.invoker.name || t("members.you") })}
+													{t("agent.askedByYou")}
+												</span>
+											) : null}
+											{m.agentTrust === AgentRowTrust.Unverified && !m.proposal ? (
+												<span className="chat__line-invoker" data-testid="agent-unverified">
+													{t("agent.unverified")}
 												</span>
 											) : null}
 											{m.richBody ? (
@@ -1326,7 +1345,7 @@ function MessageView({
 													proposal={m.proposal}
 													host={proposalHost}
 													{...(m.proposalReadOnly ? { readOnly: true } : {})}
-													{...(m.invoker?.name ? { invokerName: m.invoker.name } : {})}
+													{...(m.agentTrust ? { trust: m.agentTrust } : {})}
 												/>
 											) : null}
 											{chips.length > 0 ? (
