@@ -1133,6 +1133,10 @@ function agentProposalsProxy(bridge: Bridge): AgentProposalsService {
 				[input],
 				["agents.approve"],
 			),
+		// Agent-13 — asking whether `@agent` is invocable rides `agents.mention`,
+		// the same scarce grant the invocation itself needs.
+		mentionTarget: () =>
+			callService<unknown>(bridge, "agent-proposals", "mentionTarget", [], ["agents.mention"]),
 	};
 }
 

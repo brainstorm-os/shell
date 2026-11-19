@@ -25,7 +25,13 @@
 
 import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import { LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
-import { AGENT_PROVENANCE_PROPERTY_KEY, buildAgentProvenance } from "@brainstorm-os/sdk-types";
+import {
+	AGENT_PROVENANCE_PROPERTY_KEY,
+	BUILTIN_AGENT_APP_ID,
+	type BuiltinAgentMentionTarget,
+	buildAgentProvenance,
+} from "@brainstorm-os/sdk-types";
+import { isLockedProperties } from "@brainstorm-os/sdk/entity-lock";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
 import { DekWrapFailurePolicy, createEntityWithDek } from "../entities/create-with-dek";
@@ -39,6 +45,7 @@ import {
 	CHANNEL_PROPOSAL_PROPERTY_KEY,
 	type ChannelProposal,
 	ChannelProposalStatus,
+	buildProposalPreview,
 	proposalEntityProperties,
 	readChannelProposal,
 	settledProposalProperty,
@@ -53,6 +60,12 @@ export const AGENT_PROPOSALS_SERVICE = "agent-proposals";
 
 /** Scarce capability: deciding an agent's proposal on behalf of the human. */
 export const AGENTS_APPROVE_CAPABILITY = "agents.approve";
+
+/** Agent-13 — asking whether `@agent` can be invoked rides the same scarce
+ *  grant that invoking it does (`agents.mention`), so the question is no wider
+ *  a surface than the action. Kept as a literal here rather than imported from
+ *  the mention runner, which already imports this module's siblings. */
+export const AGENTS_MENTION_TARGET_CAPABILITY = "agents.mention";
 
 export type AgentProposalServiceOptions = {
 	readonly getSession: () => AgentDirectorySession | null;
@@ -84,11 +97,34 @@ export type AgentProposalServiceOptions = {
 		decision: ChannelProposalStatus.Approved | ChannelProposalStatus.Discarded;
 		createdEntityId?: string;
 	}) => void;
+	/** Agent-13 — whether the built-in `@agent` can be invoked by `app`. Absent
+	 *  → the method is refused (`Unavailable`), never answered optimistically. */
+	readonly resolveMentionTarget?: (app: string) => Promise<BuiltinAgentMentionTarget>;
+	/** Agent-13 — mirror a built-in card's outcome onto its synced, display-only
+	 *  preview so the other members of a shared channel see how it ended.
+	 *  Best-effort and contained: the decision is already committed. */
+	readonly syncProposalPreview?: (
+		messageId: string,
+		preview: Record<string, unknown>,
+	) => Promise<void>;
 };
 
 export type DecideProposalResult =
 	| { ok: true; status: ChannelProposalStatus; createdEntityId?: string }
-	| { ok: false; reason: "not-found" | "not-a-proposal" | "already-decided" | "untrusted-agent" };
+	| {
+			ok: false;
+			reason:
+				| "not-found"
+				| "not-a-proposal"
+				| "already-decided"
+				| "untrusted-agent"
+				// Agent-13 — the card belongs to someone else's `@agent` invocation.
+				| "not-invoker"
+				// Agent-13 — the Agent app may not create an object of this type.
+				| "not-permitted"
+				// The card's message, or its channel, is read-only.
+				| "locked";
+	  };
 
 function makeError(name: string, message: string): Error {
 	const err = new Error(message);
@@ -99,6 +135,7 @@ function makeError(name: string, message: string): Error {
 async function requireCapability(
 	envelope: Envelope,
 	options: AgentProposalServiceOptions,
+	capability: string,
 ): Promise<void> {
 	if (!options.getLedger) return;
 	let ledger: CapabilityLedger | null;
@@ -113,7 +150,7 @@ async function requireCapability(
 	if (!ledger) throw makeError("Unavailable", "agent-proposals: no active vault session");
 	let held: boolean;
 	try {
-		held = ledger.has(envelope.app, AGENTS_APPROVE_CAPABILITY);
+		held = ledger.has(envelope.app, capability);
 	} catch (error) {
 		if (error instanceof LedgerUnavailableError) {
 			throw makeError("Unavailable", "agent-proposals: capability ledger unavailable");
@@ -123,7 +160,7 @@ async function requireCapability(
 	if (!held) {
 		throw makeError(
 			"Denied",
-			`agent-proposals.${envelope.method}: ${envelope.app} lacks ${AGENTS_APPROVE_CAPABILITY}`,
+			`agent-proposals.${envelope.method}: ${envelope.app} lacks ${capability}`,
 		);
 	}
 }
@@ -152,12 +189,6 @@ export async function decideChannelProposal(
 		return { ok: false, reason: "already-decided" };
 	}
 
-	// The proposing agent is the message's HOST-WRITTEN author, and it must
-	// still resolve to a trusted `Agent/v1` — so provenance names a real member,
-	// and a revoked/deleted agent's stale card cannot be cashed in.
-	const proposingAgent = await findAgentByFingerprint(session, row.createdBy);
-	if (!proposingAgent) return { ok: false, reason: "untrusted-agent" };
-
 	const now = options.now ? options.now() : Date.now();
 	// Fail closed: with no session identity there is no approver to attest, so
 	// there is no approval — never a write with the attribution silently missing.
@@ -165,6 +196,36 @@ export async function decideChannelProposal(
 	if (!approver) throw makeError("Unavailable", "agent-proposals: no session identity");
 	const channelId =
 		typeof row.properties.conversation === "string" ? row.properties.conversation : "";
+
+	// The proposer is the message's HOST-WRITTEN author. Two kinds exist:
+	//   · a team agent (`Agent/v1`) — it must still resolve to a trusted record,
+	//     so a revoked/deleted agent's stale card cannot be cashed in;
+	//   · Agent-13's built-in agent — the row was created by the Agent app, and
+	//     the reserved proposal property names the human whose `@agent`
+	//     invocation staged it. Both halves are host-written: an app can author
+	//     a row as itself but cannot write the reserved property, and a row that
+	//     arrives over sync carries neither.
+	const builtin = row.createdBy === BUILTIN_AGENT_APP_ID;
+	let proposer: string;
+	if (builtin) {
+		// INVOKER-ONLY, for approve and discard alike. A card with no invoker is
+		// not a built-in card at all — refused rather than treated as anyone's.
+		if (!proposal.invokedBy || proposal.invokedBy !== approver) {
+			return { ok: false, reason: "not-invoker" };
+		}
+		proposer = BUILTIN_AGENT_APP_ID;
+	} else {
+		const proposingAgent = await findAgentByFingerprint(session, row.createdBy);
+		if (!proposingAgent) return { ok: false, reason: "untrusted-agent" };
+		proposer = proposingAgent.def.fingerprint;
+	}
+
+	// A locked object is read-only on EVERY write path, this one included: the
+	// card's own message and the channel it sits in are both re-read here.
+	const channelRow = channelId ? repo.get(channelId) : null;
+	if (isLockedProperties(row.properties) || isLockedProperties(channelRow?.properties)) {
+		return { ok: false, reason: "locked" };
+	}
 
 	const plan =
 		decision === ChannelProposalStatus.Approved
@@ -176,6 +237,15 @@ export async function decideChannelProposal(
 		// that writes on behalf of an app checks the fence before it writes.
 		if (isShellOwnedEntityType(plan.entityType)) {
 			return { ok: false, reason: "not-a-proposal" };
+		}
+		// Agent-13 — the built-in agent creates under the Agent APP's ceiling, so
+		// the app must hold the write for this type NOW (the grant may have been
+		// revoked since the draft was staged). Fail closed without a ledger.
+		if (builtin) {
+			const ledger = (await options.getLedger?.()) ?? null;
+			if (!ledger || !ledger.has(BUILTIN_AGENT_APP_ID, `entities.write:${plan.entityType}`)) {
+				return { ok: false, reason: "not-permitted" };
+			}
 		}
 	}
 
@@ -232,15 +302,13 @@ export async function decideChannelProposal(
 			{
 				id: entityId,
 				type: plan.entityType,
-				createdBy: proposingAgent.def.fingerprint,
+				createdBy: proposer,
 				properties: {
 					...plan.properties,
-					[AGENT_PROVENANCE_PROPERTY_KEY]: buildAgentProvenance(
-						proposingAgent.def.fingerprint,
-						channelId,
-						now,
-						{ proposedBy: proposingAgent.def.fingerprint, approvedBy: approver },
-					),
+					[AGENT_PROVENANCE_PROPERTY_KEY]: buildAgentProvenance(proposer, channelId, now, {
+						proposedBy: proposer,
+						approvedBy: approver,
+					}),
 				},
 				now,
 			},
@@ -279,13 +347,20 @@ export async function decideChannelProposal(
 	options.onWrote?.();
 	try {
 		options.onDecided?.({
-			agentFingerprint: proposingAgent.def.fingerprint,
+			agentFingerprint: proposer,
 			channelId,
 			decision,
 			...(createdEntityId ? { createdEntityId } : {}),
 		});
 	} catch {
 		// Contained: the trace hook never fails a decided proposal.
+	}
+	if (builtin && options.syncProposalPreview) {
+		try {
+			await options.syncProposalPreview(messageId, buildProposalPreview(proposal.artifact, decision));
+		} catch {
+			// Contained: other members keep seeing "pending"; nothing is unsafe.
+		}
 	}
 	return { ok: true, status: decision, ...(createdEntityId ? { createdEntityId } : {}) };
 }
@@ -294,7 +369,14 @@ export function makeAgentProposalServiceHandler(
 	options: AgentProposalServiceOptions,
 ): ServiceHandler {
 	return async (envelope: Envelope): Promise<unknown> => {
-		await requireCapability(envelope, options);
+		if (envelope.method === "mentionTarget") {
+			await requireCapability(envelope, options, AGENTS_MENTION_TARGET_CAPABILITY);
+			if (!options.resolveMentionTarget) {
+				throw makeError("Unavailable", "agent-proposals: mention target unavailable");
+			}
+			return await options.resolveMentionTarget(envelope.app);
+		}
+		await requireCapability(envelope, options, AGENTS_APPROVE_CAPABILITY);
 		const arg = (envelope.args[0] ?? {}) as { messageId?: unknown };
 		const messageId = typeof arg.messageId === "string" ? arg.messageId : "";
 		if (!messageId) throw makeError("Invalid", "agent-proposals: messageId required");

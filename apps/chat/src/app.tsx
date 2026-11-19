@@ -61,6 +61,11 @@ import { formatDay, formatTime, navigatorLanguage } from "./format";
 import { plural, t } from "./i18n";
 import { useChatT } from "./i18n-hooks";
 import {
+	agentMentionCandidate,
+	queryMayMatchAgent,
+	resolveAgentMentionTarget,
+} from "./logic/agent-mention";
+import {
 	CHANNEL_TYPE,
 	type ChatChannel,
 	type ChatMessage,
@@ -172,6 +177,17 @@ export function ChatApp(): ReactElement {
 			searchCandidates: async (query: string) => {
 				const q = query.trim().toLowerCase();
 				const matches: ContextCandidate[] = [];
+				// Agent-13 — `@agent` leads the list. It is ALWAYS offered when it
+				// matches: unavailable means disabled with the reason as its caption,
+				// never absent (an option that vanishes cannot be discovered).
+				if (activeId && queryMayMatchAgent(query, t)) {
+					const target = await resolveAgentMentionTarget(
+						getBrainstorm()?.capabilities,
+						services?.agentProposals ?? null,
+					);
+					const candidate = agentMentionCandidate(query, target, t);
+					if (candidate) matches.push(candidate);
+				}
 				// People come from the channel roster (Collab-C6) — actual vault
 				// members, keyed on the sovereign pubkey so the mention resolves to a
 				// real identity, not an arbitrary Person/v1 contact. The stored
@@ -183,6 +199,7 @@ export function ChatApp(): ReactElement {
 					// (kind-tagged), so "@Researcher" works exactly like "@Ada":
 					// mentioning an agent invites its loop into the channel.
 					const people = await roster.members(activeId, { includeAgents: true });
+
 					for (const m of people) {
 						const name = m.displayName || m.fingerprint;
 						if (q && !name.toLowerCase().includes(q)) continue;
@@ -201,7 +218,7 @@ export function ChatApp(): ReactElement {
 				return matches;
 			},
 		}),
-		[roster, activeId],
+		[roster, activeId, services],
 	);
 
 	// Documents / objects are pinned through their own search picker (anchored to
@@ -432,9 +449,13 @@ export function ChatApp(): ReactElement {
 		void badge.set({ count: unread }).catch(() => undefined);
 	}, [unread, marksReady, services]);
 
+	// Agent-13 — a built-in-agent card is decidable only by its invoker, so the
+	// projection needs this viewer's key; until it resolves every such card is
+	// read-only (fail-closed).
+	const selfPubkey = selfStatus === SelfStatus.Resolved ? identity.personRef : undefined;
 	const persisted = useMemo(
-		() => (activeId ? channelMessages(entities, activeId) : []),
-		[entities, activeId],
+		() => (activeId ? channelMessages(entities, activeId, selfPubkey) : []),
+		[entities, activeId, selfPubkey],
 	);
 
 	// Merge persisted messages with this channel's optimistic echoes, dropping an
@@ -1287,6 +1308,11 @@ function MessageView({
 													<span className="bs-object-menu__more-dot" />
 												</button>
 											) : null}
+											{m.invoker && !m.proposal ? (
+												<span className="chat__line-invoker" data-testid="agent-asked-by">
+													{t("agent.askedBy", { name: m.invoker.name || t("members.you") })}
+												</span>
+											) : null}
 											{m.richBody ? (
 												<div className="chat__line chat__line--rich bs-editor bs-editor--readonly">
 													{renderEditorState(m.richBody)}
@@ -1295,7 +1321,13 @@ function MessageView({
 												<p className="chat__line">{m.body}</p>
 											) : null}
 											{m.proposal ? (
-												<ProposalCard messageId={m.id} proposal={m.proposal} host={proposalHost} />
+												<ProposalCard
+													messageId={m.id}
+													proposal={m.proposal}
+													host={proposalHost}
+													{...(m.proposalReadOnly ? { readOnly: true } : {})}
+													{...(m.invoker?.name ? { invokerName: m.invoker.name } : {})}
+												/>
 											) : null}
 											{chips.length > 0 ? (
 												<div className="chat__attachments" data-testid="message-attachments">

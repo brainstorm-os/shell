@@ -13,6 +13,8 @@
 
 import {
 	AGENT_TYPE,
+	BUILTIN_AGENT_APP_ID,
+	BUILTIN_AGENT_MENTION_REF,
 	MESSAGE_TYPE_URL,
 	type MessageAttachment,
 	type MessageDef,
@@ -20,10 +22,11 @@ import {
 	type RosterMember,
 	type RosterRole,
 	SenderKind,
+	readAgentInvoker,
 } from "@brainstorm-os/sdk-types";
 import { parseAttachments } from "@brainstorm-os/sdk/composer-context";
 import { readPinned } from "./pins";
-import { type ChannelProposal, readChannelProposal } from "./proposal";
+import { type ChannelProposal, readChannelProposal, readProposalPreview } from "./proposal";
 
 /** The Chat-owned channel type (a channel is NOT an AI `Conversation/v1`, so
  *  it never collides with the Agent app's primary opener). */
@@ -77,6 +80,12 @@ export type ChatMessage = {
 	 *  row carries a well-formed one. Absent for every ordinary message AND for
 	 *  a malformed proposal (fail-closed: it renders as an ordinary message). */
 	proposal?: ChannelProposal;
+	/** Agent-13 — the card is not this viewer's to decide: it was staged by
+	 *  someone else's `@agent` invocation (or is only a synced preview of one).
+	 *  It renders with its actions disabled and a line saying whose it is. */
+	proposalReadOnly?: boolean;
+	/** Agent-13 — who invoked the built-in agent for this row. Display-only. */
+	invoker?: { pubkey: string; name: string };
 };
 
 /** One run of consecutive messages from the same author on the same day, within
@@ -176,7 +185,42 @@ export function trustedAgentAuthors(entities: readonly EntityLike[]): ReadonlySe
 export type ToMessageContext = {
 	/** {@link trustedAgentAuthors} — the vault's own agent members. */
 	trustedAgents?: ReadonlySet<string>;
+	/** Agent-13 — this viewer's sovereign pubkey. A built-in-agent card is
+	 *  decidable only when its invoker is this key; omit it and every such card
+	 *  is read-only (fail-closed, like the trusted set). */
+	selfPubkey?: string;
 };
+
+/**
+ * Agent-13 — resolve the card on a row the built-in agent posted.
+ *
+ * Two sources, in order of authority:
+ *   1. the RESERVED `agentProposal` on a row whose host-written author is the
+ *      Agent app — present only on the device that ran the invocation, and
+ *      decidable only by the invoker it names;
+ *   2. the synced, display-only preview — what every other member sees. Always
+ *      read-only. It is honoured only on a row that presents as the built-in
+ *      agent, so an arbitrary message cannot grow a card.
+ */
+function builtinAgentCard(
+	entity: EntityLike,
+	selfPubkey: string | undefined,
+): { proposal: ChannelProposal; readOnly: boolean } | null {
+	if (entity.ownerAppId === BUILTIN_AGENT_APP_ID) {
+		const proposal = readChannelProposal(entity.properties);
+		if (proposal?.invokedBy) {
+			return { proposal, readOnly: !selfPubkey || proposal.invokedBy !== selfPubkey };
+		}
+	}
+	const sender = entity.properties.sender;
+	const presentsAsAgent =
+		!!sender &&
+		typeof sender === "object" &&
+		(sender as Record<string, unknown>).personRef === BUILTIN_AGENT_MENTION_REF;
+	if (!presentsAsAgent) return null;
+	const preview = readProposalPreview(entity.properties);
+	return preview ? { proposal: preview, readOnly: true } : null;
+}
 
 /**
  * Project a message row. A proposal is attached ONLY when the row's
@@ -194,8 +238,11 @@ export function toMessage(entity: EntityLike, context?: ToMessageContext): ChatM
 	const author = readAuthor(entity.properties, entity.id);
 	const richBody = str(entity.properties.richBody);
 	const trusted = context?.trustedAgents;
-	const proposal =
+	const teamProposal =
 		trusted?.has(entity.ownerAppId ?? "") === true ? readChannelProposal(entity.properties) : null;
+	const builtin = teamProposal ? null : builtinAgentCard(entity, context?.selfPubkey);
+	const proposal = teamProposal ?? builtin?.proposal ?? null;
+	const invoker = readAgentInvoker(entity.properties);
 	return {
 		id: entity.id,
 		channelId: str(entity.properties.conversation),
@@ -207,6 +254,8 @@ export function toMessage(entity: EntityLike, context?: ToMessageContext): ChatM
 		seq: num(entity.properties.seq) ?? 0,
 		attachments: parseAttachments(entity.properties.attachments),
 		...(proposal ? { proposal } : {}),
+		...(builtin?.readOnly ? { proposalReadOnly: true } : {}),
+		...(invoker ? { invoker: { pubkey: invoker.pubkey, name: invoker.displayName } } : {}),
 	};
 }
 
@@ -221,12 +270,16 @@ export function sortMessages(messages: readonly ChatMessage[]): ChatMessage[] {
 /** The ordered messages of one channel from the live snapshot. Resolves the
  *  trusted-agent author set from the same snapshot, so a proposal card only
  *  renders for a local agent's own message (see {@link toMessage}). */
-export function channelMessages(entities: readonly EntityLike[], channelId: string): ChatMessage[] {
+export function channelMessages(
+	entities: readonly EntityLike[],
+	channelId: string,
+	selfPubkey?: string,
+): ChatMessage[] {
 	if (!channelId) return [];
 	const trustedAgents = trustedAgentAuthors(entities);
 	const rows = entities
 		.filter((e) => e.type === MESSAGE_TYPE && str(e.properties.conversation) === channelId)
-		.map((e) => toMessage(e, { trustedAgents }));
+		.map((e) => toMessage(e, { trustedAgents, ...(selfPubkey ? { selfPubkey } : {}) }));
 	return sortMessages(rows);
 }
 

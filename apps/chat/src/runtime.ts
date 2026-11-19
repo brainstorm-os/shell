@@ -29,6 +29,10 @@ import type {
 export type AgentProposalsService = {
 	approve(input: { messageId: string }): Promise<unknown>;
 	discard(input: { messageId: string }): Promise<unknown>;
+	/** Agent-13 — can the built-in `@agent` be invoked right now (cap
+	 *  `agents.mention`)? Optional: an older host simply has no such method,
+	 *  and the composer then offers `@agent` disabled. Parsed, never cast. */
+	mentionTarget?(): Promise<unknown>;
 };
 
 export type ChatAppRuntime = {

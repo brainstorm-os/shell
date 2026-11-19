@@ -58,6 +58,11 @@ export type ChannelProposal = {
 	/** The entity an approval created — the card's "open it" back-link. */
 	createdEntityId?: string;
 	decidedAt?: number;
+	/** Agent-13 — the sovereign pubkey of the human whose `@agent` invocation
+	 *  staged this draft. Present only on a built-in-agent card, and then the
+	 *  ONLY identity that may decide it. Host-written inside the reserved
+	 *  property, so neither an app nor a synced projection can set it. */
+	invokedBy?: string;
 };
 
 /** The kinds a CHANNEL proposal may carry.
@@ -147,6 +152,7 @@ export function readChannelProposal(properties: Record<string, unknown>): Channe
 	const decidedBy = typeof raw.decidedBy === "string" ? raw.decidedBy : undefined;
 	const createdEntityId = typeof raw.createdEntityId === "string" ? raw.createdEntityId : undefined;
 	const decidedAt = typeof raw.decidedAt === "number" ? raw.decidedAt : undefined;
+	const invokedBy = typeof raw.invokedBy === "string" && raw.invokedBy ? raw.invokedBy : undefined;
 
 	return {
 		artifact: { id, kind: kind as ProposeKind, entityType, fields, summary },
@@ -154,12 +160,17 @@ export function readChannelProposal(properties: Record<string, unknown>): Channe
 		...(decidedBy ? { decidedBy } : {}),
 		...(createdEntityId ? { createdEntityId } : {}),
 		...(decidedAt !== undefined ? { decidedAt } : {}),
+		...(invokedBy ? { invokedBy } : {}),
 	};
 }
 
 /** The property bag for a freshly-staged proposal message. */
-export function buildProposalProperty(artifact: ProposedArtifact): Record<string, unknown> {
+export function buildProposalProperty(
+	artifact: ProposedArtifact,
+	invokedBy?: string,
+): Record<string, unknown> {
 	return {
+		...(invokedBy ? { invokedBy } : {}),
 		artifact: {
 			id: artifact.id,
 			kind: artifact.kind,
@@ -192,6 +203,27 @@ export function settledProposalProperty(
 		decidedBy,
 		decidedAt,
 		...(createdEntityId ? { createdEntityId } : {}),
+		// The invoker binding outlives the decision: a settled card still says
+		// whose it was.
+		...(proposal.invokedBy ? { invokedBy: proposal.invokedBy } : {}),
+	};
+}
+
+/**
+ * Agent-13 — the DISPLAY-ONLY mirror of a card, written as an ordinary synced
+ * property so the other members of a shared channel see what was proposed and
+ * how it ended. It carries no authority: `decideChannelProposal` never reads
+ * it, so whoever can write it can change only what a read-only card says.
+ */
+export function buildProposalPreview(
+	artifact: ProposedArtifact,
+	status: ChannelProposalStatus,
+): Record<string, unknown> {
+	return {
+		kind: artifact.kind,
+		summary: artifact.summary,
+		fields: { ...artifact.fields },
+		status,
 	};
 }
 

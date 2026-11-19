@@ -28,6 +28,7 @@ import {
 	type MentionMatch,
 	clearMentionToken,
 	detectMention,
+	nextSelectableIndex,
 } from "@brainstorm-os/sdk/composer-context";
 import {
 	type TypeaheadMenuItem,
@@ -119,6 +120,8 @@ export const MentionComposerPlugin = forwardRef<MentionComposerHandle, MentionCo
 
 		const commit = useCallback(
 			(candidate: ContextCandidate) => {
+				// A disabled candidate is listed so it can be discovered, never chosen.
+				if (candidate.disabled === true) return;
 				const active = activeRef.current;
 				if (active) {
 					editor.update(() => {
@@ -175,6 +178,7 @@ export const MentionComposerPlugin = forwardRef<MentionComposerHandle, MentionCo
 							id: c.id,
 							label: c.label,
 							...(c.description ? { description: c.description } : {}),
+							...(c.disabled === true ? { disabled: true } : {}),
 						}))
 					: [{ id: "__empty__", label: emptyLabel, disabled: true }];
 			openTypeaheadMenu({
@@ -194,12 +198,13 @@ export const MentionComposerPlugin = forwardRef<MentionComposerHandle, MentionCo
 					.then((results) => {
 						if (seq !== searchSeqRef.current) return;
 						candidatesRef.current = results;
-						activeIndexRef.current = 0;
+						activeIndexRef.current = nextSelectableIndex(results, -1, 1);
 						render();
 					})
 					.catch(() => {
 						if (seq !== searchSeqRef.current) return;
 						candidatesRef.current = [];
+						activeIndexRef.current = -1;
 						render();
 					});
 			},
@@ -246,10 +251,10 @@ export const MentionComposerPlugin = forwardRef<MentionComposerHandle, MentionCo
 						(e) => {
 							if (!openRef.current) return false;
 							e?.preventDefault();
-							const n = candidatesRef.current.length;
-							if (n > 0) {
-								activeIndexRef.current = (activeIndexRef.current + 1) % n;
-								setTypeaheadActiveIndex(activeIndexRef.current);
+							const next = nextSelectableIndex(candidatesRef.current, activeIndexRef.current, 1);
+							if (next >= 0) {
+								activeIndexRef.current = next;
+								setTypeaheadActiveIndex(next);
 							}
 							return true;
 						},
@@ -260,10 +265,11 @@ export const MentionComposerPlugin = forwardRef<MentionComposerHandle, MentionCo
 						(e) => {
 							if (!openRef.current) return false;
 							e?.preventDefault();
-							const n = candidatesRef.current.length;
-							if (n > 0) {
-								activeIndexRef.current = (activeIndexRef.current - 1 + n) % n;
-								setTypeaheadActiveIndex(activeIndexRef.current);
+							const from = activeIndexRef.current < 0 ? 0 : activeIndexRef.current;
+							const next = nextSelectableIndex(candidatesRef.current, from, -1);
+							if (next >= 0) {
+								activeIndexRef.current = next;
+								setTypeaheadActiveIndex(next);
 							}
 							return true;
 						},

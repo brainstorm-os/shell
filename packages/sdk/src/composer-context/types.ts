@@ -46,7 +46,27 @@ export type ContextCandidate = {
 	entityType?: string;
 	/** Optional secondary line (a type name / snippet) shown under the label. */
 	description?: string;
+	/** The option exists but cannot be chosen right now. It is still LISTED —
+	 *  with `description` saying why — because an option that vanishes cannot
+	 *  be discovered; a surface must never commit a disabled candidate. */
+	disabled?: boolean;
 };
+
+/** Step from `from` to the next choosable candidate in `direction`, wrapping.
+ *  Returns -1 when none can be chosen (an empty list, or all disabled). Pass
+ *  `from = -1` with `direction = 1` for "the first choosable one". */
+export function nextSelectableIndex(
+	candidates: readonly ContextCandidate[],
+	from: number,
+	direction: 1 | -1,
+): number {
+	const n = candidates.length;
+	for (let step = 1; step <= n; step++) {
+		const index = (((from + direction * step) % n) + n) % n;
+		if (candidates[index]?.disabled !== true) return index;
+	}
+	return -1;
+}
 
 /** The host seam the primitive draws on. The host owns vault access (and its
  *  capability checks) and the media-upload flow; the primitive owns the UI. */

@@ -53,7 +53,11 @@ afterEach(() => {
 	vi.useRealTimers();
 });
 
-function mount(opts: { insertNode?: boolean; onSelect?: (c: ContextCandidate) => void }): {
+function mount(opts: {
+	insertNode?: boolean;
+	onSelect?: (c: ContextCandidate) => void;
+	candidates?: readonly ContextCandidate[];
+}): {
 	mention: React.RefObject<MentionComposerHandle | null>;
 	payload: () => CompactEditorPayload;
 } {
@@ -69,7 +73,7 @@ function mount(opts: { insertNode?: boolean; onSelect?: (c: ContextCandidate) =>
 			>
 				<MentionComposerPlugin
 					ref={mention}
-					host={{ searchCandidates: () => Promise.resolve([RAZOR]) }}
+					host={{ searchCandidates: () => Promise.resolve(opts.candidates ?? [RAZOR]) }}
 					onSelect={opts.onSelect ?? (() => {})}
 					ariaLabel="People"
 					emptyLabel="No matches"
@@ -123,5 +127,42 @@ describe("MentionComposerPlugin — commit modes", () => {
 		expect(chip?.label).toBe("Razor");
 		// The plain-text flattening reads `@Razor ` — what agents/search see.
 		expect(payload().text).toBe("@Razor ");
+	});
+
+	it("a disabled candidate is LISTED with its reason but can never be committed", async () => {
+		const agent: ContextCandidate = {
+			id: "app:io.brainstorm.agent",
+			kind: AttachmentKind.Person,
+			label: "Agent",
+			description: "Install the Agent app to use @agent",
+			disabled: true,
+		};
+		const onSelect = vi.fn();
+		const { mention, payload } = mount({ onSelect, insertNode: true, candidates: [agent, RAZOR] });
+		await act(async () => {
+			mention.current?.trigger();
+		});
+		await act(async () => {
+			vi.advanceTimersByTime(200);
+			await Promise.resolve();
+		});
+		const call = openTypeaheadMenu.mock.calls.at(-1)?.[0] as {
+			items: { id: string; disabled?: boolean; description?: string }[];
+			activeIndex: number;
+			onSelect: (id: string) => void;
+		};
+		// Shown — never hidden — and marked disabled, with the hint as its caption.
+		expect(call.items[0]).toMatchObject({
+			id: agent.id,
+			disabled: true,
+			description: agent.description,
+		});
+		// The highlight starts on the first CHOOSABLE row, not the disabled one.
+		expect(call.activeIndex).toBe(1);
+		await act(async () => {
+			call.onSelect(agent.id);
+		});
+		expect(onSelect).not.toHaveBeenCalled();
+		expect(payload().text).toBe("@");
 	});
 });
