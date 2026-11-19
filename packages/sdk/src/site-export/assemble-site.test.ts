@@ -163,6 +163,8 @@ describe("assembleSite — what leaves the vault", () => {
 		expect(links?.resolveEntityHref("home")).toBe("index.html");
 		expect(links?.resolveEntityHref(SECRET_ID)).toBeNull();
 		expect(links?.resolveEntityHref("__proto__")).toBeNull();
+		expect(links?.resolveEntityLabel("in")).toBe("Inside");
+		expect(links?.resolveEntityLabel(SECRET_ID)).toBeNull();
 		expect(links?.resolveEntityHref("constructor")).toBeNull();
 	});
 
@@ -275,5 +277,11 @@ describe("collectAssetIds", () => {
 		);
 		expect(collectAssetIds(state)).toEqual(["b-2", "a_1"]);
 		expect(collectAssetIds(null)).toEqual([]);
+	});
+
+	it("walks a 20,000-deep body without overflowing the stack", () => {
+		let node: SiteNode = image("deep-asset");
+		for (let level = 0; level < 20_000; level += 1) node = { type: "quote", children: [node] };
+		expect(collectAssetIds(body(node))).toEqual(["deep-asset"]);
 	});
 });
