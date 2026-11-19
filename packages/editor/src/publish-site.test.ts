@@ -1,7 +1,7 @@
 import { bytesToB64 } from "@brainstorm-os/react-yjs";
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
-import { buildSiteArchive } from "./publish-site";
+import { type SitePlan, buildSiteArchive, planSite } from "./publish-site";
 
 const LABELS = { pages: "Pages", untitled: "Untitled", unpublished: "[unpublished]" };
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]);
@@ -64,16 +64,26 @@ const image = (assetId: string): Inline => ({
 	props: { src: `brainstorm://asset/${assetId}`, alt: "" },
 });
 
-type Vault = Record<string, { title: string; body: Inline[][] }>;
+const SOLO = "solo";
+const TEAM = "team:alice+bob";
 
-function harness(vault: Vault, publishable: readonly string[] = Object.keys(vault)) {
+type Vault = Record<
+	string,
+	{ title: string; body: Inline[][]; parent?: string; scope?: string | null }
+>;
+
+function harness(vault: Vault) {
 	const loaded: string[] = [];
 	const closed: string[] = [];
 	const fetched: string[] = [];
-	const input = {
+	const planInput = {
 		getPage: (id: string) => {
-			const page = publishable.includes(id) ? vault[id] : undefined;
-			return page ? { title: page.title } : null;
+			const page = Object.hasOwn(vault, id) ? vault[id] : undefined;
+			return page ? { title: page.title, parentId: page.parent ?? null } : null;
+		},
+		pageAccess: async (id: string) => {
+			const scope = vault[id]?.scope === undefined ? SOLO : vault[id]?.scope;
+			return scope ? { scope, solo: scope === SOLO } : null;
 		},
 		transport: {
 			loadDoc: async (id: string) => {
@@ -86,6 +96,8 @@ function harness(vault: Vault, publishable: readonly string[] = Object.keys(vaul
 				closed.push(id);
 			},
 		},
+	};
+	const buildInput = {
 		fetchAsset: async (assetId: string) => {
 			fetched.push(assetId);
 			return { bytes: PNG, mime: "image/png" };
@@ -94,8 +106,15 @@ function harness(vault: Vault, publishable: readonly string[] = Object.keys(vaul
 		labels: LABELS,
 		modifiedAt: new Date(2026, 10, 19, 10, 0, 0),
 	};
-	return { input, loaded, closed, fetched };
+	const plan = (rootId: string, maxPages?: number) =>
+		planSite({ ...planInput, rootId, ...(maxPages ? { maxPages } : {}) });
+	const build = (sitePlan: SitePlan, confirmedIds = sitePlan.pages.map((page) => page.id)) =>
+		buildSiteArchive({ ...buildInput, plan: sitePlan, confirmedIds });
+	const publish = async (rootId: string) => build(await plan(rootId));
+	return { planInput, buildInput, plan, build, publish, loaded, closed, fetched };
 }
+
+const ids = (plan: SitePlan) => plan.pages.map((page) => page.id);
 
 /** Entry name → text for a store-only archive (data sits verbatim). */
 function unzip(archive: Uint8Array): Map<string, string> {
@@ -120,93 +139,220 @@ function unzip(archive: Uint8Array): Map<string, string> {
 /** The whole archive as one string — for "this never appears anywhere". */
 const everything = (archive: Uint8Array) => new TextDecoder("latin1").decode(archive);
 
-describe("buildSiteArchive", () => {
-	it("publishes the root and its sub-pages, transitively, with links between them", async () => {
-		const { input, loaded, closed } = harness({
-			root: { title: "Handbook", body: [[{ text: "Start: " }, pageRef("a", "Onboarding")]] },
-			a: { title: "Onboarding", body: [[pageRef("b", "Tools")], [pageRef("root", "Handbook")]] },
-			b: { title: "Tools", body: [[{ text: "Use them." }]] },
+describe("planSite — which pages belong to the site", () => {
+	it("admits a sub-page that names the page as its parent, transitively", async () => {
+		const { plan, loaded, closed } = harness({
+			root: { title: "Handbook", body: [[pageRef("a", "A")]] },
+			a: { title: "Onboarding", parent: "root", body: [[pageRef("b", "B")]] },
+			b: { title: "Tools", parent: "a", body: [] },
 		});
-		const archive = await buildSiteArchive({ ...input, rootId: "root" });
+		const sitePlan = await plan("root");
+		expect(sitePlan.pages).toEqual([
+			{ id: "root", title: "Handbook" },
+			{ id: "a", title: "Onboarding" },
+			{ id: "b", title: "Tools" },
+		]);
+		expect(sitePlan.truncated).toBe(false);
+		expect(loaded).toEqual(["root", "a", "b"]);
+		expect(closed).toEqual(loaded);
+	});
+
+	it("does not admit a note just because a page-ref points at it", async () => {
+		const { plan, loaded } = harness({
+			root: { title: "Shared", scope: TEAM, body: [[pageRef("private", "x")]] },
+			private: { title: "Private diary", body: [[{ text: "Nobody may read this" }]] },
+		});
+		expect(ids(await plan("root"))).toEqual(["root"]);
+		expect(loaded).toEqual(["root"]);
+	});
+
+	it("does not admit a planted reference to a note that is someone else's sub-page", async () => {
+		const { plan } = harness({
+			root: { title: "Shared", body: [[pageRef("other-child", "x")]] },
+			elsewhere: { title: "Elsewhere", body: [[pageRef("other-child", "x")]] },
+			"other-child": { title: "Other child", parent: "elsewhere", body: [] },
+		});
+		expect(ids(await plan("root"))).toEqual(["root"]);
+	});
+
+	it("does not admit a child the parent no longer shows", async () => {
+		const { plan } = harness({
+			root: { title: "Home", body: [[{ text: "no links" }]] },
+			orphan: { title: "Orphan", parent: "root", body: [] },
+		});
+		expect(ids(await plan("root"))).toEqual(["root"]);
+	});
+
+	it("never widens across a sharing scope, in either direction", async () => {
+		const shared = harness({
+			root: { title: "Shared", scope: TEAM, body: [[pageRef("c", "x")]] },
+			c: { title: "Private child", parent: "root", scope: SOLO, body: [] },
+		});
+		expect(ids(await shared.plan("root"))).toEqual(["root"]);
+		const solo = harness({
+			root: { title: "Private", scope: SOLO, body: [[pageRef("c", "x")]] },
+			c: { title: "Shared child", parent: "root", scope: TEAM, body: [] },
+		});
+		expect(ids(await solo.plan("root"))).toEqual(["root"]);
+		const other = harness({
+			root: { title: "Team", scope: TEAM, body: [[pageRef("c", "x")]] },
+			c: { title: "Other team", parent: "root", scope: "team:alice+carol", body: [] },
+		});
+		expect(ids(await other.plan("root"))).toEqual(["root"]);
+	});
+
+	it("admits a child in the very same scope as a shared root", async () => {
+		const { plan } = harness({
+			root: { title: "Team", scope: TEAM, body: [[pageRef("c", "x")]] },
+			c: { title: "Team child", parent: "root", scope: TEAM, body: [] },
+		});
+		expect(ids(await plan("root"))).toEqual(["root", "c"]);
+	});
+
+	it("fails closed to the root alone when a scope cannot be read", async () => {
+		const unknownChild = harness({
+			root: { title: "Home", body: [[pageRef("c", "x")]] },
+			c: { title: "Child", parent: "root", scope: null, body: [] },
+		});
+		expect(ids(await unknownChild.plan("root"))).toEqual(["root"]);
+		const unknownRoot = harness({
+			root: { title: "Home", scope: null, body: [[pageRef("c", "x")]] },
+			c: { title: "Child", parent: "root", body: [] },
+		});
+		expect(ids(await unknownRoot.plan("root"))).toEqual(["root"]);
+		const throwing = harness({
+			root: { title: "Home", body: [[pageRef("c", "x")]] },
+			c: { title: "Child", parent: "root", body: [] },
+		});
+		const sitePlan = await planSite({
+			...throwing.planInput,
+			rootId: "root",
+			pageAccess: async () => {
+				throw new Error("Unavailable");
+			},
+		});
+		expect(ids(sitePlan)).toEqual(["root"]);
+	});
+
+	it("does not follow a mention or a link, and ignores prototype-named ids", async () => {
+		const { plan, loaded } = harness({
+			root: {
+				title: "Home",
+				body: [
+					[mention("m", "M")],
+					[{ link: "brainstorm://entity/l", text: "l" }],
+					[pageRef("__proto__", "x"), pageRef("constructor", "y")],
+				],
+			},
+			m: { title: "Mentioned", parent: "root", body: [] },
+			l: { title: "Linked", parent: "root", body: [] },
+		});
+		expect(ids(await plan("root"))).toEqual(["root"]);
+		expect(loaded).toEqual(["root"]);
+	});
+
+	it("survives a cycle of parents", async () => {
+		const { plan } = harness({
+			root: { title: "Home", parent: "a", body: [[pageRef("a", "A")]] },
+			a: { title: "A", parent: "root", body: [[pageRef("root", "Home")]] },
+		});
+		expect(ids(await plan("root"))).toEqual(["root", "a"]);
+	});
+
+	it("stops at the page cap and says so", async () => {
+		const { plan } = harness({
+			root: { title: "Home", body: [[pageRef("a", "A"), pageRef("b", "B"), pageRef("c", "C")]] },
+			a: { title: "A", parent: "root", body: [] },
+			b: { title: "B", parent: "root", body: [] },
+			c: { title: "C", parent: "root", body: [] },
+		});
+		const sitePlan = await plan("root", 2);
+		expect(ids(sitePlan)).toEqual(["root", "a"]);
+		expect(sitePlan.truncated).toBe(true);
+	});
+
+	it("refuses a root that is not publishable, before loading anything", async () => {
+		const { plan, loaded } = harness({});
+		await expect(plan("root")).rejects.toThrow(/not publishable/);
+		expect(loaded).toEqual([]);
+	});
+
+	it("leaves out a sub-page whose body cannot be loaded, and closes what it opened", async () => {
+		const { planInput, closed } = harness({
+			root: { title: "Home", body: [[pageRef("gone", "Gone page")]] },
+			gone: { title: "Gone page", parent: "root", body: [] },
+		});
+		const sitePlan = await planSite({
+			...planInput,
+			rootId: "root",
+			transport: {
+				...planInput.transport,
+				loadDoc: async (id) => {
+					if (id === "gone") throw new Error("NotFound");
+					return planInput.transport.loadDoc(id);
+				},
+			},
+		});
+		expect(ids(sitePlan)).toEqual(["root"]);
+		expect(closed).toEqual(["root", "gone"]);
+	});
+});
+
+describe("buildSiteArchive", () => {
+	it("writes the confirmed pages with links between them", async () => {
+		const { publish } = harness({
+			root: { title: "Handbook", body: [[{ text: "Start: " }, pageRef("a", "stale label")]] },
+			a: {
+				title: "Onboarding",
+				parent: "root",
+				body: [[pageRef("b", "Tools")], [mention("root", "Handbook")]],
+			},
+			b: { title: "Tools", parent: "a", body: [[{ text: "Use them." }]] },
+		});
+		const archive = await publish("root");
 		expect(archive.pageCount).toBe(3);
-		expect(archive.truncated).toBe(false);
 		const site = unzip(archive.bytes);
 		expect([...site.keys()]).toEqual(["index.html", "onboarding.html", "tools.html", "styles.css"]);
 		expect(site.get("index.html")).toContain('Start: <a href="onboarding.html">Onboarding</a>');
 		expect(site.get("onboarding.html")).toContain('<a href="tools.html">Tools</a>');
 		expect(site.get("onboarding.html")).toContain('<a href="index.html">Handbook</a>');
 		expect(site.get("tools.html")).toContain("<p>Use them.</p>");
-		expect(loaded).toEqual(["root", "a", "b"]);
-		expect(closed).toEqual(loaded);
+	});
+
+	it("publishes only what was confirmed — an unticked sub-page is as absent as a stranger", async () => {
+		const { plan, build } = harness({
+			root: { title: "Home", body: [[pageRef("a", "A")], [pageRef("b", "B")]] },
+			a: { title: "Kept page", parent: "root", body: [] },
+			b: { title: "Dropped page", parent: "root", body: [[{ text: "dropped body" }]] },
+		});
+		const archive = await build(await plan("root"), ["root", "a"]);
+		expect(archive.pageCount).toBe(2);
+		const site = unzip(archive.bytes);
+		expect([...site.keys()]).toEqual(["index.html", "kept-page.html", "styles.css"]);
+		expect(everything(archive.bytes)).not.toMatch(/Dropped page|dropped body/);
+	});
+
+	it("ignores a confirmed id that was never in the plan, and always keeps the root", async () => {
+		const { plan, build } = harness({
+			root: { title: "Home", body: [[pageRef("a", "A")]] },
+			a: { title: "A page", parent: "root", body: [] },
+			stranger: { title: "Stranger", body: [[{ text: "stranger body" }]] },
+		});
+		const archive = await build(await plan("root"), ["stranger", "a"]);
+		expect([...unzip(archive.bytes).keys()]).toEqual(["index.html", "a-page.html", "styles.css"]);
+		expect(everything(archive.bytes)).not.toContain("tranger");
 	});
 
 	it("rewrites an entity link between published pages", async () => {
-		const { input } = harness({
+		const { publish } = harness({
 			root: {
 				title: "Home",
 				body: [[pageRef("a", "A")], [{ link: "brainstorm://entity/a", text: "read A" }]],
 			},
-			a: { title: "A page", body: [] },
+			a: { title: "A page", parent: "root", body: [] },
 		});
-		const site = unzip((await buildSiteArchive({ ...input, rootId: "root" })).bytes);
+		const site = unzip((await publish("root")).bytes);
 		expect(site.get("index.html")).toContain('<a href="a-page.html" rel="noreferrer">read A</a>');
-	});
-
-	it("does not follow a mention or a link into the set — only a sub-page does", async () => {
-		const { input, loaded } = harness({
-			root: {
-				title: "Home",
-				body: [[mention("m", "Mentioned")], [{ link: "brainstorm://entity/l", text: "linked" }]],
-			},
-			m: { title: "Mentioned", body: [] },
-			l: { title: "Linked", body: [] },
-		});
-		const archive = await buildSiteArchive({ ...input, rootId: "root" });
-		expect(archive.pageCount).toBe(1);
-		expect(loaded).toEqual(["root"]);
-	});
-
-	it("stops at the page cap and says so", async () => {
-		const { input } = harness({
-			root: { title: "Home", body: [[pageRef("a", "A"), pageRef("b", "B"), pageRef("c", "C")]] },
-			a: { title: "A", body: [] },
-			b: { title: "B", body: [] },
-			c: { title: "C", body: [] },
-		});
-		const archive = await buildSiteArchive({ ...input, rootId: "root", maxPages: 2 });
-		expect(archive.pageCount).toBe(2);
-		expect(archive.truncated).toBe(true);
-		const site = unzip(archive.bytes);
-		expect([...site.keys()]).toEqual(["index.html", "a.html", "styles.css"]);
-		expect(site.get("index.html")).not.toContain(">B<");
-	});
-
-	it("refuses a root that is not publishable, before loading anything", async () => {
-		const { input, loaded } = harness({ root: { title: "Home", body: [] } }, []);
-		await expect(buildSiteArchive({ ...input, rootId: "root" })).rejects.toThrow(/not publishable/);
-		expect(loaded).toEqual([]);
-	});
-
-	it("leaves out a sub-page whose body cannot be loaded, and closes what it opened", async () => {
-		const { input, closed } = harness({
-			root: { title: "Home", body: [[pageRef("gone", "Gone page")]] },
-			gone: { title: "Gone page", body: [] },
-		});
-		const archive = await buildSiteArchive({
-			...input,
-			rootId: "root",
-			transport: {
-				...input.transport,
-				loadDoc: async (id) => {
-					if (id === "gone") throw new Error("NotFound");
-					return input.transport.loadDoc(id);
-				},
-			},
-		});
-		const site = unzip(archive.bytes);
-		expect([...site.keys()]).toEqual(["index.html", "styles.css"]);
-		expect(site.get("index.html")).not.toContain("Gone page");
-		expect(closed).toEqual(["root", "gone"]);
 	});
 });
 
@@ -215,24 +361,22 @@ describe("buildSiteArchive — what leaves the vault", () => {
 	const SECRET_TITLE = "Severance terms";
 	const SECRET_BODY = "Nobody may read this";
 
-	it("publishes nothing of an entity outside the set: no body, title, id or assets", async () => {
-		const { input, loaded, fetched } = harness(
-			{
-				root: {
-					title: "Public",
-					body: [
-						[pageRef(SECRET, SECRET_TITLE)],
-						[mention(SECRET, SECRET_TITLE)],
-						[{ link: `brainstorm://entity/${SECRET}`, text: "the terms" }],
-						[{ decorator: "transclusion", props: { entityId: SECRET, label: SECRET_TITLE } }],
-						[{ text: `raw brainstorm://entity/${SECRET} url` }],
-					],
-				},
-				[SECRET]: { title: SECRET_TITLE, body: [[{ text: SECRET_BODY }], [image("secret-asset")]] },
+	it("publishes nothing of a private note a collaborator planted a page-ref to", async () => {
+		const { publish, loaded, fetched } = harness({
+			root: {
+				title: "Shared page",
+				scope: TEAM,
+				body: [
+					[pageRef(SECRET, SECRET_TITLE)],
+					[mention(SECRET, SECRET_TITLE)],
+					[{ link: `brainstorm://entity/${SECRET}`, text: "the terms" }],
+					[{ decorator: "transclusion", props: { entityId: SECRET, label: SECRET_TITLE } }],
+					[{ text: `raw brainstorm://entity/${SECRET} url` }],
+				],
 			},
-			["root"],
-		);
-		const archive = await buildSiteArchive({ ...input, rootId: "root" });
+			[SECRET]: { title: SECRET_TITLE, body: [[{ text: SECRET_BODY }], [image("secret-asset")]] },
+		});
+		const archive = await publish("root");
 		expect(archive.pageCount).toBe(1);
 		expect(loaded).toEqual(["root"]);
 		expect(fetched).toEqual([]);
@@ -248,26 +392,25 @@ describe("buildSiteArchive — what leaves the vault", () => {
 	});
 
 	it("never writes any entity id, published or not", async () => {
-		const ids = {
-			root: "11111111-aaaa-4aaa-8aaa-111111111111",
-			sub: "22222222-bbbb-4bbb-8bbb-222222222222",
-		};
-		const { input } = harness({
-			[ids.root]: { title: "Home", body: [[pageRef(ids.sub, "Sub")]] },
-			[ids.sub]: { title: "Sub", body: [[mention(ids.root, "Home")]] },
+		const root = "11111111-aaaa-4aaa-8aaa-111111111111";
+		const sub = "22222222-bbbb-4bbb-8bbb-222222222222";
+		const { publish } = harness({
+			[root]: { title: "Home", body: [[pageRef(sub, "Sub")]] },
+			[sub]: { title: "Sub", parent: root, body: [[mention(root, "Home")]] },
 		});
-		const raw = everything((await buildSiteArchive({ ...input, rootId: ids.root })).bytes);
-		expect(raw).not.toContain(ids.root);
-		expect(raw).not.toContain(ids.sub);
+		const raw = everything((await publish(root)).bytes);
+		expect(raw).not.toContain(root);
+		expect(raw).not.toContain(sub);
 	});
 
-	it("fetches assets for published pages only, once each, and never names them", async () => {
-		const { input, fetched } = harness({
+	it("copies assets for confirmed private pages only, once each, and never names them", async () => {
+		const { publish, fetched } = harness({
 			root: { title: "Home", body: [[image("asset-one")], [pageRef("a", "A")]] },
-			a: { title: "A", body: [[image("asset-one")], [image("asset-two")]] },
+			a: { title: "A", parent: "root", body: [[image("asset-one")], [image("asset-two")]] },
 		});
-		const archive = await buildSiteArchive({ ...input, rootId: "root" });
+		const archive = await publish("root");
 		expect(fetched).toEqual(["asset-one", "asset-two"]);
+		expect(archive.withheldAssets).toBe(0);
 		const site = unzip(archive.bytes);
 		expect([...site.keys()]).toEqual([
 			"index.html",
@@ -280,38 +423,83 @@ describe("buildSiteArchive — what leaves the vault", () => {
 		expect(everything(archive.bytes)).not.toMatch(/asset-(one|two)/);
 	});
 
+	it("does not fetch an asset for a page that was not confirmed", async () => {
+		const { plan, build, fetched } = harness({
+			root: { title: "Home", body: [[pageRef("a", "A")]] },
+			a: { title: "A", parent: "root", body: [[image("unconfirmed-asset")]] },
+		});
+		await build(await plan("root"), ["root"]);
+		expect(fetched).toEqual([]);
+	});
+
+	it("withholds every vault image on a page other people can write, and counts them", async () => {
+		const { publish, fetched } = harness({
+			root: {
+				title: "Shared",
+				scope: TEAM,
+				body: [[image("planted-private-asset")], [image("own-upload")]],
+			},
+		});
+		const archive = await publish("root");
+		expect(fetched).toEqual([]);
+		expect(archive.withheldAssets).toBe(2);
+		const site = unzip(archive.bytes);
+		expect([...site.keys()]).toEqual(["index.html", "styles.css"]);
+		expect(site.get("index.html")).not.toContain("<img");
+		expect(everything(archive.bytes)).not.toMatch(/planted-private-asset|own-upload/);
+	});
+
 	it("stops copying images at the size cap, fetches no more, and counts what it left out", async () => {
-		const { input, fetched } = harness({
+		const { plan, buildInput, fetched } = harness({
 			root: { title: "Home", body: [[image("a1"), image("a2"), image("a3"), image("a4")]] },
 		});
+		const sitePlan = await plan("root");
 		const archive = await buildSiteArchive({
-			...input,
-			rootId: "root",
+			...buildInput,
+			plan: sitePlan,
+			confirmedIds: ["root"],
 			maxAssetBytes: PNG.length * 2 + 1,
 		});
 		expect(archive.skippedAssets).toBe(2);
 		expect(fetched).toEqual(["a1", "a2", "a3"]);
 		const site = unzip(archive.bytes);
 		expect([...site.keys()]).toEqual(["index.html", "styles.css", "assets/1.png", "assets/2.png"]);
-		expect(site.get("index.html")?.match(/<img/g)).toHaveLength(2);
 	});
 
-	it("reports nothing skipped when the images fit exactly", async () => {
-		const { input } = harness({ root: { title: "Home", body: [[image("a1"), image("a2")]] } });
-		const archive = await buildSiteArchive({
-			...input,
-			rootId: "root",
-			maxAssetBytes: PNG.length * 2,
+	it("counts inline data images against the same cap", async () => {
+		const big = `data:image/png;base64,${"A".repeat(4000)}`;
+		const small = "data:image/png;base64,AAAA";
+		const dataImage = (src: string): Inline => ({
+			decorator: "image-block",
+			props: { src, alt: "" },
 		});
-		expect(archive.skippedAssets).toBe(0);
-		expect(unzip(archive.bytes).has("assets/2.png")).toBe(true);
+		const { plan, buildInput, fetched } = harness({
+			root: {
+				title: "Home",
+				body: [[dataImage(big)], [dataImage(small)], [dataImage(big)], [image("vault-asset")]],
+			},
+		});
+		const archive = await buildSiteArchive({
+			...buildInput,
+			plan: await plan("root"),
+			confirmedIds: ["root"],
+			maxAssetBytes: 1024,
+		});
+		expect(archive.bytes.length).toBeLessThan(6000);
+		expect(archive.skippedAssets).toBe(2);
+		const home = unzip(archive.bytes).get("index.html") ?? "";
+		expect(home.match(/<img/g)).toHaveLength(2);
+		expect(home).toContain(small);
+		expect(home).not.toContain("AAAAAAAA");
+		expect(fetched).toEqual(["vault-asset"]);
 	});
 
 	it("drops an image whose fetch fails instead of failing the site", async () => {
-		const { input } = harness({ root: { title: "Home", body: [[image("x")]] } });
+		const { plan, buildInput } = harness({ root: { title: "Home", body: [[image("x")]] } });
 		const archive = await buildSiteArchive({
-			...input,
-			rootId: "root",
+			...buildInput,
+			plan: await plan("root"),
+			confirmedIds: ["root"],
 			fetchAsset: async () => {
 				throw new Error("blocked");
 			},
@@ -321,15 +509,55 @@ describe("buildSiteArchive — what leaves the vault", () => {
 		expect(site.get("index.html")).not.toContain("<img");
 	});
 
+	it("references nothing outside the archive: no remote image, stylesheet, script or frame", async () => {
+		const remote = (type: string): Inline => ({
+			decorator: type,
+			props: { src: "https://tracker.example/pixel.gif", alt: "" },
+		});
+		const { plan, buildInput } = harness({
+			root: {
+				title: "Home",
+				body: [
+					[remote("image-block"), remote("inline-image"), remote("image")],
+					[{ decorator: "web-embed", props: { url: "https://www.youtube.com/watch?v=x" } }],
+					[pageRef("a", "A")],
+				],
+			},
+			a: { title: "A", parent: "root", body: [[remote("image-block")]] },
+		});
+		const archive = await buildSiteArchive({
+			...buildInput,
+			plan: await plan("root"),
+			confirmedIds: ["root", "a"],
+			tokens: {
+				"--color-a": 'image-set("https://tracker.example/a.png" 1x)',
+				"--color-b": "cross-fade(url(https://tracker.example/b.png), red)",
+				"--color-c": "#123456",
+			},
+		});
+		for (const [path, content] of unzip(archive.bytes)) {
+			if (path.endsWith(".css")) {
+				expect(content).not.toMatch(/https?:|\/\/|url\(|image-set|cross-fade|@import/i);
+				continue;
+			}
+			expect(content).not.toMatch(/<(script|iframe|object|embed|video|audio|source)\b/i);
+			expect(content).not.toMatch(/\bsrc(set)?\s*=\s*["']?\s*(https?:)?\/\//i);
+			for (const [, target] of content.matchAll(/<link[^>]*href="([^"]*)"/g)) {
+				expect(target).toBe("styles.css");
+			}
+			expect(content).not.toContain("tracker.example");
+		}
+	});
+
 	it("escapes markup in a body and in titles", async () => {
-		const { input } = harness({
+		const { publish } = harness({
 			root: {
 				title: "<script>alert(1)</script>",
 				body: [[{ text: '<img src=x onerror="alert(2)">' }], [pageRef("a", "<b>bold</b>")]],
 			},
-			a: { title: '"><svg onload=alert(3)>', body: [] },
+			a: { title: '"><svg onload=alert(3)>', parent: "root", body: [] },
 		});
-		const site = unzip((await buildSiteArchive({ ...input, rootId: "root" })).bytes);
+		const site = unzip((await publish("root")).bytes);
 		for (const [path, content] of site) {
 			if (!path.endsWith(".html")) continue;
 			expect(content).not.toMatch(/<script|<img src=x|<svg|<b>/);
@@ -338,12 +566,12 @@ describe("buildSiteArchive — what leaves the vault", () => {
 	});
 
 	it("keeps a path-shaped title from shaping the path", async () => {
-		const { input } = harness({
+		const { publish } = harness({
 			root: { title: "Home", body: [[pageRef("a", "x"), pageRef("b", "y")]] },
-			a: { title: "../../../etc/cron.d/job", body: [] },
-			b: { title: "/abs\\path:evil", body: [] },
+			a: { title: "../../../etc/cron.d/job", parent: "root", body: [] },
+			b: { title: "/abs\\path:evil", parent: "root", body: [] },
 		});
-		const site = unzip((await buildSiteArchive({ ...input, rootId: "root" })).bytes);
+		const site = unzip((await publish("root")).bytes);
 		expect([...site.keys()]).toEqual([
 			"index.html",
 			"etc-cron-d-job.html",

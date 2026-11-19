@@ -27,6 +27,10 @@ import type { SerializedEditorStateLike, SerializedNode } from "./preview";
 
 /** The `@lexical/yjs` binding root — `doc.get("root", XmlText)`. */
 const ROOT_SHARED_TYPE = "root";
+/** Far deeper than any document a person writes. A synced doc can nest
+ *  without limit; past this the reader stops descending rather than recursing
+ *  until the stack gives out. */
+const MAX_READ_DEPTH = 256;
 
 function isPlainValue(value: unknown): boolean {
 	if (value === null) return true;
@@ -56,11 +60,12 @@ function typeOf(value: unknown, fallback: string): string {
 	return typeof value === "string" && value.length > 0 ? value : fallback;
 }
 
-function readElement(xml: XmlText, fallbackType: string): SerializedNode {
+function readElement(xml: XmlText, fallbackType: string, depth: number): SerializedNode {
 	const attributes = xml.getAttributes() as Record<string, unknown>;
 	const children: SerializedNode[] = [];
 	let openText: SerializedNode | null = null;
-	for (const op of xml.toDelta() as Array<{ insert?: unknown }>) {
+	const delta = depth < MAX_READ_DEPTH ? (xml.toDelta() as Array<{ insert?: unknown }>) : [];
+	for (const op of delta) {
 		const insert = op.insert;
 		if (typeof insert === "string") {
 			if (openText) {
@@ -81,7 +86,7 @@ function readElement(xml: XmlText, fallbackType: string): SerializedNode {
 			children.push(textNode);
 			openText = textNode;
 		} else if (insert instanceof XmlText) {
-			children.push(readElement(insert, "paragraph"));
+			children.push(readElement(insert, "paragraph", depth + 1));
 		} else if (insert instanceof XmlElement) {
 			const attrs = insert.getAttributes() as Record<string, unknown>;
 			children.push({
@@ -100,5 +105,5 @@ function readElement(xml: XmlText, fallbackType: string): SerializedNode {
 export function serializedStateFromDoc(doc: Doc): SerializedEditorStateLike | null {
 	const root = doc.get(ROOT_SHARED_TYPE, XmlText);
 	if (root.length === 0) return null;
-	return { root: { ...readElement(root, "root"), type: "root" } };
+	return { root: { ...readElement(root, "root", 0), type: "root" } };
 }

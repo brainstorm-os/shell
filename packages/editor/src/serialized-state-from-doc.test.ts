@@ -88,3 +88,24 @@ describe("serializedStateFromDoc", () => {
 		expect(blocks[1]?.type).toBe("horizontalrule");
 	});
 });
+
+describe("serializedStateFromDoc — hostile nesting", () => {
+	it("stops reading at a fixed depth, dropping what lies deeper", () => {
+		const doc = new Y.Doc();
+		let parent = doc.get("root", Y.XmlText);
+		for (let level = 0; level < 600; level += 1) {
+			const child = new Y.XmlText();
+			parent.insertEmbed(0, child);
+			child.setAttribute("__type", "quote");
+			parent = child;
+		}
+		const state = serializedStateFromDoc(doc);
+		let depth = 0;
+		let node = state?.root as { children?: unknown[] } | undefined;
+		while (node && Array.isArray(node.children) && node.children.length > 0) {
+			node = node.children[0] as { children?: unknown[] };
+			depth += 1;
+		}
+		expect(depth).toBe(256);
+	});
+});

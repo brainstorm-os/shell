@@ -56,8 +56,9 @@ export type SerializeHtmlOptions = {
 	/** Text standing in for a mention / page reference whose target is not
 	 *  published. Its stored label is the target's title, so it is never used. */
 	unpublishedLabel?: string;
-	/** Keep inline raster `data:` images. */
-	allowDataImages?: boolean;
+	/** Keep inline raster `data:` images — all of them, or those a predicate
+	 *  admits (a publisher holding them to a size budget). */
+	allowDataImages?: boolean | ((url: string) => boolean);
 };
 
 type RenderContext = SerializeHtmlOptions & {
@@ -205,7 +206,10 @@ function linkHref(raw: string, ctx: RenderContext): string | null {
 
 function imageSrc(raw: string, ctx: RenderContext): string | null {
 	const url = raw.trim();
-	if (ctx.allowDataImages && DATA_IMAGE_URL.test(url)) return url;
+	if (ctx.allowDataImages && DATA_IMAGE_URL.test(url)) {
+		if (ctx.allowDataImages === true || ctx.allowDataImages(url)) return url;
+		return null;
+	}
 	if (!ctx.resolveEntityHref) return safeUrl(url, ctx);
 	// A published page loads nothing it does not carry: a remote image would
 	// report every visitor to a third party.
