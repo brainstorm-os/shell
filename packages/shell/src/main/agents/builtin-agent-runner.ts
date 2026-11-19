@@ -321,10 +321,7 @@ async function runBuiltinAgent(
 	}
 
 	const messages = readChannelMessages(repo, channelId);
-	let rowSeq = Math.min(
-		Math.max(messages[messages.length - 1]?.seq ?? 0, 0) + 1,
-		MENTION_MAX_SEQ,
-	);
+	let rowSeq = Math.min(Math.max(messages[messages.length - 1]?.seq ?? 0, 0) + 1, MENTION_MAX_SEQ);
 	let envelopeSeq = 0;
 	const envelope = (service: string, method: string, arg: unknown): Envelope => {
 		envelopeSeq += 1;
@@ -429,9 +426,9 @@ async function runBuiltinAgent(
 			// No provider is pinned: the broker resolves the invoker's configured
 			// default, and the Agent app's own budget and provider grants apply.
 			generate: async (chat) => {
-				const reply = (await aiHandler(
-					envelope("ai", "generate", { messages: [...chat] }),
-				)) as { content?: unknown } | null;
+				const reply = (await aiHandler(envelope("ai", "generate", { messages: [...chat] }))) as {
+					content?: unknown;
+				} | null;
 				return { content: typeof reply?.content === "string" ? reply.content : "" };
 			},
 			// SECURITY: a propose verb is staged, never dispatched. Any other tool

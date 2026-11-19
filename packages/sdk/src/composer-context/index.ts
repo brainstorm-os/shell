@@ -19,6 +19,7 @@ export {
 	attachmentLabel,
 	candidateToAttachment,
 	inlineMentionRefs,
+	nextSelectableIndex,
 	parseAttachments,
 	visibleAttachments,
 	withMentionAttachments,

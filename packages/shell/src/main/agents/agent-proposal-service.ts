@@ -357,10 +357,7 @@ export async function decideChannelProposal(
 	}
 	if (builtin && options.syncProposalPreview) {
 		try {
-			await options.syncProposalPreview(
-				messageId,
-				buildProposalPreview(proposal.artifact, decision),
-			);
+			await options.syncProposalPreview(messageId, buildProposalPreview(proposal.artifact, decision));
 		} catch {
 			// Contained: other members keep seeing "pending"; nothing is unsafe.
 		}

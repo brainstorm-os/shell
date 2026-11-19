@@ -20,7 +20,11 @@
  * Pure — no React, no services — so every branch unit-tests on plain objects.
  */
 
-import { PROPOSE_DESCRIPTORS, ProposeKind } from "@brainstorm-os/sdk-types";
+import {
+	AGENT_PROPOSAL_PREVIEW_PROPERTY_KEY,
+	PROPOSE_DESCRIPTORS,
+	ProposeKind,
+} from "@brainstorm-os/sdk-types";
 
 /** The property an agent's proposal rides on its `Message/v1` row. Must match
  *  `CHANNEL_PROPOSAL_PROPERTY_KEY` in the main-process module. */
@@ -66,6 +70,9 @@ export type ChannelProposal = {
 	/** The entity an approval created — the card's "open it" back-link. */
 	createdEntityId?: string;
 	decidedAt?: number;
+	/** Agent-13 — the sovereign pubkey of the human whose `@agent` invocation
+	 *  staged this draft; when present, the only identity that may decide it. */
+	invokedBy?: string;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -118,6 +125,7 @@ export function readChannelProposal(properties: Record<string, unknown>): Channe
 	const decidedBy = typeof raw.decidedBy === "string" ? raw.decidedBy : undefined;
 	const createdEntityId = typeof raw.createdEntityId === "string" ? raw.createdEntityId : undefined;
 	const decidedAt = typeof raw.decidedAt === "number" ? raw.decidedAt : undefined;
+	const invokedBy = typeof raw.invokedBy === "string" && raw.invokedBy ? raw.invokedBy : undefined;
 
 	return {
 		artifact: { id, kind, entityType, fields, summary },
@@ -125,6 +133,39 @@ export function readChannelProposal(properties: Record<string, unknown>): Channe
 		...(decidedBy ? { decidedBy } : {}),
 		...(createdEntityId ? { createdEntityId } : {}),
 		...(decidedAt !== undefined ? { decidedAt } : {}),
+		...(invokedBy ? { invokedBy } : {}),
+	};
+}
+
+/**
+ * Agent-13 — read the DISPLAY-ONLY preview of a built-in-agent card: what a
+ * member of a shared channel sees for a draft someone else's `@agent` staged.
+ *
+ * The preview is an ordinary synced property, so it carries no authority and
+ * the result must only ever be rendered READ-ONLY (main would refuse a decision
+ * on it anyway — the approval authority is the reserved property, which never
+ * leaves the invoker's device). Same fail-closed parse as the real card; only
+ * the descriptor's own fields are kept, and it never carries a back-link.
+ */
+export function readProposalPreview(properties: Record<string, unknown>): ChannelProposal | null {
+	const raw = asRecord(properties[AGENT_PROPOSAL_PREVIEW_PROPERTY_KEY]);
+	if (!raw) return null;
+	const kind = parseKind(raw.kind);
+	const status = parseStatus(raw.status);
+	if (!kind || !status) return null;
+	const summary = raw.summary;
+	if (typeof summary !== "string" || !summary) return null;
+	const descriptor = PROPOSE_DESCRIPTORS.find((d) => d.kind === kind);
+	if (!descriptor) return null;
+	const rawFields = asRecord(raw.fields) ?? {};
+	const fields: Record<string, string> = {};
+	for (const key of descriptor.fields) {
+		const value = rawFields[key];
+		if (typeof value === "string" && value !== "") fields[key] = value;
+	}
+	return {
+		artifact: { id: "preview", kind, entityType: descriptor.entityType, fields, summary },
+		status,
 	};
 }
 
@@ -164,6 +205,12 @@ export enum ProposalDecisionFailure {
 	NotAProposal = "not-a-proposal",
 	AlreadyDecided = "already-decided",
 	UntrustedAgent = "untrusted-agent",
+	/** Agent-13 — the card belongs to someone else's `@agent` invocation. */
+	NotInvoker = "not-invoker",
+	/** Agent-13 — the Agent app may not create an object of this type. */
+	NotPermitted = "not-permitted",
+	/** The card's message, or its channel, is read-only. */
+	Locked = "locked",
 	Unavailable = "unavailable",
 }
 

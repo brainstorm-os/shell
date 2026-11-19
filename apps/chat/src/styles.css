@@ -482,6 +482,12 @@ body {
 	color: var(--text-dim);
 }
 
+.chat__line-invoker {
+	display: block;
+	font-size: var(--text-size-xs);
+	color: var(--text-dim);
+}
+
 .chat__proposal-error {
 	margin: 0;
 	font-size: var(--text-size-sm);

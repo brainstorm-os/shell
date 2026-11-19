@@ -493,7 +493,10 @@ describe("@agent in Chat (Agent-13)", () => {
 
 		// Across the WHOLE prompt the structural markers occur exactly as often as
 		// the system wrote them: one unquoted close, one unquoted heading.
-		const all = rest.map((m) => m.content).join("\n").split("\n");
+		const all = rest
+			.map((m) => m.content)
+			.join("\n")
+			.split("\n");
 		expect(all.filter((l) => l === CHANNEL_CONTEXT_CLOSE)).toHaveLength(1);
 		expect(all.filter((l) => l === REQUEST_HEADING)).toHaveLength(1);
 		expect(all.filter((l) => l.startsWith("[#"))).toHaveLength(0);

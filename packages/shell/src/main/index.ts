@@ -55,6 +55,7 @@ import {
 	shell,
 	webContents,
 } from "electron";
+import { ENVELOPE_PROTOCOL_VERSION } from "../ipc/envelope";
 import { BackgroundActivityStore } from "./activity/background-activity-store";
 import { SEMANTIC_MODEL_OP_ID, operationFromSemanticStatus } from "./activity/semantic-activity";
 import { listAgents } from "./agents/agent-directory";
@@ -73,7 +74,6 @@ import {
 	resolveBuiltinAgentMentionTarget,
 } from "./agents/builtin-agent-runner";
 import { ChannelProposalStatus } from "./agents/channel-proposals";
-import { ENVELOPE_PROTOCOL_VERSION } from "../ipc/envelope";
 import {
 	AGENTS_MENTION_CAPABILITY,
 	type MentionRunnerDeps,
