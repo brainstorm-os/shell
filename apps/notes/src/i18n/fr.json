@@ -95,6 +95,7 @@
   "notes.publish.failed": "Le site web n'a pas pu être publié. Rien n'a été enregistré.",
   "notes.publish.confirmTitle": "Publier « {title} » en tant que site web",
   "notes.publish.subPagesLegend": "Sous-pages à inclure",
+  "notes.publish.linkedPagesLegend": "Pages liées. Elles ne font pas partie de l'arborescence de cette page et ne sont publiées que si vous les cochez.",
   "notes.publish.confirmAction": "Publier",
   "notes.publish.imagesWithheld.one": "1 image d'une page partagée a été omise : une image n'est publiée que depuis une page que personne d'autre ne peut modifier.",
   "notes.publish.imagesWithheld.other": "{count} images de pages partagées ont été omises : une image n'est publiée que depuis une page que personne d'autre ne peut modifier.",

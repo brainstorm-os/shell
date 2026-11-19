@@ -23,6 +23,7 @@ const LABELS = {
 	unpublished: "[unpublished page]",
 	confirmTitle: "Publish “Handbook” as a website",
 	subPagesLegend: "Sub-pages to include",
+	linkedPagesLegend: "Linked pages — not part of this page's tree, published only if ticked",
 	formatLegend: "Format",
 	confirmAction: "Publish",
 	cancel: "Cancel",
@@ -60,7 +61,8 @@ function bodyWithSubPages(ids: readonly string[]): string {
 }
 
 const NOTES: Record<string, { title: string; parentId: string | null; subPages: string[] }> = {
-	root: { title: "Handbook", parentId: null, subPages: ["a", "b", "planted"] },
+	root: { title: "Handbook", parentId: null, subPages: ["a", "b", "planted", "legacy"] },
+	legacy: { title: "Old sub-page", parentId: null, subPages: [] },
 	a: { title: "Onboarding", parentId: "root", subPages: [] },
 	b: { title: "", parentId: "root", subPages: [] },
 	planted: { title: "Private diary", parentId: null, subPages: [] },
@@ -72,7 +74,8 @@ function input(files: SaveFileService, extra: Partial<SiteExportInput> = {}): Si
 		title: "My: Hand/book",
 		files,
 		getPage: (id) => (Object.hasOwn(NOTES, id) ? (NOTES[id] ?? null) : null),
-		pageAccess: async () => ({ scope: "solo", solo: true }),
+		pageAccess: async (id) =>
+			id === "planted" ? { scope: "someone-else", solo: false } : { scope: "solo", solo: true },
 		transport: {
 			loadDoc: async (id) => ({ snapshotB64: bodyWithSubPages(NOTES[id]?.subPages ?? []) }),
 			closeDoc: async () => {},
@@ -119,8 +122,13 @@ describe("openSiteExport — the pages are confirmed before anything is saved", 
 		expect(popover()?.textContent).toContain("Publish “Handbook” as a website");
 		expect(popover()?.textContent).toContain("Sub-pages to include");
 		const boxes = checkboxes();
-		expect(boxes.map((box) => box.value)).toEqual(["a", "b"]);
-		expect(boxes.every((box) => box.checked)).toBe(true);
+		expect(boxes.map((box) => [box.value, box.checked])).toEqual([
+			["a", true],
+			["b", true],
+			["legacy", false],
+		]);
+		expect(popover()?.textContent).toContain("published only if ticked");
+		expect(popover()?.textContent).toContain("Old sub-page");
 		expect(popover()?.textContent).toContain("Onboarding");
 		expect(popover()?.textContent).toContain("Untitled");
 		expect(popover()?.textContent).not.toContain("Private diary");
@@ -160,10 +168,29 @@ describe("openSiteExport — the pages are confirmed before anything is saved", 
 		expect(archive).toContain("onboarding.html");
 		expect(archive).not.toContain("untitled.html");
 		expect(archive).not.toContain("Private diary");
+		expect(archive).not.toContain("old-sub-page.html");
 		expect(archive).toContain("--color-text-primary: #123456;");
 		expect(onResult).toHaveBeenCalledWith(
 			expect.objectContaining({ kind: SaveDispositionKind.Saved }),
 			expect.objectContaining({ pageCount: 2, truncated: false, skippedAssets: 0 }),
+		);
+	});
+
+	it("publishes a linked page once it is ticked", async () => {
+		const { files, writes } = stubFiles({ handleId: "h", displayName: "x.zip" });
+		const onResult = vi.fn();
+		await openSiteExport(input(files, { onResult }));
+		checkboxes()
+			.find((box) => box.value === "legacy")
+			?.click();
+		button("Publish")?.click();
+		await vi.waitFor(() => expect(onResult).toHaveBeenCalled());
+		const archive = decode(writes[0] ?? new Uint8Array());
+		expect(archive).toContain("old-sub-page.html");
+		expect(archive).not.toContain("Private diary");
+		expect(onResult).toHaveBeenCalledWith(
+			expect.anything(),
+			expect.objectContaining({ pageCount: 4 }),
 		);
 	});
 

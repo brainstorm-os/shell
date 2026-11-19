@@ -33,6 +33,7 @@ const SITE_ARCHIVE_EXTENSION = "zip";
 const PUBLISHED_TOKEN_NAME = /^--(color|space|radius)-/;
 const BYTES_PER_MEGABYTE = 1024 * 1024;
 const SUB_PAGES_OPTION_ID = "sub-pages";
+const LINKED_PAGES_OPTION_ID = "linked-pages";
 const CONFIRM_POPOVER_TEST_ID = "notes-publish-site";
 
 /** Values are the shell notification kinds, so a report posts as-is. */
@@ -81,6 +82,9 @@ export type SiteExportLabels = {
 	confirmTitle: string;
 	/** Legend over the list of sub-pages to include. */
 	subPagesLegend: string;
+	/** Legend over the linked pages offered unticked; says in one line that
+	 *  they are not part of this page's tree and publish only if ticked. */
+	linkedPagesLegend: string;
 	/** Legend over the (single) output format. */
 	formatLegend: string;
 	/** The confirmation's primary button. */
@@ -193,32 +197,40 @@ export async function openSiteExport(input: SiteExportInput): Promise<void> {
 		input.onResult?.({ kind: SaveDispositionKind.Failed, error }, null);
 		return;
 	}
+	const choicesOf = (pages: SitePlan["pages"]) =>
+		pages.map((page) => ({
+			value: page.id,
+			label: page.title.trim() || input.labels.untitled,
+		}));
 	const subPages = plan.pages.filter((page) => page.id !== plan.rootId);
+	const options = [
+		...(subPages.length > 0
+			? [
+					{
+						kind: ExportOptionKind.Checklist as const,
+						id: SUB_PAGES_OPTION_ID,
+						label: input.labels.subPagesLegend,
+						choices: choicesOf(subPages),
+						default: subPages.map((page) => page.id),
+					},
+				]
+			: []),
+		...(plan.linkedPages.length > 0
+			? [
+					{
+						kind: ExportOptionKind.Checklist as const,
+						id: LINKED_PAGES_OPTION_ID,
+						label: input.labels.linkedPagesLegend,
+						choices: choicesOf(plan.linkedPages),
+						default: [],
+					},
+				]
+			: []),
+	];
 	openExportPopover({
 		testId: CONFIRM_POPOVER_TEST_ID,
 		spec: {
-			formats: [
-				{
-					id: SITE_ARCHIVE_EXTENSION,
-					label: input.labels.filterName,
-					...(subPages.length > 0
-						? {
-								options: [
-									{
-										kind: ExportOptionKind.Checklist,
-										id: SUB_PAGES_OPTION_ID,
-										label: input.labels.subPagesLegend,
-										choices: subPages.map((page) => ({
-											value: page.id,
-											label: page.title.trim() || input.labels.untitled,
-										})),
-										default: subPages.map((page) => page.id),
-									},
-								],
-							}
-						: {}),
-				},
-			],
+			formats: [{ id: SITE_ARCHIVE_EXTENSION, label: input.labels.filterName, options }],
 		},
 		labels: {
 			title: input.labels.confirmTitle,
@@ -227,8 +239,11 @@ export async function openSiteExport(input: SiteExportInput): Promise<void> {
 			cancel: input.labels.cancel,
 		},
 		onExport: ({ values }) => {
-			const ticked = values[SUB_PAGES_OPTION_ID];
-			return saveSite(input, plan, Array.isArray(ticked) ? ticked : []);
+			const ticked = [SUB_PAGES_OPTION_ID, LINKED_PAGES_OPTION_ID].flatMap((id) => {
+				const value = values[id];
+				return Array.isArray(value) ? value : [];
+			});
+			return saveSite(input, plan, ticked);
 		},
 	});
 }

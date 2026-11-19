@@ -298,6 +298,141 @@ describe("planSite — which pages belong to the site", () => {
 	});
 });
 
+describe("planSite — linked pages offered as an explicit opt-in", () => {
+	const linkedIds = (plan: SitePlan) => plan.linkedPages.map((page) => page.id);
+
+	it("offers a same-scope page the tree links to but does not own, outside the default set", async () => {
+		const { plan } = harness({
+			root: { title: "Home", body: [[pageRef("child", "c")], [pageRef("old", "o")]] },
+			child: { title: "Child", parent: "root", body: [[pageRef("old-two", "o2")]] },
+			old: { title: "Old sub-page", body: [] },
+			"old-two": { title: "Linked from a child", parent: "elsewhere", body: [] },
+		});
+		const sitePlan = await plan("root");
+		expect(ids(sitePlan)).toEqual(["root", "child"]);
+		expect(sitePlan.linkedPages).toEqual([
+			{ id: "old", title: "Old sub-page" },
+			{ id: "old-two", title: "Linked from a child" },
+		]);
+	});
+
+	it("never lists a private note planted in a shared root — in either group", async () => {
+		const { plan, loaded } = harness({
+			root: { title: "Shared", scope: TEAM, body: [[pageRef("private", "x")]] },
+			private: { title: "Private diary", scope: SOLO, body: [[{ text: "secret" }]] },
+		});
+		const sitePlan = await plan("root");
+		expect(ids(sitePlan)).toEqual(["root"]);
+		expect(linkedIds(sitePlan)).toEqual([]);
+		expect(loaded).toEqual(["root"]);
+	});
+
+	it("does not offer a page whose scope differs or cannot be read", async () => {
+		const { plan } = harness({
+			root: { title: "Home", body: [[pageRef("team", "t"), pageRef("unknown", "u")]] },
+			team: { title: "Team page", scope: TEAM, body: [] },
+			unknown: { title: "Unknown", scope: null, body: [] },
+		});
+		expect(linkedIds(await plan("root"))).toEqual([]);
+		const noRootScope = harness({
+			root: { title: "Home", scope: null, body: [[pageRef("x", "x")]] },
+			x: { title: "X", body: [] },
+		});
+		expect(linkedIds(await noRootScope.plan("root"))).toEqual([]);
+	});
+
+	it("does not follow a linked page's own links", async () => {
+		const { plan, loaded } = harness({
+			root: { title: "Home", body: [[pageRef("linked", "l")]] },
+			linked: { title: "Linked", body: [[pageRef("further", "f")]] },
+			further: { title: "Further", body: [] },
+		});
+		const sitePlan = await plan("root");
+		expect(linkedIds(sitePlan)).toEqual(["linked"]);
+		expect(loaded).toEqual(["root", "linked"]);
+	});
+
+	it("does not offer a mention target, a missing note, or a page already in the tree", async () => {
+		const { plan } = harness({
+			root: {
+				title: "Home",
+				body: [[mention("m", "M")], [pageRef("gone", "g")], [pageRef("child", "c")]],
+			},
+			m: { title: "Mentioned", body: [] },
+			child: { title: "Child", parent: "root", body: [[pageRef("root", "r")]] },
+		});
+		expect(linkedIds(await plan("root"))).toEqual([]);
+	});
+
+	it("holds both groups to one page cap", async () => {
+		const { plan } = harness({
+			root: { title: "Home", body: [[pageRef("c", "c"), pageRef("l1", "1"), pageRef("l2", "2")]] },
+			c: { title: "Child", parent: "root", body: [] },
+			l1: { title: "Linked one", body: [] },
+			l2: { title: "Linked two", body: [] },
+		});
+		const sitePlan = await plan("root", 3);
+		expect(ids(sitePlan)).toEqual(["root", "c"]);
+		expect(linkedIds(sitePlan)).toEqual(["l1"]);
+		expect(sitePlan.truncated).toBe(true);
+	});
+});
+
+describe("buildSiteArchive — linked pages", () => {
+	const vault = (withLinked: boolean) => ({
+		root: { title: "Home", body: [[pageRef("child", "c")], [pageRef("old", "stored label")]] },
+		child: { title: "Child", parent: "root", body: [[image("child-asset")]] },
+		...(withLinked
+			? { old: { title: "Old sub-page", body: [[{ text: "old body" }], [image("old-asset")]] } }
+			: {}),
+	});
+
+	it("leaves a linked page out by default, byte for byte as if it were not offered", async () => {
+		const offered = harness(vault(true));
+		const plan = await offered.plan("root");
+		expect(plan.linkedPages).toHaveLength(1);
+		const byDefault = await offered.build(plan);
+		const absent = harness(vault(false));
+		const before = await absent.build(await absent.plan("root"));
+		expect(byDefault.bytes).toEqual(before.bytes);
+		expect(byDefault.pageCount).toBe(2);
+		expect(offered.fetched).toEqual(["child-asset"]);
+		expect(everything(byDefault.bytes)).not.toMatch(/Old sub-page|old body/);
+	});
+
+	it("publishes a linked page only when it is ticked", async () => {
+		const { plan, build, fetched } = harness(vault(true));
+		const archive = await build(await plan("root"), ["root", "child", "old"]);
+		expect(archive.pageCount).toBe(3);
+		const site = unzip(archive.bytes);
+		expect([...site.keys()]).toEqual([
+			"index.html",
+			"child.html",
+			"old-sub-page.html",
+			"styles.css",
+			"assets/1.png",
+			"assets/2.png",
+		]);
+		expect(site.get("index.html")).toContain('<a href="old-sub-page.html">Old sub-page</a>');
+		expect(site.get("old-sub-page.html")).toContain("old body");
+		expect(fetched).toEqual(["child-asset", "old-asset"]);
+	});
+
+	it("does not write to the vault when a linked page is published", async () => {
+		const { planInput, buildInput } = harness(vault(true));
+		const calls: string[] = [];
+		const transport = new Proxy(planInput.transport, {
+			get: (target, key: string) => {
+				calls.push(key);
+				return target[key as keyof typeof target];
+			},
+		});
+		const plan = await planSite({ ...planInput, transport, rootId: "root" });
+		await buildSiteArchive({ ...buildInput, plan, confirmedIds: ["old"] });
+		expect(new Set(calls)).toEqual(new Set(["loadDoc", "closeDoc"]));
+	});
+});
+
 describe("buildSiteArchive", () => {
 	it("writes the confirmed pages with links between them", async () => {
 		const { publish } = harness({
