@@ -14,7 +14,6 @@
 
 import {
 	type BlockCommand,
-	BookmarkIcon,
 	ColorTarget,
 	CommandCategory,
 	type CommandContext,
@@ -38,6 +37,7 @@ import {
 	createStandardBlockCommands,
 	createTaskCommand,
 	createTransclusionCommand,
+	createWebEmbedCommands,
 	getBlockAnchorsController,
 	insertSnippet,
 	openEntityEmbedPicker,
@@ -70,7 +70,6 @@ import { getBrainstorm } from "../store/runtime";
 import { getYDocResolverApi } from "../store/ydoc-resolver";
 import { AddPropertyTargetKind, addPropertyStore } from "./add-property-store";
 import { copyBlockLink } from "./block-link";
-import { $createBookmarkNode } from "./nodes/bookmark-node";
 import { $createCheckboxFieldNode } from "./nodes/checkbox-field-node";
 import { $createDateFieldNode } from "./nodes/date-field-node";
 import { $createEquationNode } from "./nodes/equation-node";
@@ -345,25 +344,9 @@ const NOTES_EMBED_COMMANDS: readonly BlockCommand[] = [
 			});
 		},
 	},
-	{
-		id: "block.embed.bookmark",
-		category: CommandCategory.Embed,
-		label: t("notes.command.bookmark.label"),
-		description: t("notes.command.bookmark.description"),
-		icon: <BookmarkIcon />,
-		keywords: ["bookmark", "link", "url", "web", "embed", "preview"],
-		run: ({ editor }) => {
-			editor.update(() => {
-				const sel = $getSelection();
-				if (!$isRangeSelection(sel)) return;
-				try {
-					sel.anchor.getNode().getTopLevelElementOrThrow().replace($createBookmarkNode(""));
-				} catch {
-					// no top-level block (shouldn't happen from slash) — skip.
-				}
-			});
-		},
-	},
+	// Bookmark / web embed + the YouTube and Google Maps rows — the SHARED
+	// catalogue every full-editor host mounts (B11.20b), not a Notes fork.
+	...createWebEmbedCommands(editorT),
 ];
 
 export const BLOCK_COMMANDS: readonly BlockCommand[] = [

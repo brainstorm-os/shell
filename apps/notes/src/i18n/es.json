@@ -166,8 +166,6 @@
   "notes.command.audio.description": "Adjuntar un clip de audio con reproductor",
   "notes.command.file.label": "Archivo",
   "notes.command.file.description": "Adjuntar cualquier archivo como descarga",
-  "notes.command.bookmark.label": "Marcador",
-  "notes.command.bookmark.description": "Un enlace mostrado como tarjeta enriquecida",
   "notes.bookmark.urlPlaceholder": "Pegue un enlace…",
   "notes.bookmark.titlePlaceholder": "Título (opcional)",
   "notes.bookmark.descPlaceholder": "Descripción (opcional)",

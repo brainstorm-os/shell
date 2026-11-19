@@ -20,9 +20,11 @@
 import {
 	FULL_EDITOR_NODES,
 	MEDIA_COMMAND_IDS,
+	WEB_EMBED_COMMAND_IDS,
 	createEditorT,
 	createMediaBlockCommands,
 	createStandardBlockCommands,
+	createWebEmbedCommands,
 } from "@brainstorm-os/editor";
 import { describe, expect, it } from "vitest";
 import { BLOCK_COMMANDS } from "./commands";
@@ -51,6 +53,7 @@ describe("editor capability parity (Notes ⊇ shared full editor)", () => {
 		const sharedFullIds = [
 			...createStandardBlockCommands(t).map((c) => c.id),
 			...MEDIA_COMMAND_IDS,
+			...WEB_EMBED_COMMAND_IDS,
 			"block.embed.entity",
 			"block.transclusion",
 		];
@@ -72,6 +75,15 @@ describe("editor capability parity (Notes ⊇ shared full editor)", () => {
 			// shared factory) and re-checked here.
 			expect(mounted?.label).toBe(sharedCmd.label);
 			expect(mounted?.description).toBe(sharedCmd.description);
+		}
+	});
+
+	it("uses the SHARED web-embed commands verbatim (no Notes-authored fork)", () => {
+		for (const sharedCmd of createWebEmbedCommands(t)) {
+			const mounted = BLOCK_COMMANDS.filter((c) => c.id === sharedCmd.id);
+			expect(mounted, `${sharedCmd.id} must be mounted exactly once`).toHaveLength(1);
+			expect(mounted[0]?.label).toBe(sharedCmd.label);
+			expect(mounted[0]?.description).toBe(sharedCmd.description);
 		}
 	});
 });

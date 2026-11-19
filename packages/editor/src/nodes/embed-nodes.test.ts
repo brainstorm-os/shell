@@ -49,6 +49,59 @@ describe("BookmarkNode", () => {
 	});
 });
 
+describe("BookmarkNode embed hint", () => {
+	function hintAfterImport(embedHint: unknown): unknown {
+		const e = editor();
+		e.setEditorState(
+			e.parseEditorState(
+				JSON.stringify({
+					root: {
+						type: "root",
+						format: "",
+						indent: 0,
+						version: 1,
+						direction: null,
+						children: [{ type: "bookmark", version: 1, url: "", title: "", description: "", embedHint }],
+					},
+				}),
+			),
+		);
+		let out: unknown;
+		e.getEditorState().read(() => {
+			const node = $getRoot().getFirstChild();
+			out = $isBookmarkNode(node) ? node.exportJSON().embedHint : "not-a-bookmark";
+		});
+		return out;
+	}
+
+	it("round-trips a provider hint and omits the field on a plain bookmark", () => {
+		const e = editor();
+		e.update(
+			() => {
+				$getRoot().append(
+					$createBookmarkNode("", "", "", EmbedKind.GoogleMaps),
+					$createBookmarkNode("https://example.com"),
+				);
+			},
+			{ discrete: true },
+		);
+		roundTrip(e)
+			.getEditorState()
+			.read(() => {
+				const [hinted, plain] = $getRoot().getChildren();
+				expect($isBookmarkNode(hinted) && hinted.exportJSON().embedHint).toBe(EmbedKind.GoogleMaps);
+				expect($isBookmarkNode(plain) && "embedHint" in plain.exportJSON()).toBe(false);
+			});
+	});
+
+	it("drops a hint that is not a catalogue provider", () => {
+		expect(hintAfterImport(EmbedKind.YouTube)).toBe(EmbedKind.YouTube);
+		for (const bogus of ["bookmark", "evil", "__proto__", "constructor", 7, null, { a: 1 }]) {
+			expect(hintAfterImport(bogus), String(bogus)).toBeUndefined();
+		}
+	});
+});
+
 describe("WebEmbedNode", () => {
 	it("round-trips url + embedUrl + kind and coerces a bad kind", () => {
 		const e = editor();
@@ -56,8 +109,8 @@ describe("WebEmbedNode", () => {
 			() => {
 				$getRoot().append(
 					$createWebEmbedNode(
-						"https://youtu.be/abc",
-						"https://www.youtube-nocookie.com/embed/abc",
+						"https://youtu.be/dQw4w9WgXcQ",
+						"https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
 						EmbedKind.YouTube,
 					),
 				);
@@ -73,7 +126,7 @@ describe("WebEmbedNode", () => {
 				expect(node.exportJSON()).toMatchObject({
 					type: "web-embed",
 					kind: EmbedKind.YouTube,
-					embedUrl: "https://www.youtube-nocookie.com/embed/abc",
+					embedUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
 				});
 			});
 
@@ -145,7 +198,7 @@ describe("WebEmbedNode", () => {
 			type: "web-embed",
 			version: 1,
 			url: "https://attacker.example/evil",
-			embedUrl: "https://www.youtube-nocookie.com/embed/abc",
+			embedUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
 			kind: EmbedKind.YouTube,
 		});
 		expect(node).not.toBeNull();
@@ -157,7 +210,7 @@ describe("WebEmbedNode", () => {
 		const node = parseChild({
 			type: "web-embed",
 			version: 1,
-			url: "https://youtu.be/abc",
+			url: "https://youtu.be/dQw4w9WgXcQ",
 			// Deliberately wrong stored embedUrl — re-derivation must replace it.
 			embedUrl: "https://attacker.example/evil",
 			kind: EmbedKind.YouTube,
@@ -166,6 +219,6 @@ describe("WebEmbedNode", () => {
 		if (!node) return;
 		const json = node.exportJSON();
 		expect(json.kind).toBe(EmbedKind.YouTube);
-		expect(json.embedUrl).toBe("https://www.youtube-nocookie.com/embed/abc");
+		expect(json.embedUrl).toBe("https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ");
 	});
 });

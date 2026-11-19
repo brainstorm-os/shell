@@ -17,6 +17,7 @@ import {
 	TabsNode,
 	TitleNode,
 	ToggleNode,
+	WebEmbedNode,
 } from "@brainstorm-os/editor";
 import { CodeNode } from "@lexical/code";
 import { AutoLinkNode, LinkNode } from "@lexical/link";
@@ -44,7 +45,6 @@ import { SelectFieldNode } from "./nodes/select-field-node";
 import { TableOfContentsNode } from "./nodes/toc-node";
 import { TransclusionNode } from "./nodes/transclusion-node";
 import { VideoBlockNode } from "./nodes/video-block-node";
-import { WebEmbedNode } from "./nodes/web-embed-node";
 
 export const NOTES_ADDITIONAL_NODES: ReadonlyArray<Klass<LexicalNode>> = [
 	HeadingNode,

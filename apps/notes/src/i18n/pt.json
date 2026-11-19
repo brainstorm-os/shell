@@ -166,8 +166,6 @@
   "notes.command.audio.description": "Anexar um clipe de áudio com player",
   "notes.command.file.label": "Arquivo",
   "notes.command.file.description": "Anexar qualquer arquivo como download",
-  "notes.command.bookmark.label": "Favorito",
-  "notes.command.bookmark.description": "Um link exibido como cartão enriquecido",
   "notes.bookmark.urlPlaceholder": "Cole um link…",
   "notes.bookmark.titlePlaceholder": "Título (opcional)",
   "notes.bookmark.descPlaceholder": "Descrição (opcional)",

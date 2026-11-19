@@ -1578,9 +1578,51 @@
 	aspect-ratio: 16 / 9;
 	border-radius: var(--radius-md);
 	overflow: hidden;
+	background: var(--bg-elev);
+}
+
+/* Per-provider frame shape (EmbedAspect). Audio players are fixed-height
+ * strips, not ratios — a ratio would make them grow with the column. */
+.notes__embed[data-aspect="map"] {
+	aspect-ratio: 4 / 3;
+}
+
+.notes__embed[data-aspect="canvas"] {
+	aspect-ratio: 3 / 2;
+}
+
+.notes__embed[data-aspect="audio"] {
+	aspect-ratio: auto;
+	height: 166px;
+}
+
+.notes__embed[data-aspect="audio-list"] {
+	aspect-ratio: auto;
+	height: 352px;
+}
+
+.notes__embed[data-loaded] {
 	/* Matte behind the embedded iframe bitmap (named once on `.notes`),
 	 * intentionally literal for the same reason as the video letterbox. */
 	background: var(--notes-media-matte);
+}
+
+.notes__embed--link {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	aspect-ratio: auto;
+	padding: var(--space-2) var(--space-3);
+	border: var(--border-width) solid var(--border-strong);
+	color: var(--text-dim);
+}
+
+.notes__embed-link {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--text);
 }
 
 .notes__embed-frame {
@@ -1589,6 +1631,70 @@
 	width: 100%;
 	height: 100%;
 	border: 0;
+}
+
+/* Click-to-load facade: local chrome only — no thumbnail, no remote fetch. */
+.notes__embed-facade {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-1);
+	width: 100%;
+	padding: var(--space-3);
+	border: var(--border-width) solid var(--border-strong);
+	border-radius: var(--radius-md);
+	background: transparent;
+	color: var(--text);
+	font: inherit;
+	text-align: center;
+	cursor: pointer;
+}
+
+.notes__embed-facade:hover {
+	background: var(--hover);
+}
+
+.notes__embed-facade:focus-visible {
+	outline: 2px solid color-mix(in srgb, var(--color-focus-ring) 50%, transparent);
+	outline-offset: -2px;
+}
+
+.notes__embed-facade-glyph {
+	display: flex;
+	color: var(--text-dim);
+}
+
+.notes__embed-facade-name {
+	font-weight: var(--text-weight-semibold);
+}
+
+.notes__embed-facade-url,
+.notes__embed-facade-notice {
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: var(--text-size-xs);
+}
+
+.notes__embed-facade-url {
+	color: var(--text-dim);
+}
+
+.notes__embed-facade-notice {
+	color: var(--text-faint);
+}
+
+.notes__embed-facade-cta {
+	margin-top: var(--space-1);
+	padding: var(--space-1) var(--space-3);
+	border: var(--border-width) solid var(--border-strong);
+	border-radius: var(--radius-sm);
+	background: var(--bg);
+	font-size: var(--text-size-sm);
 }
 
 /* Toggle / collapsible block. A left gutter holds the disclosure caret

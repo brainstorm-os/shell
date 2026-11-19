@@ -166,8 +166,6 @@
   "notes.command.audio.description": "Attach an audio clip with a player",
   "notes.command.file.label": "File",
   "notes.command.file.description": "Attach any file as a download",
-  "notes.command.bookmark.label": "Bookmark",
-  "notes.command.bookmark.description": "A link rendered as a rich card",
   "notes.bookmark.urlPlaceholder": "Paste a link…",
   "notes.bookmark.titlePlaceholder": "Title (optional)",
   "notes.bookmark.descPlaceholder": "Description (optional)",

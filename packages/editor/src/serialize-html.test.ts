@@ -106,6 +106,33 @@ describe("serializedStateToHtml", () => {
 			),
 		).toBe("<p>@A &amp; B</p>");
 	});
+
+	it("exports a bookmark or web embed as an escaped anchor, never an iframe", () => {
+		const html = serializedStateToHtml(
+			doc([
+				{
+					type: "web-embed",
+					url: "https://www.google.com/maps/place/A&B/@1,2,3z",
+					embedUrl: "https://www.google.com/maps?q=A%26B&z=3&output=embed",
+					kind: "google-maps",
+				},
+				{ type: "bookmark", url: "https://example.com/a", title: "<b>T</b>", description: "" },
+				{ type: "bookmark", url: "javascript:alert(1)", title: "x", description: "" },
+				{ type: "web-embed", url: 'https://example.com/"onmouseover="x', embedUrl: null },
+			]),
+		);
+		expect(html).not.toContain("<iframe");
+		expect(html).not.toContain("output=embed");
+		expect(html).not.toContain("javascript:");
+		expect(html).not.toContain("<b>");
+		expect(html).not.toContain('"onmouseover="');
+		expect(html).toContain(
+			'<a href="https://www.google.com/maps/place/A&amp;B/@1,2,3z" rel="noreferrer">',
+		);
+		expect(html).toContain(
+			'<a href="https://example.com/a" rel="noreferrer">&lt;b&gt;T&lt;/b&gt;</a>',
+		);
+	});
 });
 
 describe("serializedStateToHtml — publishing mode (IE-12)", () => {

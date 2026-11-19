@@ -32,7 +32,7 @@ import { useEffect } from "react";
 import { useEditorT } from "../i18n";
 import { $createBookmarkNode } from "../nodes/bookmark-node";
 import { $createWebEmbedNode } from "../nodes/web-embed-node";
-import { EmbedKind, classifyUrl, isLoneUrl } from "./embed-providers";
+import { classifyEmbed, isLoneUrl } from "./embed-providers";
 
 export const INSERT_BOOKMARK_COMMAND = createCommand<string>("INSERT_BOOKMARK_COMMAND");
 export const INSERT_EMBED_COMMAND = createCommand<string>("INSERT_EMBED_COMMAND");
@@ -56,13 +56,12 @@ export function EmbedPlugin() {
 			};
 			const asBookmark = () => replaceWith(() => $createBookmarkNode(url));
 			const asEmbed = () => {
-				const c = classifyUrl(url);
-				if (!c || !c.embedUrl || c.kind === EmbedKind.Bookmark) {
+				const c = classifyEmbed(url);
+				if (!c) {
 					asBookmark();
 					return;
 				}
-				const { embedUrl, kind } = c;
-				replaceWith(() => $createWebEmbedNode(url, embedUrl, kind));
+				replaceWith(() => $createWebEmbedNode(url, c.embedUrl, c.kind));
 			};
 			const asLink = () => {
 				editor.update(() => {
@@ -73,8 +72,7 @@ export function EmbedPlugin() {
 					link.selectEnd();
 				});
 			};
-			const c = classifyUrl(url);
-			const embeddable = Boolean(c && c.kind !== EmbedKind.Bookmark && c.embedUrl);
+			const embeddable = classifyEmbed(url) !== null;
 			const items: AnchoredMenuItem[] = [
 				{ label: t("editor.embed.chooser.bookmark"), onSelect: asBookmark },
 				...(embeddable ? [{ label: t("editor.embed.chooser.embed"), onSelect: asEmbed }] : []),
@@ -127,12 +125,8 @@ export function EmbedPlugin() {
 					if (!$isRangeSelection(sel)) return false;
 					const block = sel.anchor.getNode().getTopLevelElement();
 					if (!block) return false;
-					const c = classifyUrl(url);
-					block.replace(
-						c && c.kind !== EmbedKind.Bookmark && c.embedUrl
-							? $createWebEmbedNode(url, c.embedUrl, c.kind)
-							: $createBookmarkNode(url),
-					);
+					const c = classifyEmbed(url);
+					block.replace(c ? $createWebEmbedNode(url, c.embedUrl, c.kind) : $createBookmarkNode(url));
 					return true;
 				},
 				COMMAND_PRIORITY_LOW,
