@@ -45,9 +45,14 @@ export enum CreateTaskToolError {
 	NotWritten = "create-task: task not written",
 }
 
+/** What the CALLER gets back: the id of the task that was made, and nothing
+ *  else. In particular nothing READ from the source — Tasks reads the object
+ *  under its own grants, and echoing its title would hand it to a caller that
+ *  may hold no read grant of its own (the Tool-10 review's confused-deputy
+ *  finding). The shell now refuses such a caller outright; this is the second
+ *  lock, so the answer stays safe if that check ever regresses. */
 export type CreateTaskToolResult = {
 	taskId: string;
-	name: string;
 };
 
 export type CreateTaskToolDeps = {
@@ -118,5 +123,5 @@ export async function runCreateTaskTool(
 		// The store's own message may quote vault content; the caller gets a code.
 		throw new Error(CreateTaskToolError.NotWritten);
 	}
-	return { taskId: task.id, name: task.name };
+	return { taskId: task.id };
 }

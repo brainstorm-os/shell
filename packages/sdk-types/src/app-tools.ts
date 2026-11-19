@@ -334,6 +334,11 @@ export function appToolFingerprint(tool: AppToolRegistration): string {
 		tool.description,
 		tool.effect,
 		[...(tool.surfaces ?? [])].sort(),
+		// Which objects the tool is offered on is part of what was approved: an
+		// update that widens `appliesTo` (or empties it, which means ANY type)
+		// puts the same approved tool in front of objects the user never agreed
+		// to hand it. Sorted — order is not a change.
+		[...(tool.appliesTo ?? [])].sort(),
 		(tool.input ?? []).map((i) => [
 			i.name,
 			i.description,

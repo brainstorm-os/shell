@@ -131,7 +131,7 @@ const settle = () =>
 describe("a note's object menu as a tool consumer", () => {
 	it("offers the granted tool, attributed to its provider, and sends THIS note", async () => {
 		const list = vi.fn(async () => [createTask]);
-		const call = vi.fn(async () => ({ value: { taskId: "task-1", name: "Plan the offsite" } }));
+		const call = vi.fn(async () => ({ value: { taskId: "task-1" } }));
 		const rows = await openNoteMenu(runtimeWith({ list, call }), true);
 		expect(list).toHaveBeenCalledWith({ surface: AppToolSurface.Menu, appliesTo: NOTE_TYPE });
 

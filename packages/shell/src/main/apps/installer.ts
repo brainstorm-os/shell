@@ -42,6 +42,7 @@ import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 import { type ShortcutRegistry, shellChordSet } from "../shortcuts/shortcut-registry";
 import { OpenerTargetKind, RegistryRepositories } from "../storage/registry-repo";
 import { hashBundleDirectory } from "./app-bundle-hash";
+import { forgetAppName } from "./app-name";
 import {
 	AppSignatureStatus,
 	type SignatureVerification,
@@ -225,6 +226,7 @@ export class AppInstaller {
 		}
 
 		this.mirrorShortcuts(manifest);
+		forgetAppName(manifest.id);
 		broadcastAppsChanged();
 
 		return {
@@ -327,6 +329,7 @@ export class AppInstaller {
 		}
 
 		this.mirrorShortcuts(manifest);
+		forgetAppName(manifest.id);
 		broadcastAppsChanged();
 
 		return {
@@ -413,6 +416,7 @@ export class AppInstaller {
 			this.writeRegistrations(manifest, now, blockSources);
 		})();
 		this.mirrorShortcuts(manifest);
+		forgetAppName(appId);
 		broadcastAppsChanged();
 		return { ok: true, id: manifest.id, version: manifest.version };
 	}
@@ -437,6 +441,7 @@ export class AppInstaller {
 
 		// Bundle directory stays on disk for forensic recovery; vacuum is a
 		// separate operation (Stage 13).
+		forgetAppName(appId);
 		broadcastAppsChanged();
 		return { ok: true, revokedCapabilities, orphanedTypes };
 	}

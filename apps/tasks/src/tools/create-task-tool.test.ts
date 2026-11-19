@@ -42,7 +42,10 @@ describe("create-task tool handler", () => {
 	it("creates one task named after the source note", async () => {
 		const d = deps();
 		const out = await runCreateTaskTool({ source: "n1" }, d);
-		expect(out).toEqual({ taskId: "task-1", name: "Plan the offsite" });
+		// The id of what was made, and NOTHING read from the source: a caller
+		// must not learn a note's title through the tool's answer.
+		expect(out).toEqual({ taskId: "task-1" });
+		expect(JSON.stringify(out)).not.toContain("offsite");
 		expect(d.written).toHaveLength(1);
 		expect(d.written[0]).toMatchObject({
 			id: "task-1",
@@ -58,7 +61,8 @@ describe("create-task tool handler", () => {
 	it("names an untitled source with the localised fallback and adds no notes", async () => {
 		const d = deps({ getEntity: async () => ({ type: NOTE_TYPE, properties: { title: "  " } }) });
 		const out = await runCreateTaskTool({ source: "n1" }, d);
-		expect(out.name).toBe("Untitled task");
+		expect(out).toEqual({ taskId: "task-1" });
+		expect(d.written[0]?.name).toBe("Untitled task");
 		expect(d.written[0]?.notes).toBeUndefined();
 	});
 

@@ -15,6 +15,7 @@ import {
 } from "@brainstorm-os/sdk-types";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+	TOOL_APPROVAL_LABEL_MAX,
 	TOOL_APPROVAL_PROMPT_CHANNEL,
 	ToolApprovalHost,
 	ToolApprovalReason,
@@ -158,5 +159,35 @@ describe("ToolApprovalHost", () => {
 
 	it("uses the documented channel", () => {
 		expect(TOOL_APPROVAL_PROMPT_CHANNEL).toBe("tools:approval-prompt");
+	});
+
+	it("clamps both party names and falls back to the app id for an unusable one", async () => {
+		const host = new ToolApprovalHost();
+		const d = dashboard();
+		host.setDashboard(d);
+		const asked = ask(host, {
+			callerLabel: "N".repeat(120),
+			providerLabel: "Tasks\u202e",
+		});
+		const sent = d.sent[0] as ToolApprovalRequest;
+		expect(Array.from(sent.callerLabel).length).toBe(TOOL_APPROVAL_LABEL_MAX + 1);
+		expect(sent.callerLabel.endsWith("…")).toBe(true);
+		// A name carrying a bidi override is not shown at all — the registry id is.
+		expect(sent.providerLabel).toBe(TOOL.appId);
+		// The ids are never rewritten: they are what makes the prompt unambiguous.
+		expect(sent.callerAppId).toBe("io.brainstorm.notes");
+		expect(sent.providerAppId).toBe(TOOL.appId);
+		host.handleReply({ requestId: sent.requestId, accept: false });
+		await asked;
+	});
+
+	it("leaves a short, clean name exactly as the registry gave it", async () => {
+		const host = new ToolApprovalHost();
+		const d = dashboard();
+		host.setDashboard(d);
+		const asked = ask(host, { callerLabel: "  Notes ", providerLabel: "Tasks" });
+		expect(d.sent[0]).toMatchObject({ callerLabel: "Notes", providerLabel: "Tasks" });
+		host.handleReply({ requestId: (d.sent[0] as ToolApprovalRequest).requestId, accept: false });
+		await asked;
 	});
 });
