@@ -18,8 +18,8 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CommandCategory } from "./block-command";
 import { createEditorT } from "./i18n";
-import { $isBookmarkNode, BookmarkNode } from "./nodes/bookmark-node";
-import { $isWebEmbedNode, WebEmbedNode } from "./nodes/web-embed-node";
+import { $createBookmarkNode, $isBookmarkNode, BookmarkNode } from "./nodes/bookmark-node";
+import { $createWebEmbedNode, $isWebEmbedNode, WebEmbedNode } from "./nodes/web-embed-node";
 import { EmbedKind } from "./plugins/embed-providers";
 import { fullEditorExtraCommands } from "./plugins/full-editor-plugins";
 import { filterCommands } from "./slash-sections";
@@ -194,5 +194,32 @@ describe("shared web-embed slash rows", () => {
 		await flush();
 		expect(firstBlock((n) => $isWebEmbedNode(n) && n.exportJSON().kind)).toBe(EmbedKind.Spotify);
 		expect(container.querySelector("iframe")).toBeNull();
+	});
+});
+
+describe("embed decorators with non-string synced fields", () => {
+	it("render a safe fallback for any JSON value a peer can write, without throwing", async () => {
+		const errors: unknown[] = [];
+		const stop = editor.registerUpdateListener(() => undefined);
+		const onError = (event: ErrorEvent) => errors.push(event.error);
+		window.addEventListener("error", onError);
+		for (const hostile of [42, null, { href: "https://youtu.be/dQw4w9WgXcQ" }, ["x"], true]) {
+			const bad = hostile as unknown as string;
+			await act(async () => {
+				editor.update(() => {
+					$getRoot()
+						.clear()
+						.append($createWebEmbedNode(bad, bad, EmbedKind.YouTube), $createBookmarkNode(bad, bad, bad));
+				});
+			});
+			await flush();
+			expect(container.querySelector(".notes__embed--link"), String(hostile)).not.toBeNull();
+			expect(container.querySelector(".notes__bookmark"), String(hostile)).not.toBeNull();
+			expect(container.querySelector("iframe"), String(hostile)).toBeNull();
+			expect(container.querySelector("a[href]"), String(hostile)).toBeNull();
+		}
+		window.removeEventListener("error", onError);
+		stop();
+		expect(errors).toEqual([]);
 	});
 });

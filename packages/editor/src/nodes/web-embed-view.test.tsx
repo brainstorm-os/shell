@@ -142,3 +142,58 @@ describe("WebEmbedView degrade path", () => {
 		}
 	});
 });
+
+describe("WebEmbedView consent is bound to the loaded target", () => {
+	it("falls back to the facade when the URL changes under a loaded frame", () => {
+		render("https://youtu.be/dQw4w9WgXcQ");
+		load();
+		expect(frame()?.getAttribute("src")).toBe("https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ");
+
+		for (const rewritten of [
+			"https://codepen.io/attacker/pen/abcXYZ",
+			"https://www.loom.com/share/0281766fa2d04bb788eaf19e65135184",
+			"https://youtu.be/AAAAAAAAAAA",
+		]) {
+			render(rewritten);
+			expect(frame(), rewritten).toBeNull();
+			expect(harness.container.querySelector(".notes__embed-facade"), rewritten).not.toBeNull();
+		}
+	});
+
+	it("does not resurrect a frame without a new click when the URL changes back and forth", () => {
+		render("https://youtu.be/dQw4w9WgXcQ");
+		load();
+		render("https://codepen.io/attacker/pen/abcXYZ");
+		expect(frame()).toBeNull();
+		load();
+		expect(new URL(frame()?.getAttribute("src") ?? "").origin).toBe("https://codepen.io");
+		render("https://youtu.be/dQw4w9WgXcQ");
+		expect(frame()).toBeNull();
+	});
+
+	it("keeps the frame across a rerender that leaves the target unchanged", () => {
+		render("https://youtu.be/dQw4w9WgXcQ");
+		load();
+		const before = frame();
+		render("https://www.youtube.com/watch?v=dQw4w9WgXcQ&si=other-tracking");
+		expect(frame()).toBe(before);
+	});
+});
+
+describe("WebEmbedView with a non-string synced url", () => {
+	it("renders the inert fallback instead of throwing", () => {
+		for (const hostile of [
+			42,
+			null,
+			undefined,
+			{ href: "https://youtu.be/dQw4w9WgXcQ" },
+			["x"],
+			true,
+		]) {
+			expect(() => render(hostile as unknown as string), String(hostile)).not.toThrow();
+			expect(frame(), String(hostile)).toBeNull();
+			expect(harness.container.querySelector("[href]"), String(hostile)).toBeNull();
+			expect(harness.container.querySelector(".notes__embed-facade"), String(hostile)).toBeNull();
+		}
+	});
+});
