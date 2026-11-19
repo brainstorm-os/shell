@@ -39,6 +39,7 @@ import { NOTE_TYPE } from "../store/entities-repository";
 import type { StoredNote } from "../store/note";
 import type { NotesBrainstorm } from "../store/runtime";
 import { EntityIcon } from "./entity-icon";
+import type { NoteToolSeams } from "./note-tools";
 import { noteObjectMenuContext } from "./object-menu-context";
 /** Fixed row pitch. Titles are single-line (nowrap + ellipsis) so every
  *  note row is the same height; date-section headers use a shorter fixed
@@ -84,6 +85,9 @@ export type NotesListProps = {
 	 *  editor: opens the target-note picker anchored to `anchor`. Omitted →
 	 *  no menu item (e.g. a host without the twin flow). */
 	onLinkInto?: (source: { id: string; title: string }, anchor: Element | null) => void;
+	/** Tool-10 — app-tool seams for each row's object menu, so a row offers the
+	 *  same tools the open note's header does. */
+	tools?: NoteToolSeams;
 };
 
 export function NotesList({
@@ -95,6 +99,7 @@ export function NotesList({
 	runtime,
 	onRemoveNote,
 	onLinkInto,
+	tools,
 }: NotesListProps) {
 	const flatRows = useMemo<FlatRow[]>(() => {
 		if (order) {
@@ -256,6 +261,7 @@ export function NotesList({
 										noteId: note.id,
 										noteTitle: title,
 										runtime,
+										...(tools ? { tools } : {}),
 										onRemove: () => onRemoveNote(note.id),
 										// DND-6 — the keyboard/menu twin of dragging this row
 										// into an editor (reference semantic, target picked).
