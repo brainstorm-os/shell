@@ -37,6 +37,7 @@ import { type EditorT, useEditorT } from "../i18n";
 import { createMediaBlockCommands } from "../media-commands";
 import { createEntityEmbedCommand, createTransclusionCommand } from "../standard-commands";
 import { createTaskCommand } from "../task-mention";
+import { createWebEmbedCommands } from "../web-embed-commands";
 import { BlockEmbedPickerPlugin } from "./block-embed-picker-plugin";
 import { CodeBlockPlugin } from "./code-block-plugin";
 import { CodeBlockToolbarPlugin } from "./code-block-toolbar-plugin";
@@ -85,7 +86,8 @@ export type FullEditorPluginsProps = {
 	/** Comment-on-selection (B11.9): adds the toolbar's "Comment" overflow row,
 	 *  handing the selection's enclosing block id + quote to the host. */
 	onComment?: (anchor: SelectionCommentAnchor) => void;
-	/** Lone-URL paste → bookmark / embed / link chooser. */
+	/** External web embeds: the lone-URL paste chooser (bookmark / embed /
+	 *  link) and the shared bookmark · YouTube · Google Maps slash rows. */
 	embed?: boolean;
 	/** Media blocks: `/image` `/video` `/audio` `/file` slash commands,
 	 *  drag-drop + paste of files, and the click-to-edit inspector. Needs a
@@ -133,6 +135,7 @@ export function fullEditorExtraCommands(
 	options: {
 		extraCommands?: readonly BlockCommand[];
 		media?: boolean;
+		webEmbed?: boolean;
 		entityEmbed?: boolean;
 		transclusion?: boolean;
 		task?: boolean;
@@ -140,6 +143,7 @@ export function fullEditorExtraCommands(
 ): readonly BlockCommand[] {
 	const extras = options.extraCommands ? [...options.extraCommands] : [];
 	if (options.media) extras.push(...createMediaBlockCommands(t));
+	if (options.webEmbed) extras.push(...createWebEmbedCommands(t));
 	// Order mirrors Notes' catalogue: Embed before Reference.
 	if (options.entityEmbed) extras.push(createEntityEmbedCommand(t));
 	if (options.transclusion) extras.push(createTransclusionCommand(t));
@@ -187,11 +191,12 @@ export function FullEditorPlugins({
 			fullEditorExtraCommands(t, {
 				...(extraCommands ? { extraCommands } : {}),
 				media,
+				webEmbed: embed,
 				entityEmbed: showEntityEmbed,
 				transclusion: showTransclusion,
 				task: showTask,
 			}),
-		[t, extraCommands, showTransclusion, showEntityEmbed, showTask, media],
+		[t, extraCommands, showTransclusion, showEntityEmbed, showTask, media, embed],
 	);
 	return (
 		<StandardEditingPlugins

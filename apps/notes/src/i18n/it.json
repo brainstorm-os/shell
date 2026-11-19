@@ -161,8 +161,6 @@
   "notes.command.audio.description": "Allega un clip audio con lettore",
   "notes.command.file.label": "File",
   "notes.command.file.description": "Allega qualsiasi file come download",
-  "notes.command.bookmark.label": "Segnalibro",
-  "notes.command.bookmark.description": "Un link mostrato come scheda arricchita",
   "notes.bookmark.urlPlaceholder": "Incolli un link…",
   "notes.bookmark.titlePlaceholder": "Titolo (facoltativo)",
   "notes.bookmark.descPlaceholder": "Descrizione (facoltativa)",

@@ -161,8 +161,6 @@
   "notes.command.audio.description": "Joindre un clip audio avec un lecteur",
   "notes.command.file.label": "Fichier",
   "notes.command.file.description": "Joindre n'importe quel fichier en téléchargement",
-  "notes.command.bookmark.label": "Signet",
-  "notes.command.bookmark.description": "Un lien affiché sous forme de carte enrichie",
   "notes.bookmark.urlPlaceholder": "Collez un lien…",
   "notes.bookmark.titlePlaceholder": "Titre (facultatif)",
   "notes.bookmark.descPlaceholder": "Description (facultative)",

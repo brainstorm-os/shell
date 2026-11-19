@@ -161,8 +161,6 @@
   "notes.command.audio.description": "Einen Audioclip mit Player anhängen",
   "notes.command.file.label": "Datei",
   "notes.command.file.description": "Beliebige Datei als Download anhängen",
-  "notes.command.bookmark.label": "Lesezeichen",
-  "notes.command.bookmark.description": "Ein Link, dargestellt als Rich-Karte",
   "notes.bookmark.urlPlaceholder": "Link einfügen…",
   "notes.bookmark.titlePlaceholder": "Titel (optional)",
   "notes.bookmark.descPlaceholder": "Beschreibung (optional)",

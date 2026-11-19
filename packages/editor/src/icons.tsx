@@ -43,11 +43,13 @@ import {
 	ListDashes,
 	ListNumbers,
 	MagnifyingGlass,
+	MapPin,
 	Minus,
 	MusicNote,
 	PaintBucket,
 	Paragraph,
 	PencilSimple,
+	Play,
 	Plus,
 	Quotes,
 	Rows,
@@ -269,6 +271,14 @@ export function AudioIcon(): ReactNode {
 
 export function GlobeIcon(): ReactNode {
 	return <Globe size={SIZE} aria-hidden focusable={false} />;
+}
+
+export function MapPinIcon(): ReactNode {
+	return <MapPin size={SIZE} aria-hidden focusable={false} />;
+}
+
+export function PlayIcon(): ReactNode {
+	return <Play size={SIZE} aria-hidden focusable={false} />;
 }
 
 export function EmbedIcon(): ReactNode {
