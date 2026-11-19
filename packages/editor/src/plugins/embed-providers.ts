@@ -20,25 +20,15 @@
  *     grants (embed-csp.test.ts pins the two together).
  */
 
+import {
+	EMBED_FRAMES,
+	type EmbedFrame,
+	EmbedKind,
+	type EmbedProviderKind,
+} from "@brainstorm-os/sdk-types";
 import type { EditorI18nKey } from "../i18n";
 
-export enum EmbedKind {
-	YouTube = "youtube",
-	Vimeo = "vimeo",
-	Loom = "loom",
-	Figma = "figma",
-	CodeSandbox = "codesandbox",
-	GoogleMaps = "google-maps",
-	OpenStreetMap = "openstreetmap",
-	Spotify = "spotify",
-	SoundCloud = "soundcloud",
-	CodePen = "codepen",
-	Miro = "miro",
-	/** Not embeddable — render a link/bookmark card instead. */
-	Bookmark = "bookmark",
-}
-
-export type EmbedProviderKind = Exclude<EmbedKind, EmbedKind.Bookmark>;
+export { EmbedKind, type EmbedProviderKind };
 
 /** The frame's shape, applied as `data-aspect` (sized in editor-theme.css). */
 export enum EmbedAspect {
@@ -57,9 +47,7 @@ export enum EmbedLoadPolicy {
 	ClickToLoadAlways = "click-to-load-always",
 }
 
-export type EmbedProvider = {
-	/** The only origin this provider's iframe may point at. */
-	frameOrigin: string;
+export type EmbedProvider = EmbedFrame & {
 	aspect: EmbedAspect;
 	loadPolicy: EmbedLoadPolicy;
 	/** `sandbox` tokens — the minimum the provider's player needs. */
@@ -81,7 +69,7 @@ const SANDBOX_PLAYGROUND = `${SANDBOX_BASE} allow-forms`;
 
 export const EMBED_PROVIDERS: Readonly<Record<EmbedProviderKind, EmbedProvider>> = {
 	[EmbedKind.YouTube]: {
-		frameOrigin: "https://www.youtube-nocookie.com",
+		...EMBED_FRAMES[EmbedKind.YouTube],
 		aspect: EmbedAspect.Video,
 		loadPolicy: EmbedLoadPolicy.ClickToLoad,
 		sandbox: SANDBOX_VIDEO,
@@ -90,7 +78,7 @@ export const EMBED_PROVIDERS: Readonly<Record<EmbedProviderKind, EmbedProvider>>
 		labelKey: "editor.embed.provider.youtube",
 	},
 	[EmbedKind.Vimeo]: {
-		frameOrigin: "https://player.vimeo.com",
+		...EMBED_FRAMES[EmbedKind.Vimeo],
 		aspect: EmbedAspect.Video,
 		loadPolicy: EmbedLoadPolicy.ClickToLoad,
 		sandbox: SANDBOX_VIDEO,
@@ -99,7 +87,7 @@ export const EMBED_PROVIDERS: Readonly<Record<EmbedProviderKind, EmbedProvider>>
 		labelKey: "editor.embed.provider.vimeo",
 	},
 	[EmbedKind.Loom]: {
-		frameOrigin: "https://www.loom.com",
+		...EMBED_FRAMES[EmbedKind.Loom],
 		aspect: EmbedAspect.Video,
 		loadPolicy: EmbedLoadPolicy.ClickToLoadAlways,
 		sandbox: SANDBOX_VIDEO,
@@ -108,7 +96,7 @@ export const EMBED_PROVIDERS: Readonly<Record<EmbedProviderKind, EmbedProvider>>
 		labelKey: "editor.embed.provider.loom",
 	},
 	[EmbedKind.Figma]: {
-		frameOrigin: "https://www.figma.com",
+		...EMBED_FRAMES[EmbedKind.Figma],
 		aspect: EmbedAspect.Canvas,
 		loadPolicy: EmbedLoadPolicy.ClickToLoadAlways,
 		sandbox: SANDBOX_BASE,
@@ -117,7 +105,7 @@ export const EMBED_PROVIDERS: Readonly<Record<EmbedProviderKind, EmbedProvider>>
 		labelKey: "editor.embed.provider.figma",
 	},
 	[EmbedKind.CodeSandbox]: {
-		frameOrigin: "https://codesandbox.io",
+		...EMBED_FRAMES[EmbedKind.CodeSandbox],
 		aspect: EmbedAspect.Canvas,
 		loadPolicy: EmbedLoadPolicy.ClickToLoad,
 		sandbox: SANDBOX_PLAYGROUND,
@@ -126,7 +114,7 @@ export const EMBED_PROVIDERS: Readonly<Record<EmbedProviderKind, EmbedProvider>>
 		labelKey: "editor.embed.provider.codesandbox",
 	},
 	[EmbedKind.GoogleMaps]: {
-		frameOrigin: "https://www.google.com",
+		...EMBED_FRAMES[EmbedKind.GoogleMaps],
 		aspect: EmbedAspect.Map,
 		loadPolicy: EmbedLoadPolicy.ClickToLoadAlways,
 		sandbox: SANDBOX_BASE,
@@ -135,7 +123,7 @@ export const EMBED_PROVIDERS: Readonly<Record<EmbedProviderKind, EmbedProvider>>
 		labelKey: "editor.embed.provider.googleMaps",
 	},
 	[EmbedKind.OpenStreetMap]: {
-		frameOrigin: "https://www.openstreetmap.org",
+		...EMBED_FRAMES[EmbedKind.OpenStreetMap],
 		aspect: EmbedAspect.Map,
 		loadPolicy: EmbedLoadPolicy.ClickToLoad,
 		sandbox: SANDBOX_BASE,
@@ -144,7 +132,7 @@ export const EMBED_PROVIDERS: Readonly<Record<EmbedProviderKind, EmbedProvider>>
 		labelKey: "editor.embed.provider.openStreetMap",
 	},
 	[EmbedKind.Spotify]: {
-		frameOrigin: "https://open.spotify.com",
+		...EMBED_FRAMES[EmbedKind.Spotify],
 		aspect: EmbedAspect.Audio,
 		loadPolicy: EmbedLoadPolicy.ClickToLoadAlways,
 		sandbox: SANDBOX_BASE,
@@ -153,7 +141,7 @@ export const EMBED_PROVIDERS: Readonly<Record<EmbedProviderKind, EmbedProvider>>
 		labelKey: "editor.embed.provider.spotify",
 	},
 	[EmbedKind.SoundCloud]: {
-		frameOrigin: "https://w.soundcloud.com",
+		...EMBED_FRAMES[EmbedKind.SoundCloud],
 		aspect: EmbedAspect.Audio,
 		loadPolicy: EmbedLoadPolicy.ClickToLoadAlways,
 		sandbox: SANDBOX_BASE,
@@ -162,7 +150,7 @@ export const EMBED_PROVIDERS: Readonly<Record<EmbedProviderKind, EmbedProvider>>
 		labelKey: "editor.embed.provider.soundCloud",
 	},
 	[EmbedKind.CodePen]: {
-		frameOrigin: "https://codepen.io",
+		...EMBED_FRAMES[EmbedKind.CodePen],
 		aspect: EmbedAspect.Canvas,
 		loadPolicy: EmbedLoadPolicy.ClickToLoad,
 		sandbox: SANDBOX_PLAYGROUND,
@@ -171,7 +159,7 @@ export const EMBED_PROVIDERS: Readonly<Record<EmbedProviderKind, EmbedProvider>>
 		labelKey: "editor.embed.provider.codePen",
 	},
 	[EmbedKind.Miro]: {
-		frameOrigin: "https://miro.com",
+		...EMBED_FRAMES[EmbedKind.Miro],
 		aspect: EmbedAspect.Canvas,
 		loadPolicy: EmbedLoadPolicy.ClickToLoadAlways,
 		sandbox: SANDBOX_BASE,

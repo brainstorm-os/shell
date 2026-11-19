@@ -3487,3 +3487,10 @@ export {
 	type VersionRestoreResult,
 	type VersionSummary,
 } from "./version-history";
+export {
+	EMBEDDER_REFERRER,
+	EMBED_FRAMES,
+	type EmbedFrame,
+	EmbedKind,
+	type EmbedProviderKind,
+} from "./embed-frames";
