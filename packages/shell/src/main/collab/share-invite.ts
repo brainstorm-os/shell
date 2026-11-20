@@ -437,7 +437,7 @@ export function shareEntityWithInvite(
 	}
 	publishDocProfile(doc, opts.invite.userPubB64, inviteProfile(opts.invite));
 
-	const existingWrap = findWrapForRecipient(doc, recipientPub);
+	const existingWrap = findWrapForRecipient(doc, recipientPub, opts.dekVersion);
 	if (currentRole !== null && existingWrap !== null) return existingWrap;
 
 	grantAccess(doc, {

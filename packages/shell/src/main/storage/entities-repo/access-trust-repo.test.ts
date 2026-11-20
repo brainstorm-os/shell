@@ -48,6 +48,16 @@ describe("AccessTrustRepository", () => {
 		expect(repo.pinRoot("ent_a", "root-2", 20)).toBe("root-1");
 	});
 
+	it("pins a child's container once, and lists what a container holds", () => {
+		expect(repo.getContainer("msg_1")).toBeNull();
+		expect(repo.pinContainer("msg_1", "chan_a", 10)).toBe("chan_a");
+		expect(repo.pinContainer("msg_1", "chan_b", 20)).toBe("chan_a");
+		repo.pinContainer("msg_2", "chan_a", 30);
+		repo.pinContainer("msg_3", "chan_b", 40);
+		expect(repo.listContained("chan_a")).toEqual(["msg_1", "msg_2"]);
+		expect(repo.listContained("chan_none")).toEqual([]);
+	});
+
 	it("remembers statements idempotently and per entity; a grant and a revoke may share a signature string", () => {
 		const grant = { kind: AccessStatementKind.Grant, sig: "sig-1", body: '{"g":1}' };
 		const revoke = { kind: AccessStatementKind.Revoke, sig: "sig-1", body: '{"r":1}' };

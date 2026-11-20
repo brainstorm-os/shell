@@ -469,4 +469,23 @@ export const ENTITIES_MIGRATIONS: SqliteMigration[] = [
 			`);
 		},
 	},
+	{
+		version: 15,
+		description: "entities.db v15 — entity_containers (0.16.0 container rule for shared children)",
+		up: (db) => {
+			// The container a shared CHILD entity (a channel's message, a project's
+			// task) was first seen in on this device. A child is written only by a
+			// current Editor+ of its container, and the container consulted is this
+			// pin - never the child's own parent property, which its author can
+			// rewrite in the very update being judged. First pin wins. LOCAL state.
+			db.exec(`
+				CREATE TABLE entity_containers (
+					entity_id     TEXT PRIMARY KEY,
+					container_id  TEXT NOT NULL,
+					pinned_at     INTEGER NOT NULL
+				);
+				CREATE INDEX idx_entity_containers_container ON entity_containers(container_id);
+			`);
+		},
+	},
 ];

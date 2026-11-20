@@ -318,7 +318,14 @@ export async function authorizeShareBootstrap(
 			verdict = await authorizeContainerDescent(input, probe, selfGrant.via, selfGrant.addedBy);
 		}
 		// Admitted: from here on this entity's root owner is fixed on this device.
-		if (verdict === ShareBootstrapVerdict.Allow) input.accessTrust.pinRoot(input.entityId, root);
+		if (verdict === ShareBootstrapVerdict.Allow) {
+			input.accessTrust.pinRoot(input.entityId, root);
+			// A cascade child: the container we just checked it descends from is,
+			// from now on, the container whose membership governs who writes it.
+			if (selfGrant.anchor === null && selfGrant.via !== null) {
+				input.accessTrust.pinContainer(input.entityId, selfGrant.via);
+			}
+		}
 		return verdict;
 	} catch {
 		return ShareBootstrapVerdict.DenyUnreadable;

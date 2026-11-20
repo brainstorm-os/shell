@@ -41,6 +41,9 @@ export type AccessTrustPersistence = {
 	pinRoot(entityId: string, rootPub: string, now: number): string;
 	listStatements(entityId: string): AccessStatementRecord[];
 	remember(entityId: string, records: readonly AccessStatementRecord[], now: number): void;
+	getContainer(entityId: string): string | null;
+	pinContainer(entityId: string, containerId: string, now: number): string;
+	listContained(containerId: string): string[];
 };
 
 function parseGrant(body: string): GrantStatement | null {
@@ -95,6 +98,45 @@ export class AccessTrustStore {
 		this.#persistence = persistence;
 		this.#selfPubB64 = selfPubB64;
 		this.#now = now;
+	}
+
+	/** Pin the container `entityId` was first seen in (a cascade child). The
+	 *  first pin is the only pin. */
+	pinContainer(entityId: string, containerId: string): string {
+		return this.#persistence.pinContainer(entityId, containerId, this.#now());
+	}
+
+	/** Every entity this device has pinned to `containerId`. */
+	containedIn(containerId: string): string[] {
+		return this.#persistence.listContained(containerId);
+	}
+
+	/**
+	 * The container(s) whose membership also governs `entityId` — the CONTAINER
+	 * RULE: a shared child is written, and re-keyed, only by a current Editor+
+	 * of the container it lives in.
+	 *
+	 * The answer is this device's pin when it has one. Otherwise it is read from
+	 * the `via` of the grants that have effect on the child (signed by its
+	 * owners, and remembered here once seen): exactly one names the container
+	 * and is pinned; several means the record disagrees with itself, and then
+	 * ALL of them must admit the writer. It is never read from the child's own
+	 * parent property, which its author can rewrite in the update being judged -
+	 * so moving a message does not move who may write it. Empty for an entity
+	 * that is not a cascade child.
+	 */
+	containersOf(doc: Y.Doc, entityId: string, trust: AccessTrust): string[] {
+		const pinned = this.#persistence.getContainer(entityId);
+		if (pinned !== null) return [pinned];
+		if (trust.root === null) return [];
+		const named = new Set<string>();
+		for (const grant of effectiveStatements(doc, entityId, trust).grants) {
+			if (grant.via !== null) named.add(grant.via);
+		}
+		const containers = [...named].sort();
+		const [only] = containers;
+		if (containers.length === 1 && only !== undefined) this.pinContainer(entityId, only);
+		return containers;
 	}
 
 	/** What this device remembers of `entityId`'s record. Every remembered
@@ -169,7 +211,17 @@ export class AccessTrustStore {
 export function inMemoryAccessTrust(): AccessTrustPersistence {
 	const roots = new Map<string, string>();
 	const statements = new Map<string, Map<string, AccessStatementRecord>>();
+	const containers = new Map<string, string>();
 	return {
+		getContainer: (entityId) => containers.get(entityId) ?? null,
+		pinContainer: (entityId, containerId) => {
+			const existing = containers.get(entityId);
+			if (existing !== undefined) return existing;
+			containers.set(entityId, containerId);
+			return containerId;
+		},
+		listContained: (containerId) =>
+			[...containers].filter(([, container]) => container === containerId).map(([id]) => id),
 		getRoot: (entityId) => roots.get(entityId) ?? null,
 		pinRoot: (entityId, rootPub) => {
 			const existing = roots.get(entityId);

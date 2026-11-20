@@ -3795,6 +3795,9 @@ void app.whenReady().then(async () => {
 	// here at construction; the live-sync engine's `applyRemoteUpdate` routes
 	// inbound decrypted frames through it (off the broker — never app-callable).
 	let applyRemoteDocFn: ApplyRemoteDocFn | null = null;
+	// Set once the sharing engine holder exists (further down); a remote update
+	// that lands before then simply does not trigger a re-assert.
+	let reassertAccessRecord: ((entityId: string) => void) | null = null;
 	// 10.16 — version history. The restore closure comes out of the entities
 	// service at construction (off the broker); the engine is per session.
 	let restoreEntityFn: RestoreEntityFn | null = null;
@@ -4046,9 +4049,12 @@ void app.whenReady().then(async () => {
 						apply: () => applyRemoteDocFn,
 						noteSender: (entityId, sender) =>
 							historyBinding.current()?.noteWrite(entityId, [memberPrincipal(sender)]),
-						onApplied: () => {
+						onApplied: (entityId) => {
 							broadcastVaultEntitiesStaleSignal(launchSetup.getLauncherSync()?.allWindows() ?? []);
 							scheduleSearchReindex();
+							// The root owner puts back any access statement an inbound
+							// update deleted or blanked (`SharingEngine.reassertRecord`).
+							reassertAccessRecord?.(entityId);
 						},
 					}),
 					// PRES-2b — a decrypted remote AWARENESS frame (cursors / "who's
@@ -4733,6 +4739,9 @@ void app.whenReady().then(async () => {
 		getSession: () => getActiveVaultSession(),
 		getRelay: () => getActiveRelay(),
 	});
+	reassertAccessRecord = (entityId) => {
+		if (getActiveVaultSession()) void autoShareEngine().reassertRecord(entityId);
+	};
 	createAutoShareReactor(automationsChangeEmitter, {
 		getEngine: () => (getActiveVaultSession() ? autoShareEngine() : null),
 		readEntityProperties: async (entityId) => {
