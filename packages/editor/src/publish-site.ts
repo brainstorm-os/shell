@@ -33,7 +33,7 @@ import {
 	zipStore,
 } from "@brainstorm-os/sdk/site-export";
 import { Doc, applyUpdate } from "yjs";
-import { serializedStateToHtml } from "./serialize-html";
+import { normalizeImageSrc, serializedStateToHtml } from "./serialize-html";
 import { serializedStateFromDoc } from "./serialized-state-from-doc";
 
 export const MAX_SITE_PAGES = 200;
@@ -244,8 +244,10 @@ export async function buildSiteArchive(input: SiteArchiveInput): Promise<SiteArc
 	const dataImages = new Map<string, number>();
 	for (const page of pages) {
 		for (const node of walkBody(page.state)) {
-			if (typeof node.src !== "string" || !node.src.startsWith(DATA_URL_PREFIX)) continue;
-			dataImages.set(node.src, (dataImages.get(node.src) ?? 0) + 1);
+			if (typeof node.src !== "string") continue;
+			const src = normalizeImageSrc(node.src);
+			if (!src.startsWith(DATA_URL_PREFIX)) continue;
+			dataImages.set(src, (dataImages.get(src) ?? 0) + 1);
 		}
 	}
 	const keptDataImages = new Set<string>();

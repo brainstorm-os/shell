@@ -204,8 +204,14 @@ function linkHref(raw: string, ctx: RenderContext): string | null {
 	return safeUrl(url, ctx);
 }
 
+/** The form of an image source the serializer decides on and emits. Anything
+ *  that budgets or allow-lists image sources must key on this same string. */
+export function normalizeImageSrc(raw: string): string {
+	return raw.trim();
+}
+
 function imageSrc(raw: string, ctx: RenderContext): string | null {
-	const url = raw.trim();
+	const url = normalizeImageSrc(raw);
 	if (ctx.allowDataImages && DATA_IMAGE_URL.test(url)) {
 		if (ctx.allowDataImages === true || ctx.allowDataImages(url)) return url;
 		return null;
