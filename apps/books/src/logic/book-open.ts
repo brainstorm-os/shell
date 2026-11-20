@@ -13,7 +13,8 @@
 import { type Book, BookFormat } from "../types/book";
 import type { Locator } from "../types/locator";
 import { type BookRecord, parseBook, serializeBook, withReadingPosition } from "./book-codec";
-import { bookRecordFromImport, formatFromName, titleFromName } from "./book-import";
+import { BookMime, bookRecordFromImport, formatFromName, titleFromName } from "./book-import";
+import { SniffedKind } from "./book-sniff";
 
 /** The slice of an `entities.get` row this resolver reads — structurally
  *  typed so Books takes no cross-package type dependency. */
@@ -42,29 +43,58 @@ export function bookFromEntity(entity: OpenableEntity | null | undefined): Book 
 	return parseBook({ ...props, id } as Parameters<typeof parseBook>[0]);
 }
 
-/** True when the book opens in PDF reading mode AND has a backing file to
- *  read from. An EPUB (or a file-less preview record) falls back to the
- *  reflow reader. */
-export function isOpenablePdfBook(book: Book | null): book is Book & { fileId: string } {
-	return book !== null && book.format === BookFormat.Pdf && book.fileId !== null;
-}
+const FORMAT_BY_MIME: Readonly<Record<string, BookFormat>> = {
+	[BookMime.Pdf]: BookFormat.Pdf,
+	[BookMime.Epub]: BookFormat.Epub,
+	[BookMime.Fb2]: BookFormat.Fb2,
+	[BookMime.Fb2Zip]: BookFormat.Fb2,
+};
 
 /** Book format implied by a `File/v1`'s `mime` / `name` — the bridge that
- *  lets a raw PDF/EPUB file invoked from the Files app open in Books. MIME
- *  wins (it's the shell's sniffed truth); the filename extension is the
- *  fallback for files the mime map doesn't cover (EPUB seals as
- *  `application/octet-stream` today, so `.epub` only resolves by name). */
+ *  lets a raw book file invoked from the Files app open in Books. A book MIME
+ *  wins; the filename is the fallback, and it is what resolves the many
+ *  existing rows that were stored as `application/octet-stream` before EPUB
+ *  and FB2 had a label of their own. */
 export function bookFormatFromFile(
 	props: Record<string, unknown> | null | undefined,
 ): BookFormat | null {
 	const mime = readString(props?.mime);
-	if (mime === "application/pdf") return BookFormat.Pdf;
-	if (mime === "application/epub+zip") return BookFormat.Epub;
+	const byMime = mime ? FORMAT_BY_MIME[mime] : undefined;
+	if (byMime) return byMime;
 	const name = readString(props?.name);
 	return name ? formatFromName(name) : null;
 }
 
-/** Resolve an open invoked on a `brainstorm/File/v1` (a PDF/EPUB the user
+const MIME_BY_SNIFF: Readonly<Partial<Record<SniffedKind, string>>> = {
+	[SniffedKind.Pdf]: BookMime.Pdf,
+	[SniffedKind.Epub]: BookMime.Epub,
+	[SniffedKind.Fb2]: BookMime.Fb2,
+	[SniffedKind.Fb2Zip]: BookMime.Fb2Zip,
+};
+
+/** MIME values that say nothing about what a file is. */
+const UNINFORMATIVE_MIMES: ReadonlySet<string> = new Set([
+	"application/octet-stream",
+	"application/zip",
+]);
+
+/** The `File/v1` patch that corrects a stale label once the file's BYTES have
+ *  been read as a book: a row with no MIME, or one that says only "binary" /
+ *  "zip", gains the truthful book MIME. A row that already names a specific
+ *  type is left alone — this heals a missing label, it does not overrule one.
+ *  `null` when there is nothing to correct. */
+export function staleFileMimePatch(
+	props: Record<string, unknown> | null | undefined,
+	sniffed: SniffedKind,
+): Record<string, unknown> | null {
+	const truthful = MIME_BY_SNIFF[sniffed];
+	if (!truthful) return null;
+	const stored = readString(props?.mime);
+	if (stored !== null && !UNINFORMATIVE_MIMES.has(stored)) return null;
+	return { mime: truthful };
+}
+
+/** Resolve an open invoked on a `brainstorm/File/v1` (a book file the user
  *  opened from Files) to the `Book/v1` that should mount. Reuses the catalog
  *  record that already wraps the file; otherwise mints one pointing at the
  *  file in place (no byte re-import — the `File/v1` is the source of truth).

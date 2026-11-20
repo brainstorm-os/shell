@@ -13,6 +13,7 @@ import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BooksApp } from "./app";
+import { buildConverterEpub, buildZip } from "./logic/zip-fixture";
 
 vi.mock("@brainstorm-os/sdk/object-menu", () => ({
 	openAnchoredMenu: vi.fn(),
@@ -311,5 +312,175 @@ describe("BooksApp — auto-hide library (7.15)", () => {
 		expect(library(el).getAttribute("data-bs-autohide")).toBe("hidden");
 		expect(library(el).hasAttribute("inert")).toBe(true);
 		expect(el.querySelector(".bs-autohide-edge")).not.toBeNull();
+	});
+});
+
+/** A vault holding one book with a real backing file: the shell stub answers
+ *  `entities.get` for both rows and `fetch` serves the file's bytes. */
+function installBookWithFile(args: {
+	book: Record<string, unknown>;
+	file: Record<string, unknown>;
+	bytes: Uint8Array;
+}): { update: ReturnType<typeof vi.fn> } {
+	const book: StubEntity = {
+		id: "bk1",
+		type: "brainstorm/Book/v1",
+		properties: {
+			author: "",
+			fileId: "file1",
+			spineLength: 0,
+			reading: { position: null, progress: 0, lastReadAt: null },
+			createdAt: 1,
+			updatedAt: 1,
+			...args.book,
+		},
+	};
+	const file: StubEntity = {
+		id: "file1",
+		type: "brainstorm/File/v1",
+		properties: { attachment: "brainstorm://asset/a1", ...args.file },
+	};
+	installShell([book, file]);
+	const services = (
+		window as unknown as {
+			brainstorm: { services: { entities: Record<string, ReturnType<typeof vi.fn>> } };
+		}
+	).brainstorm.services;
+	services.entities.get = vi.fn((id: string) =>
+		Promise.resolve(id === "bk1" ? book : id === "file1" ? file : null),
+	);
+	const update = vi.fn(() => Promise.resolve(null));
+	services.entities.update = update;
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(() =>
+			Promise.resolve({
+				ok: true,
+				status: 200,
+				arrayBuffer: () =>
+					Promise.resolve(
+						args.bytes.buffer.slice(args.bytes.byteOffset, args.bytes.byteOffset + args.bytes.byteLength),
+					),
+			}),
+		),
+	);
+	return { update };
+}
+
+async function openFirstBook(el: HTMLElement): Promise<void> {
+	const row = el.querySelector<HTMLButtonElement>(".books__row");
+	await act(async () => {
+		row?.click();
+	});
+	// The open is a chain of awaited steps (rows → bytes → parse → mount).
+	for (let i = 0; i < 40; i += 1) {
+		await act(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 5));
+		});
+		const notice = el.querySelector(".books__placeholder")?.textContent ?? "";
+		if (!notice.includes("Opening book") && !notice.includes("Select a book")) break;
+	}
+}
+
+const FB2_BOOK = `<?xml version="1.0" encoding="utf-8"?><FictionBook><description><title-info><author><first-name>Стивен</first-name><last-name>Кинг</last-name></author><book-title>Библиотечная полиция</book-title></title-info></description><body><section><title><p>Глава первая</p></title><p>Первый абзац книги.</p></section><section><title><p>Глава вторая</p></title><p>Второй абзац.</p></section></body></FictionBook>`;
+
+describe("BooksApp opening a book file", () => {
+	const OWNER_FILE = "King_Chetyre-posle-polunochi_3_Bibliotechnaya-policiya.159046.fb2.epub";
+
+	it("opens the owner's already-imported EPUB and heals its stale labels", async () => {
+		const { update } = installBookWithFile({
+			// Exactly what an older build wrote: a title that kept `.fb2`, and a
+			// file row labelled as a generic binary.
+			book: { name: OWNER_FILE.replace(/\.epub$/, ""), format: "epub" },
+			file: { name: OWNER_FILE, mime: "application/octet-stream" },
+			bytes: buildConverterEpub(),
+		});
+		const el = await renderApp();
+		await openFirstBook(el);
+		expect(el.querySelector(".books__placeholder")).toBeNull();
+		expect(el.querySelector(".books__page")?.textContent).toContain("Первый текст.");
+		expect(update).toHaveBeenCalledWith("file1", { mime: "application/epub+zip" });
+		expect(update).toHaveBeenCalledWith("bk1", {
+			author: "Стивен Кинг",
+			name: "Библиотечная полиция",
+		});
+	});
+
+	it("opens an FB2 book in the reflow reader with its chapters as contents", async () => {
+		const { update } = installBookWithFile({
+			book: { name: "King", format: "fb2" },
+			file: { name: "King.fb2", mime: "application/x-fictionbook+xml" },
+			bytes: new TextEncoder().encode(FB2_BOOK),
+		});
+		const el = await renderApp();
+		await openFirstBook(el);
+		expect(el.querySelector(".books__placeholder")).toBeNull();
+		expect(el.querySelector(".books__page")?.textContent).toContain("Первый абзац книги.");
+		const toc = [...el.querySelectorAll(".books__toc-link")].map((n) => n.textContent);
+		expect(toc).toEqual(["Глава первая", "Глава вторая"]);
+		expect(update).toHaveBeenCalledWith("bk1", {
+			author: "Стивен Кинг",
+			name: "Библиотечная полиция",
+		});
+	});
+
+	it("reads an FB2 that was catalogued as an EPUB, and corrects the record", async () => {
+		const { update } = installBookWithFile({
+			book: { name: "My own title", format: "epub", author: "Me" },
+			file: { name: "book.epub", mime: "application/octet-stream" },
+			bytes: new TextEncoder().encode(FB2_BOOK),
+		});
+		const el = await renderApp();
+		await openFirstBook(el);
+		expect(el.querySelector(".books__page")?.textContent).toContain("Первый абзац книги.");
+		expect(update).toHaveBeenCalledWith("bk1", { format: "fb2" });
+		expect(update).toHaveBeenCalledWith("file1", { mime: "application/x-fictionbook+xml" });
+		// The user's own title and author are not overwritten by the file's.
+		expect(update).not.toHaveBeenCalledWith(
+			"bk1",
+			expect.objectContaining({ name: expect.anything() }),
+		);
+	});
+
+	it("names the file and says why when the format is not one Books reads", async () => {
+		installBookWithFile({
+			book: { name: "Archive", format: "epub" },
+			file: { name: "photos.zip", mime: "application/zip" },
+			bytes: buildZip([{ name: "a.jpg", data: "x" }]),
+		});
+		const el = await renderApp();
+		await openFirstBook(el);
+		const notice = el.querySelector(".books__placeholder")?.textContent ?? "";
+		expect(notice).toContain("photos.zip");
+		expect(notice).toContain("Books opens EPUB, FB2 and PDF");
+		expect(el.querySelector(".books__page")).toBeNull();
+	});
+
+	it("reports a damaged EPUB at once instead of a blank reader or an endless spinner", async () => {
+		installBookWithFile({
+			book: { name: "Broken", format: "epub" },
+			file: { name: "broken.epub", mime: "application/epub+zip" },
+			// An archive that claims to be an EPUB and has no package document.
+			bytes: buildZip([{ name: "mimetype", data: "application/epub+zip" }]),
+		});
+		const el = await renderApp();
+		await openFirstBook(el);
+		const notice = el.querySelector(".books__placeholder")?.textContent ?? "";
+		expect(notice).toContain("broken.epub");
+		expect(notice).toContain("damaged or incomplete");
+		expect(el.querySelector(".books__page")).toBeNull();
+	});
+
+	it("reports a book whose file row is gone", async () => {
+		installBookWithFile({
+			book: { name: "Orphan", format: "epub", fileId: "missing" },
+			file: { name: "x.epub" },
+			bytes: new Uint8Array(0),
+		});
+		const el = await renderApp();
+		await openFirstBook(el);
+		const notice = el.querySelector(".books__placeholder")?.textContent ?? "";
+		expect(notice).toContain("Orphan");
+		expect(notice).toContain("missing from this vault");
 	});
 });

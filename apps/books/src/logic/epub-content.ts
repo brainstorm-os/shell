@@ -74,7 +74,7 @@ const TITLE_CLASS_RE = /(?:^|[\s_-])(?:title|subtitle|head(?:er|ing)?|chapter)\d
 
 /** Collapse runs of whitespace (incl. newlines from the source markup) to single
  *  spaces and trim — the reflow renderer owns visual wrapping. */
-function normalizeText(raw: string): string {
+export function normalizeText(raw: string): string {
 	return raw.replace(/\s+/g, " ").trim();
 }
 
@@ -146,6 +146,18 @@ export function htmlToBlocks(html: string): ContentBlock[] {
 	return blocks;
 }
 
+const BODY_RE = /<body\b[^>]*>([\s\S]*?)<\/body\s*>/i;
+const VOID_STYLE_RE = /<(title|script|style|textarea)\b([^>]*)\/>/gi;
+
+/** The `<body>` markup of a raw XHTML document, made safe for the lenient
+ *  HTML parser `htmlToBlocks` uses: XHTML's self-closed `<title/>` /
+ *  `<script/>` would otherwise open a raw-text element that swallows the
+ *  rest of the chapter. A document with no `<body>` is returned whole. */
+export function bodyMarkup(xhtml: string): string {
+	const body = BODY_RE.exec(xhtml)?.[1] ?? xhtml;
+	return body.replace(VOID_STYLE_RE, "<$1$2></$1>");
+}
+
 /** The chapter title for a section: the EPUB's own navigation label when the
  *  parser resolved one, else the section's first heading block, else a
  *  positional fallback numbered by the section's place in the *kept* spine
@@ -154,6 +166,15 @@ function titleFor(section: RawSection, blocks: readonly ContentBlock[], position
 	if (section.title) return section.title;
 	const heading = blocks.find((b) => b.kind === BlockKind.Heading);
 	if (heading) return heading.text;
+	return positionalChapterTitle(position);
+}
+
+/** The title of a book whose file names none. A placeholder, never real
+ *  metadata — the catalog backfill must not copy it over a filename title. */
+export const UNTITLED_BOOK = "Untitled";
+
+/** The last-resort title for a chapter that names itself nowhere. */
+export function positionalChapterTitle(position: number): string {
 	return `Chapter ${position}`;
 }
 
@@ -170,9 +191,9 @@ export function bookContentFrom(
 		if (blocks.length === 0) continue;
 		spine.push({ title: titleFor(section, blocks, spine.length + 1), blocks });
 	}
-	if (spine.length === 0) spine.push({ title: meta.title || "Untitled", blocks: [] });
+	if (spine.length === 0) spine.push({ title: meta.title || UNTITLED_BOOK, blocks: [] });
 	return {
-		title: meta.title || "Untitled",
+		title: meta.title || UNTITLED_BOOK,
 		author: meta.author || "",
 		spine,
 	};

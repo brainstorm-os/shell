@@ -3,7 +3,7 @@
   "name": "Books",
   "version": "0.1.0",
   "sdk": "1",
-  "description": "EPUB and PDF reader with highlights as first-class entities, typography controls, and an in-vault library.",
+  "description": "EPUB, FB2 and PDF reader with highlights as first-class entities, typography controls, and an in-vault library.",
   "icon": "icon.svg",
   "entry": "dist/index.html",
   "capabilities": [
@@ -46,7 +46,7 @@
             },
             "format": {
               "type": "string",
-              "enum": ["epub", "pdf"]
+              "enum": ["epub", "pdf", "fb2"]
             },
             "author": {
               "type": "string"
@@ -134,6 +134,18 @@
       {
         "kind": "secondary",
         "mime": "application/pdf"
+      },
+      {
+        "kind": "primary",
+        "mime": "application/epub+zip"
+      },
+      {
+        "kind": "primary",
+        "mime": "application/x-fictionbook+xml"
+      },
+      {
+        "kind": "primary",
+        "mime": "application/x-zip-compressed-fb2"
       }
     ],
     "intents": [
@@ -146,6 +158,21 @@
         "verb": "open",
         "mime": "application/pdf",
         "priority": "secondary"
+      },
+      {
+        "verb": "open",
+        "mime": "application/epub+zip",
+        "priority": "primary"
+      },
+      {
+        "verb": "open",
+        "mime": "application/x-fictionbook+xml",
+        "priority": "primary"
+      },
+      {
+        "verb": "open",
+        "mime": "application/x-zip-compressed-fb2",
+        "priority": "primary"
       }
     ],
     "blocks": [
