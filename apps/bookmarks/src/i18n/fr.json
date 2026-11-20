@@ -8,6 +8,7 @@
   "header.inspector.show": "Afficher les propriétés",
   "header.inspector.hide": "Masquer les propriétés",
   "header.inspector.disabledHint": "Ouvrez un signet pour voir ses propriétés",
+  "header.more.disabledHint": "Ouvrez un signet ou une collection pour voir ses actions",
   "nav.surfaces": "Sections",
   "sidebar.tags": "Étiquettes",
   "sidebar.resize": "Redimensionner la barre latérale",

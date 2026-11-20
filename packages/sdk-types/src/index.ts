@@ -1687,6 +1687,11 @@ export type AgentProposalsService = {
 	approve(input: { messageId: string }): Promise<AgentProposalDecision>;
 	/** Discard it — settles the card, writes nothing to the vault. */
 	discard(input: { messageId: string }): Promise<AgentProposalDecision>;
+	/** Agent-13 — whether the built-in `@agent` can be invoked from this app
+	 *  right now, and why not when it cannot. Requires the scarce
+	 *  `agents.mention` (the same grant invoking it needs). Parse the reply with
+	 *  `readBuiltinAgentMentionTarget` — it is fail-closed. */
+	mentionTarget(): Promise<unknown>;
 };
 
 export type RosterService = {
@@ -1760,6 +1765,15 @@ export type SharedMember = {
 	revokedAt: number | null;
 };
 
+/** Whether an object has ever involved anyone but this vault's owner, as the
+ *  HOST attests it. Unlike {@link SharedMember} rows — read from a record
+ *  inside the object that any collaborator can rewrite — this cannot be
+ *  changed by content synced from someone else, and it never turns back to
+ *  `false`: an object shared once and since made private stays `true`. */
+export type EntityExposure = {
+	everShared: boolean;
+};
+
 /** A saved contact — a teammate whose verified invite you've kept, so you can
  *  share to them by a click (share-by-name) instead of re-pasting a code. */
 export type SharedContact = {
@@ -1817,6 +1831,10 @@ export type SharingService = {
 	/** The resolved access record (active grants + revoked audit) for `entityId`.
 	 *  Requires `sharing.read`. */
 	access(entityId: string): Promise<SharedMember[]>;
+	/** Host-attested: has `entityId` ever involved anyone but this vault's
+	 *  owner? `null` for an object the caller cannot read. The answer to rely
+	 *  on before treating an object as private. Requires `sharing.read`. */
+	exposure(entityId: string): Promise<EntityExposure | null>;
 	/** Collab-C7 — the invite a `brainstorm://invite/` link the user opened
 	 *  delivered, verified, for the share dialog to PRE-FILL (consumed on read).
 	 *  Null when none is waiting. Requires `sharing.share`. Optional: an older
@@ -2889,16 +2907,33 @@ export {
 	stripReservedProperties,
 } from "./agent-provenance";
 export type { AgentProvenance, AgentProvenanceRequest } from "./agent-provenance";
+export {
+	AGENT_INVOKER_PROPERTY_KEY,
+	AGENT_PROPOSAL_PREVIEW_PROPERTY_KEY,
+	BUILTIN_AGENT_APP_ID,
+	BUILTIN_AGENT_DISPLAY_NAME,
+	BUILTIN_AGENT_MENTION_REF,
+	BuiltinAgentUnavailableReason,
+	readAgentInvoker,
+	readBuiltinAgentMentionTarget,
+} from "./builtin-agent";
+export type { BuiltinAgentMentionTarget } from "./builtin-agent";
 
 // ─── Shared agent loop (11b.7 — Automations AIAgent + Agent app) ────────────
 export {
+	AGENT_EMPTY_ANSWER_NUDGE,
 	AGENT_LOOP_DEFAULT_MAX_ITERATIONS,
 	AGENT_LOOP_MAX_ITERATIONS_CEILING,
+	AGENT_NO_ANSWER_REPLY,
+	AGENT_TOOLS_CLOSE,
+	AGENT_TOOLS_OPEN,
+	AGENT_TOOLS_PRIVACY_GUIDANCE,
 	AgentStopReason,
 	ToolRefusalReason,
 	buildAgentSystemPrompt,
 	intersectAgentTools,
 	parseAgentReply,
+	resolveAgentAnswer,
 	runAgentLoop,
 } from "./agent-loop";
 export type {
@@ -2990,6 +3025,7 @@ export {
 	PROPOSE_DESCRIPTORS,
 	PROPOSE_LONG_MAX,
 	PROPOSE_SHORT_MAX,
+	PROPOSE_CLAIM_GUIDANCE,
 	PROPOSE_TOOL_GUIDANCE,
 	ProposalActionKind,
 	ProposalRejectReason,
@@ -3471,3 +3507,10 @@ export {
 	type VersionRestoreResult,
 	type VersionSummary,
 } from "./version-history";
+export {
+	EMBEDDER_REFERRER,
+	EMBED_FRAMES,
+	type EmbedFrame,
+	EmbedKind,
+	type EmbedProviderKind,
+} from "./embed-frames";

@@ -142,10 +142,10 @@ export function buildVaultLists(
 			id: listId,
 			name: friendlyTypeName(type),
 			icon: null,
-			description: t("brainstorm.database.vault.typeList.description", {
-				items: itemCountLabel(rows.length),
-				type,
-			}),
+			// The count alone: the raw type id (`brainstorm/Agent/v1`) used to
+			// trail it, and it was the first line of text under the first list
+			// a new user opened.
+			description: itemCountLabel(rows.length),
 			source: { kind: ListSourceKind.ByType, types: [type] },
 			members: { include: [], exclude: [] },
 			views: [viewId],
@@ -381,7 +381,7 @@ const CURATED_TYPE_LISTS: Record<string, CuratedListSpec> = {
 	// Columns mirror the `brainstorm/Task/v1` shape (apps/tasks task.ts).
 	"brainstorm/Task/v1": {
 		name: "Tasks",
-		description: (n) => `${n} ${n === 1 ? "task" : "tasks"} · brainstorm/Task/v1`,
+		description: (n) => `${n} ${n === 1 ? "task" : "tasks"}`,
 		columns: ["name", "statusKey", "priority", "scheduledAt", "dueAt"],
 		views: [
 			{
@@ -423,7 +423,7 @@ const CURATED_TYPE_LISTS: Record<string, CuratedListSpec> = {
 	},
 	"brainstorm/Person/v1": {
 		name: "People",
-		description: (n) => `${n} ${n === 1 ? "contact" : "contacts"} · brainstorm/Person/v1`,
+		description: (n) => `${n} ${n === 1 ? "contact" : "contacts"}`,
 		columns: ["name", "email", "phone", "company", "role"],
 		views: [
 			{

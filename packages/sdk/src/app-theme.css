@@ -511,6 +511,12 @@ select {
 		border-color var(--motion-duration-normal) var(--motion-easing-standard),
 		color var(--motion-duration-normal) var(--motion-easing-standard);
 }
+/* A `.bs-btn` with no variant had no hover at all, so in five apps a real
+ * button read as a bold label. `:where` keeps this at the base rule's
+ * specificity: every variant's own hover, declared later, still wins. */
+:root .bs-btn:where(:hover:not(:disabled)) {
+	background: var(--hover);
+}
 :root .bs-btn:disabled {
 	cursor: not-allowed;
 	opacity: 0.55;
@@ -750,7 +756,7 @@ select {
 	padding: 0;
 	border: none;
 	background: transparent;
-	color: var(--text-faint);
+	color: var(--color-text-secondary);
 	cursor: grab;
 	opacity: 0;
 	transition: opacity var(--motion-duration-fast, 0.1s) var(--motion-easing-standard, ease);
@@ -758,6 +764,9 @@ select {
 }
 :root .bs-drag-grip:focus-visible {
 	opacity: 1;
+}
+:root .bs-drag-grip:hover {
+	color: var(--text);
 }
 :root [data-dragging="true"] .bs-drag-grip,
 :root .bs-drag-grip:active {
@@ -1000,7 +1009,7 @@ select {
 	color: var(--text-dim);
 	cursor: pointer;
 }
-:root .header-icon-btn:hover:not(:disabled) {
+:root .header-icon-btn:hover:not(:disabled):not([aria-disabled="true"]) {
 	background: var(--hover);
 	color: var(--text);
 }
@@ -1013,7 +1022,8 @@ select {
 	background: var(--accent-soft);
 	color: var(--accent-strong);
 }
-:root .header-icon-btn:disabled {
+:root .header-icon-btn:disabled,
+:root .header-icon-btn[aria-disabled="true"] {
 	opacity: 0.5;
 	cursor: not-allowed;
 }
@@ -1268,6 +1278,12 @@ body.is-booting *::after {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	max-width: min(440px, 60vw);
+}
+/* In a header the ⋯ sits in a row of full-strength icon buttons, so the
+ * shared 0.55 resting dim (right for a list row, where it is secondary chrome)
+ * made an enabled menu read as disabled — whose own face is 0.35. */
+:root .app-header .bs-object-menu__more:not(:disabled):not([aria-disabled="true"]) {
+	opacity: 1;
 }
 :root .app-header button,
 :root .app-header a,

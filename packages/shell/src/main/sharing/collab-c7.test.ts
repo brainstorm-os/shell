@@ -14,8 +14,11 @@ import {
 	inviteLinkFor,
 } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import * as Y from "yjs";
 import { ENVELOPE_PROTOCOL_VERSION, type Envelope } from "../../ipc/envelope";
+import { AccessRole, getAccessArray, grantAccess } from "../collab/access-record";
 import { LastEditRecorder } from "../collab/last-edit-recorder";
+import { generateIdentity, publicKeyToBase64 } from "../credentials/identity";
 import { DataStores } from "../storage/data-stores";
 import { EntitiesRepository } from "../storage/entities-repo";
 import { SettingsRepository } from "../storage/settings-repo";
@@ -210,6 +213,66 @@ describe("Collab-C7", () => {
 			entities.lastEdits.record("n1", "NEW", 50);
 			entities.lastEdits.record("n1", "OLD", 40);
 			expect(entities.lastEdits.get("n1")).toMatchObject({ editor: "NEW", editedAt: 50 });
+		});
+	});
+	describe("exposure — host-attested: has this object ever involved anyone else?", () => {
+		const other = () => publicKeyToBase64(generateIdentity().publicKey);
+		const exposure = (id: string) => handler()(envelope("exposure", [id]));
+		const grantInDoc = async (member: string, signerSecret: Uint8Array) => {
+			const { doc } = await session.ydocStore.load("n1");
+			const before = Y.encodeStateVector(doc);
+			grantAccess(doc, { entityId: "n1", member, role: AccessRole.Editor, signerSecret, now: 5 });
+			await session.ydocStore.appendUpdate("n1", Y.encodeStateAsUpdate(doc, before));
+			doc.destroy();
+		};
+
+		beforeEach(() => {
+			entities.create({
+				id: "n1",
+				type: NOTE,
+				properties: { title: "Brief" },
+				createdBy: APP,
+				now: 1,
+				dekId: null,
+			});
+		});
+
+		it("answers `everShared: false` for a note nobody else has touched", async () => {
+			expect(await exposure("n1")).toEqual({ everShared: false });
+			const self = session.exposeIdentityForPairing();
+			await grantInDoc(session.identity.publicKeyBase64, self.secretKey);
+			entities.lastEdits.record("n1", session.identity.publicKeyBase64, 9);
+			expect(await exposure("n1")).toEqual({ everShared: false });
+		});
+
+		it("answers `everShared: true` once the record has named someone else, even after it is emptied", async () => {
+			const self = session.exposeIdentityForPairing();
+			await grantInDoc(other(), self.secretKey);
+			expect(await exposure("n1")).toEqual({ everShared: true });
+			const { doc } = await session.ydocStore.load("n1");
+			const before = Y.encodeStateVector(doc);
+			const access = getAccessArray(doc);
+			access.delete(0, access.length);
+			await session.ydocStore.appendUpdate("n1", Y.encodeStateAsUpdate(doc, before));
+			doc.destroy();
+			const members = (await handler()(envelope("access", ["n1"]))) as unknown[];
+			expect(members).toEqual([]);
+			expect(await exposure("n1")).toEqual({ everShared: true });
+		});
+
+		it("answers `everShared: true` when this device has applied an edit from another identity", async () => {
+			entities.lastEdits.record("n1", other(), 9);
+			expect(await exposure("n1")).toEqual({ everShared: true });
+		});
+
+		it("is gated like `lastEdit`: sharing.read plus read access to the RESOLVED type", async () => {
+			held = ["sharing.read"];
+			expect(await exposure("n1")).toBeNull();
+			held = [`entities.read:${NOTE}`];
+			await expect(exposure("n1")).rejects.toMatchObject({ name: "Denied" });
+			held = ["sharing.read", `entities.read:${NOTE}`];
+			expect(await exposure("missing")).toBeNull();
+			await expect(exposure("")).rejects.toMatchObject({ name: "Invalid" });
 		});
 	});
 });

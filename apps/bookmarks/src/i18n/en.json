@@ -8,6 +8,7 @@
   "header.inspector.show": "Show properties",
   "header.inspector.hide": "Hide properties",
   "header.inspector.disabledHint": "Open a bookmark to see its properties",
+  "header.more.disabledHint": "Open a bookmark or a collection to see its actions",
   "nav.surfaces": "Surfaces",
   "sidebar.tags": "Tags",
   "sidebar.resize": "Resize sidebar",

@@ -36,6 +36,13 @@ export { AssetDeksRepository } from "./asset-deks-repo";
 export type { AssetDekRecord, CreateAssetDekInput } from "./asset-deks-repo";
 export { AssetRefsRepository } from "./asset-refs-repo";
 export type { AssetRefRecord, CreateAssetRefInput } from "./asset-refs-repo";
+export {
+	ACCESS_STATEMENTS_PER_ENTITY_MAX,
+	ACCESS_STATEMENTS_PER_SIGNER_MAX,
+	AccessStatementKind,
+	AccessTrustRepository,
+} from "./access-trust-repo";
+export type { AccessStatementRecord } from "./access-trust-repo";
 export { PendingRotationsRepository } from "./pending-rotations-repo";
 export type { PendingRotationRecord } from "./pending-rotations-repo";
 export { ShareInvitesRepository } from "./share-invites-repo";

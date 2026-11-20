@@ -19,6 +19,7 @@ function member(over: Partial<ResolvedMember> & { device?: DeviceX25519Keypair }
 		revokedAt: null,
 		revokedBy: null,
 		grantValid: true,
+		authorized: true,
 		revokeValid: false,
 		active: true,
 		...rest,

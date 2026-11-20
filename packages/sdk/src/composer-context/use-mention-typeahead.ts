@@ -99,6 +99,7 @@ export function useMentionTypeahead(options: UseMentionTypeaheadOptions): Mentio
 						id: c.id,
 						label: c.label,
 						...(c.description ? { description: c.description } : {}),
+						...(c.disabled === true ? { disabled: true } : {}),
 					}))
 				: [{ id: "__empty__", label: emptyLabel, disabled: true }];
 		openTypeaheadMenu({
@@ -149,6 +150,8 @@ export function useMentionTypeahead(options: UseMentionTypeaheadOptions): Mentio
 
 	const commitCandidate = useCallback(
 		(candidate: ContextCandidate) => {
+			// A disabled candidate is listed so it can be discovered, never chosen.
+			if (candidate.disabled === true) return;
 			const el = textareaRef.current;
 			const match = matchRef.current;
 			if (el && match) {

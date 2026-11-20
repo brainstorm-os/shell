@@ -106,13 +106,17 @@ describe("packBundleAsync (IE-14)", () => {
 		).toBe('{"v":1}');
 	});
 
-	it("compresses off the main thread: the event loop keeps turning meanwhile", async () => {
-		let turned = false;
-		setImmediate(() => {
-			turned = true;
+	// Asserted on the microtask queue, not with a setImmediate: a threadpool
+	// that finishes before the first poll phase resolves the pack ahead of the
+	// check phase, so an immediate "turned" flag is a race on a loaded runner.
+	it("compresses off the main thread: the pack is not settled by the time the caller's microtasks drain", async () => {
+		let settled = false;
+		const pending = packBundleAsync(files, BundleCompression.Gzip).then((bytes) => {
+			settled = true;
+			return bytes;
 		});
-		const pending = packBundleAsync(files, BundleCompression.Gzip);
-		await pending;
-		expect(turned).toBe(true);
+		for (let i = 0; i < 50; i++) await Promise.resolve();
+		expect(settled).toBe(false);
+		expect((await pending).length).toBeGreaterThan(0);
 	});
 });

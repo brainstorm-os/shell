@@ -10,6 +10,13 @@ describe("mimeFromName", () => {
 		expect(mimeFromName("a.csv")).toBe("text/csv");
 	});
 
+	it("labels e-books, by the final extension of a compound name", () => {
+		expect(mimeFromName("Dune.epub")).toBe("application/epub+zip");
+		expect(mimeFromName("King_Bibliotechnaya-policiya.159046.fb2.epub")).toBe("application/epub+zip");
+		expect(mimeFromName("King.159046.FB2")).toBe("application/x-fictionbook+xml");
+		expect(mimeFromName("a.b.c.PDF")).toBe("application/pdf");
+	});
+
 	it("falls back to application/octet-stream for unknown extensions", () => {
 		expect(mimeFromName("foo.weirdext")).toBe(DEFAULT_MIME);
 	});

@@ -116,3 +116,52 @@ describe("files toolbar is one control row", () => {
 		).not.toMatch(/bs-(select|input|btn)--sm/);
 	});
 });
+
+describe("files toolbar end group is one face", () => {
+	const css = readFileSync(CSS_PATH, "utf8");
+	const tsx = readFileSync(APP_PATH, "utf8");
+	const filterTsx = readFileSync(join(SRC_DIR, "ui", "filter-bar.tsx"), "utf8");
+
+	it("the Filter toggle wears the same field face as Sort-by and the view picker", () => {
+		const className = /className="([^"]*\btoolbar__filter\b[^"]*)"/.exec(filterTsx)?.[1] ?? "";
+		expect(className.split(" "), "Filter must wear the shared .bs-select face").toContain(
+			"bs-select",
+		);
+		expect(
+			className,
+			"a transparent .bs-btn--secondary beside two white fields reads as a disabled control",
+		).not.toMatch(/bs-btn/);
+	});
+
+	it("the Sort-by trigger shows the dropdown caret, never the sort direction", () => {
+		const trigger = /data-testid="toolbar-sort"[\s\S]*?<\/button>/.exec(tsx)?.[0];
+		expect(trigger, "could not locate the sort trigger JSX").toBeDefined();
+		expect(trigger).toContain("IconName.CaretDown");
+		expect(trigger, "an up caret on a closed menu reads as an open one").not.toContain("CaretUp");
+	});
+
+	it("the view-options menu is not held to the small panel's 480px cap and shows scroll shadows", () => {
+		const panel = onlyBody(css, ".bs-popover__panel:has(.sort-menu__items)");
+		expect(panel).toMatch(/max-height:\s*80vh/);
+		const body = onlyBody(css, ".bs-popover__body:has(> .sort-menu__items)");
+		expect(body, "the covers must scroll with the content").toMatch(/\blocal\b/);
+		expect(body, "the edge shadows must stay pinned to the scrollport").toMatch(/\bscroll\b/);
+	});
+});
+
+describe("files bulk-action bar does not sit on the content", () => {
+	const css = readFileSync(CSS_PATH, "utf8");
+
+	it("the bar is an opaque surface", () => {
+		const body = onlyBody(css, ".files-bulkbar");
+		expect(body).toMatch(/background:\s*var\(--color-background-elevated\)/);
+		expect(body, "glass lets the tiles underneath read through the labels").not.toMatch(
+			/glass-background|backdrop-filter/,
+		);
+	});
+
+	it("the list reserves the bar's footprint while the bar is shown", () => {
+		const body = onlyBody(css, ".content-list:has(~ .files-bulkbar)");
+		expect(body).toMatch(/padding-bottom:/);
+	});
+});

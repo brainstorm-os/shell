@@ -286,5 +286,7 @@
   "tasks.row.toggle.open": "Marcar «{name}» como hecha",
   "tasks.row.toggle.done": "«{name}» está hecha: marcar como no se hará",
   "tasks.row.toggle.wontDo": "«{name}» no se hará: reabrir",
-  "tasks.quickLook.value.wontDo": "No se hará"
+  "tasks.quickLook.value.wontDo": "No se hará",
+  "tasks.tool.untitled": "Tarea sin título",
+  "tasks.tool.createTask.fromSource": "De “{title}”"
 }

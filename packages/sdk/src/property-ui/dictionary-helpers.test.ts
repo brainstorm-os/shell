@@ -78,7 +78,7 @@ describe("dictionary-helpers", () => {
 		expect(withColour.background).toContain("#ff0066");
 		expect(withColour.foreground).toContain("#ff0066");
 		const neutral = chipColours(undefined);
-		expect(neutral.background).toBe("var(--bg-elev)");
+		expect(neutral.background).toBe("color-mix(in srgb, var(--text-dim) 14%, var(--bg))");
 		expect(chipColours(item("a", "A", 0, { colour: "#112233" })).border).toContain("#112233");
 	});
 
@@ -98,9 +98,9 @@ describe("dictionary-helpers", () => {
 			"",
 		]) {
 			const c = chipColours(bad);
-			expect(c.background).toBe("var(--bg-elev)");
+			expect(c.background).toBe("color-mix(in srgb, var(--text-dim) 14%, var(--bg))");
 			expect(c.foreground).toBe("var(--text)");
-			expect(c.border).toBe("var(--border)");
+			expect(c.border).toBe("var(--border-strong)");
 		}
 	});
 

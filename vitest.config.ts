@@ -354,6 +354,7 @@ export default defineConfig({
 				__dirname,
 				"packages/sdk/src/export-popover/index.ts",
 			),
+			"@brainstorm-os/sdk/site-export": resolve(__dirname, "packages/sdk/src/site-export/index.ts"),
 			"@brainstorm-os/sdk/formula": resolve(__dirname, "packages/sdk/src/formula/index.ts"),
 			"@brainstorm-os/sdk/entity-export": resolve(
 				__dirname,

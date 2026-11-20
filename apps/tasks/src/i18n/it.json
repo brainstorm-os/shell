@@ -286,5 +286,7 @@
   "tasks.row.toggle.open": "Segna “{name}” come completata",
   "tasks.row.toggle.done": "“{name}” è completata — segna come da non fare",
   "tasks.row.toggle.wontDo": "“{name}” non verrà fatta — riapri",
-  "tasks.quickLook.value.wontDo": "Da non fare"
+  "tasks.quickLook.value.wontDo": "Da non fare",
+  "tasks.tool.untitled": "Attività senza titolo",
+  "tasks.tool.createTask.fromSource": "Da “{title}”"
 }

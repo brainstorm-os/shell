@@ -103,6 +103,7 @@
   "error.quotaExhausted": "O app Agent esgotou seu orçamento de IA de 30 dias. Aumente ou limpe o orçamento em Configurações → IA para continuar conversando.",
   "error.generic": "Algo deu errado ao gerar uma resposta.",
   "provenance.via": "via {model}",
+  "reply.noAnswer": "Não tive uma resposta para isso. Tente reformular.",
   "widget.label": "Agent",
   "widget.count.one": "{count} conversa",
   "widget.count.other": "{count} conversas",

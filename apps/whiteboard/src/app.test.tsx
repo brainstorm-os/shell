@@ -48,6 +48,15 @@ describe("WhiteboardApp chrome (React)", () => {
 		expect(level?.textContent).toBe("100%");
 	});
 
+	it("orders the zoom control out · level · in · reset", async () => {
+		handle = await renderInto(<WhiteboardApp />);
+		await flush();
+		const labels = [...handle.container.querySelectorAll(".whiteboard__zoom button")].map((button) =>
+			button.getAttribute("aria-label"),
+		);
+		expect(labels).toEqual(["Zoom out", "Reset zoom to 100%", "Zoom in", "Reset view"]);
+	});
+
 	it("places the object ⋯ menu LAST in the header right group", async () => {
 		handle = await renderInto(<WhiteboardApp />);
 		await flush();

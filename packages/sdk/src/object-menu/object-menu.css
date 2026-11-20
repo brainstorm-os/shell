@@ -217,4 +217,7 @@
 .bs-object-menu__host--row:focus-within > .bs-object-menu__more,
 .bs-object-menu__host--row > .bs-object-menu__more[aria-expanded="true"] {
 	display: inline-flex;
+	/* The row asked for it, so it is not resting chrome any more: the 0.55
+	 * resting dim on top of a hover-only reveal left the glyph barely there. */
+	opacity: 1;
 }

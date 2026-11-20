@@ -19,7 +19,10 @@
     "entities.write:*",
     "intents.dispatch:open",
     "files.write",
-    "sharing.share"
+    "sharing.share",
+    "notifications.post",
+    "tools.read",
+    "tools.call:io.brainstorm.tasks/create-task"
   ],
   "registrations": {
     "entityTypes": [

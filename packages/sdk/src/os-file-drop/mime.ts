@@ -23,6 +23,8 @@ const EXTENSION_MIME: Readonly<Record<string, string>> = {
 	yaml: "text/yaml",
 	yml: "text/yaml",
 	pdf: "application/pdf",
+	epub: "application/epub+zip",
+	fb2: "application/x-fictionbook+xml",
 	png: "image/png",
 	jpg: "image/jpeg",
 	jpeg: "image/jpeg",

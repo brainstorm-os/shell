@@ -48,6 +48,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { t } from "./i18n";
 import { useBooksT } from "./i18n-hooks";
+import { reflowEnrichmentPatch } from "./logic/book-enrichment";
 import {
 	FILE_ENTITY_TYPE,
 	IMPORT_EXTENSIONS,
@@ -57,15 +58,29 @@ import {
 	titleFromName,
 } from "./logic/book-import";
 import {
+	BookOpenError,
+	BookOpenFailure,
+	type ReflowBook,
+	failureOf,
+	formatOfSniff,
+	loadReflowBook,
+} from "./logic/book-load";
+import {
 	bookFromEntity,
 	entityIdFromPayload,
 	fileSourceFromEntity,
-	isOpenablePdfBook,
 	resolveFileOpen,
+	staleFileMimePatch,
 } from "./logic/book-open";
-import { makePositionPersister, removeBookEntity, writeBookPatch } from "./logic/book-writes";
+import { sniffBookBytes } from "./logic/book-sniff";
+import {
+	makePositionPersister,
+	removeBookEntity,
+	writeBookPatch,
+	writerForOpenBook,
+} from "./logic/book-writes";
 import { parseEpub } from "./logic/epub-parser";
-import { booksFromEntities } from "./logic/library";
+import { type LiveProgress, booksFromEntities, withLiveProgress } from "./logic/library";
 import { type PdfInfo, pdfEnrichmentPatch } from "./logic/pdf-metadata";
 import { SAMPLE_BOOK_CONTENT, sampleBook } from "./logic/sample-book";
 import { type TocEntry, tocFromContent, tocFromPdfOutline } from "./logic/toc";
@@ -75,7 +90,7 @@ import type { PdfPagePort } from "./render/pdf-reader";
 import { mountPdfReader } from "./render/pdf-reader";
 import { mountReader } from "./render/reader";
 import { type BooksRuntime, type CreatedEntity, getBooksRuntime } from "./runtime";
-import { BOOK_ENTITY_TYPE, type Book } from "./types/book";
+import { BOOK_ENTITY_TYPE, type Book, BookFormat } from "./types/book";
 import type { Locator } from "./types/locator";
 import { BookInspector } from "./ui/inspector";
 import { LibraryPanel } from "./ui/library-panel";
@@ -109,7 +124,10 @@ const OPEN_TIMEOUT_MS = 25_000;
  *  stale result. */
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 	return new Promise<T>((resolve, reject) => {
-		const timer = setTimeout(() => reject(new Error(`open timed out after ${ms}ms`)), ms);
+		const timer = setTimeout(
+			() => reject(new BookOpenError(BookOpenFailure.TimedOut, `open timed out after ${ms}ms`)),
+			ms,
+		);
 		promise.then(
 			(value) => {
 				clearTimeout(timer);
@@ -194,6 +212,56 @@ async function enrichBookFromPdf(args: {
 		console.warn(`[books] metadata enrichment failed for ${book.id}: ${(error as Error).message}`);
 	}
 }
+
+/** Backfill catalog metadata from a freshly-opened EPUB / FB2: the book's own
+ *  title (only over a filename-derived one), its author, and — where the
+ *  format embeds one Books extracts — a cover. Same posture as the PDF
+ *  backfill: gated write path, never clobbers a user value, never fatal. */
+async function enrichBookFromReflow(args: {
+	loaded: ReflowBook;
+	book: Book;
+	fileName: string;
+	rawProperties: Record<string, unknown> | null;
+	write: ((patch: Record<string, unknown>) => void) | null;
+	covers: CoversService | null;
+	stillCurrent: () => boolean;
+}): Promise<void> {
+	const { loaded, book, fileName, rawProperties, write, covers, stillCurrent } = args;
+	if (!write) return;
+	try {
+		const hasCover = Boolean(rawProperties?.cover);
+		let coverUrl: string | null = null;
+		if (!hasCover && loaded.cover && covers?.uploadBytes) {
+			coverUrl = (await covers.uploadBytes(loaded.cover.fileName, loaded.cover.bytes)).url;
+		}
+		if (!stillCurrent()) return;
+		const patch = reflowEnrichmentPatch(
+			{ title: loaded.content.title, author: loaded.content.author },
+			{
+				currentName: book.name,
+				currentAuthor: book.author,
+				fileName,
+				hasCover,
+				coverUrl,
+			},
+		);
+		if (Object.keys(patch).length > 0) write(patch);
+	} catch (error) {
+		console.warn(`[books] metadata enrichment failed for ${book.id}: ${(error as Error).message}`);
+	}
+}
+
+/** Catalog hint keys for each way an open can fail. */
+const FAILURE_HINT_KEYS = {
+	[BookOpenFailure.Missing]: "reader.failed.missing",
+	[BookOpenFailure.Unsupported]: "reader.failed.unsupported",
+	[BookOpenFailure.Damaged]: "reader.failed.damaged",
+	[BookOpenFailure.Empty]: "reader.failed.empty",
+	[BookOpenFailure.TimedOut]: "reader.failed.timedOut",
+} as const;
+
+/** What the failed-open notice names: the file the user would recognise. */
+type OpenFailure = { failure: BookOpenFailure; name: string };
 
 /** Narrow the Books runtime to exactly the structural slice the shared
  *  object menu reads — `capabilities` (gates Pin; Books holds none, so the
@@ -282,7 +350,9 @@ export function BooksApp(): ReactElement {
 	// book arriving in a later snapshot).
 	const [openNonce, setOpenNonce] = useState(0);
 	const [status, setStatus] = useState<ReaderStatus>(ReaderStatus.Idle);
+	const [openFailure, setOpenFailure] = useState<OpenFailure | null>(null);
 	const [toc, setToc] = useState<readonly TocEntry[]>([]);
+	const [liveProgress, setLiveProgress] = useState<LiveProgress | null>(null);
 	const [showLibrary, setShowLibrary] = useState(true);
 	const libraryAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !showLibrary });
 	const [showInspector, setShowInspector] = useState(readInspectorPref);
@@ -380,10 +450,13 @@ export function BooksApp(): ReactElement {
 	);
 
 	const isSample = selectedId === SAMPLE_BOOK_ID;
+	const shelf = useMemo(() => withLiveProgress(books, liveProgress), [books, liveProgress]);
 	const selectedBook = useMemo(() => {
-		if (isSample) return sample.current;
-		return selectedId ? (books.find((b) => b.id === selectedId) ?? null) : null;
-	}, [isSample, selectedId, books]);
+		if (isSample) {
+			return sample.current ? (withLiveProgress([sample.current], liveProgress)[0] ?? null) : null;
+		}
+		return selectedId ? (shelf.find((b) => b.id === selectedId) ?? null) : null;
+	}, [isSample, selectedId, shelf, liveProgress]);
 	// PRES-3 — who's-here on the open book (vault rows only; not the sample).
 	const bookPeers = usePresence(
 		isSample ? null : (selectedBook?.id ?? null),
@@ -461,6 +534,7 @@ export function BooksApp(): ReactElement {
 		if (!stage || !controls) return undefined;
 
 		setToc([]);
+		setLiveProgress(null);
 
 		if (selectedId === null) {
 			stage.replaceChildren();
@@ -468,9 +542,16 @@ export function BooksApp(): ReactElement {
 			return undefined;
 		}
 
+		// Every write this open makes goes to THIS book or nowhere.
+		const writeOpened = writerForOpenBook(writeBook, () => seq === openSeqRef.current);
+		const reportProgress = (progress: number): void => {
+			if (seq === openSeqRef.current) setLiveProgress({ bookId: selectedId, progress });
+		};
+
 		if (selectedId === SAMPLE_BOOK_ID) {
 			const handle = mountReader(stage, controls, SAMPLE_BOOK_CONTENT, {
 				bookId: SAMPLE_BOOK_ID,
+				onProgressChange: reportProgress,
 			});
 			readerRef.current = { dispose: handle.dispose, goTo: handle.goTo };
 			setToc(tocFromContent(SAMPLE_BOOK_CONTENT));
@@ -484,7 +565,11 @@ export function BooksApp(): ReactElement {
 
 		stage.replaceChildren();
 		setStatus(ReaderStatus.Loading);
+		setOpenFailure(null);
 		void (async () => {
+			// The name the failure notice shows — refined as the open learns
+			// more (book title, then the backing file's own name).
+			let shownName = "";
 			try {
 				const get = rt.current?.services?.entities?.get;
 				if (!get) throw new Error("entities service unavailable");
@@ -497,52 +582,93 @@ export function BooksApp(): ReactElement {
 					book = bookFromEntity(row as Parameters<typeof bookFromEntity>[0]);
 				}
 				if (seq !== openSeqRef.current) return;
-				if (book === null) {
-					setStatus(ReaderStatus.Failed);
+				if (book === null) throw new BookOpenError(BookOpenFailure.Missing, "no such book");
+				shownName = book.name;
+				// A file-less preview record has nothing to read.
+				if (!book.fileId) {
+					setStatus(ReaderStatus.EpubPending);
 					return;
 				}
-				if (!isOpenablePdfBook(book)) {
-					// EPUB (9.21.2, OQ-BK-1 hybrid): epub.js parses the archive → the
-					// pure extractor builds BookContent → the same reflow reader the
-					// sample uses. A file-less preview record still shows the notice.
-					if (!book.fileId) {
-						setStatus(ReaderStatus.EpubPending);
-						return;
-					}
-					const epubFileRow = await get(book.fileId);
-					const epubSource = fileSourceFromEntity(
-						epubFileRow as Parameters<typeof fileSourceFromEntity>[0],
-					);
-					if (!epubSource) throw new Error(`no usable file URL on ${book.fileId}`);
-					const epubBytes = await withTimeout(fetchBookBytes(epubSource.url), OPEN_TIMEOUT_MS);
-					const content = await withTimeout(parseEpub(epubBytes), OPEN_TIMEOUT_MS);
+				const fileId = book.fileId;
+				const fileRow = (await get(fileId)) as
+					| { properties?: Record<string, unknown> | null }
+					| null
+					| undefined;
+				const source = fileSourceFromEntity(fileRow);
+				if (!source) throw new Error(`no usable file URL on ${fileId}`);
+				const fileProps = fileRow?.properties ?? null;
+				const fileName = typeof fileProps?.name === "string" ? fileProps.name : "";
+				if (fileName) shownName = fileName;
+				const bytes = await withTimeout(fetchBookBytes(source.url), OPEN_TIMEOUT_MS);
+				// Route on what the file IS. Its name and its catalog record are
+				// hints a download site or an older build chose; the bytes decide
+				// which reader mounts.
+				const kind = sniffBookBytes(bytes);
+				const format = formatOfSniff(kind);
+				if (seq !== openSeqRef.current) return;
+				if (format === null) {
+					throw new BookOpenError(BookOpenFailure.Unsupported, `no reader for a ${kind} file`);
+				}
+				// Heal on open: a file stored before its format had a label gains
+				// the truthful MIME (so Files shows and routes it as a book), and
+				// a catalog record that named the wrong format is corrected.
+				const mimePatch = staleFileMimePatch(fileProps, kind);
+				const updateEntity = entitiesSvc?.update;
+				if (mimePatch && updateEntity && !isEntityLocked(fileRow)) {
+					void Promise.resolve(updateEntity(fileId, mimePatch)).catch((error: unknown) => {
+						console.warn(`[books] file label heal failed: ${(error as Error).message}`);
+					});
+				}
+				if (book.format !== format) {
+					writeOpened({ format });
+					book = { ...book, format };
+				}
+				const openedBook = book;
+				const rawProperties = entitiesRef.current.find((e) => e.id === openedBook.id)?.properties;
+				if (format !== BookFormat.Pdf) {
+					// EPUB / FB2 → `BookContent` → the same reflow reader the
+					// sample uses. epub.js is only the archive/spine parser.
+					const loaded = await withTimeout(loadReflowBook(bytes, kind, { parseEpub }), OPEN_TIMEOUT_MS);
 					if (seq !== openSeqRef.current) return;
-					const persist = makePositionPersister(writeBook, book, content.spine.length);
+					const { content } = loaded;
+					const persist = makePositionPersister(writeOpened, openedBook, content.spine.length);
 					const handle = mountReader(stage, controls, content, {
-						bookId: book.id,
-						initialPosition: book.reading.position,
+						bookId: openedBook.id,
+						initialPosition: openedBook.reading.position,
 						onPositionChange: persist,
+						onProgressChange: reportProgress,
 					});
 					readerRef.current = { dispose: handle.dispose, goTo: handle.goTo };
 					setToc(tocFromContent(content));
 					setStatus(ReaderStatus.Ready);
+					void enrichBookFromReflow({
+						loaded,
+						book: openedBook,
+						fileName,
+						rawProperties: rawProperties ?? null,
+						write: entitiesSvc ? writeOpened : null,
+						covers: coversSvc,
+						stillCurrent: () => seq === openSeqRef.current,
+					});
 					return;
 				}
-				const fileRow = await get(book.fileId);
-				const source = fileSourceFromEntity(fileRow as Parameters<typeof fileSourceFromEntity>[0]);
-				if (!source) throw new Error(`no usable file URL on ${book.fileId}`);
-				const bytes = await withTimeout(fetchBookBytes(source.url), OPEN_TIMEOUT_MS);
-				const doc = await withTimeout(openPdfDocument(bytes), OPEN_TIMEOUT_MS);
+				const doc = await withTimeout(
+					openPdfDocument(bytes).catch((error: unknown) => {
+						throw new BookOpenError(BookOpenFailure.Damaged, (error as Error).message);
+					}),
+					OPEN_TIMEOUT_MS,
+				);
 				if (seq !== openSeqRef.current) {
 					void doc.destroy().catch(() => {});
 					return;
 				}
 				const port = enginePagePort(doc);
-				const persist = makePositionPersister(writeBook, book, doc.numPages);
-				const title = book.name.length > 0 ? book.name : t("app.title");
+				const persist = makePositionPersister(writeOpened, openedBook, doc.numPages);
+				const title = openedBook.name.length > 0 ? openedBook.name : t("app.title");
 				const handle = mountPdfReader(stage, controls, title, port, {
-					initialPosition: book.reading.position,
+					initialPosition: openedBook.reading.position,
 					onPositionChange: persist,
+					onProgressChange: reportProgress,
 					onOpenLink: (url) => {
 						// Route page links through the `open` intent so web URLs land
 						// in the browser app (the registered `https` opener) — Books
@@ -560,15 +686,22 @@ export function BooksApp(): ReactElement {
 				void enrichBookFromPdf({
 					doc,
 					port,
-					book,
-					rawProperties: entitiesRef.current.find((e) => e.id === book.id)?.properties ?? null,
-					write: entitiesSvc ? writeBook : null,
+					book: openedBook,
+					rawProperties: rawProperties ?? null,
+					write: entitiesSvc ? writeOpened : null,
 					covers: coversSvc,
 					stillCurrent: () => seq === openSeqRef.current,
 				});
 			} catch (error) {
 				if (seq !== openSeqRef.current) return;
 				console.warn(`[books] failed to open ${selectedId}: ${(error as Error).message}`);
+				// A reader that threw mid-mount must not leave half a page under
+				// the notice.
+				readerRef.current?.dispose();
+				readerRef.current = null;
+				stage.replaceChildren();
+				setToc([]);
+				setOpenFailure({ failure: failureOf(error), name: shownName });
 				setStatus(ReaderStatus.Failed);
 			}
 		})();
@@ -578,8 +711,8 @@ export function BooksApp(): ReactElement {
 			readerRef.current?.dispose();
 			readerRef.current = null;
 		};
-		// `isOpenablePdfBook` depends only on fields that are fixed for a given
-		// id (format / fileId), so id + nonce is the full open identity.
+		// The reader is chosen from the file's bytes, which are fixed for a
+		// given id, so id + nonce is the full open identity.
 	}, [selectedId, openNonce, entitiesSvc]);
 
 	// Re-arm the one-shot catch-up for each genuinely new selection (keyed on
@@ -880,7 +1013,7 @@ export function BooksApp(): ReactElement {
 				data-inspector-open={selectedBook && subject && showInspector ? "true" : "false"}
 			>
 				<LibraryPanel
-					books={books}
+					books={shelf}
 					selectedId={selectedId}
 					open={libraryAutoHide.visible}
 					autoHide={libraryAutoHide.panelProps}
@@ -895,6 +1028,7 @@ export function BooksApp(): ReactElement {
 						<div className="books__placeholder">
 							<ReaderNotice
 								status={status}
+								openFailure={openFailure}
 								hasBooks={books.length > 0}
 								usingVault={usingVault}
 								onImport={canImport ? importBook : undefined}
@@ -924,11 +1058,13 @@ export function BooksApp(): ReactElement {
 
 function ReaderNotice({
 	status,
+	openFailure,
 	hasBooks,
 	usingVault,
 	onImport,
 }: {
 	status: ReaderStatus;
+	openFailure: OpenFailure | null;
 	hasBooks: boolean;
 	usingVault: boolean;
 	onImport?: (() => void) | undefined;
@@ -939,7 +1075,14 @@ function ReaderNotice({
 		return <p className="books__notice-text">{t("reader.loading")}</p>;
 	}
 	if (status === ReaderStatus.Failed) {
-		return <EmptyState icon={IconName.Warning} title={t("reader.loadFailed")} />;
+		const name = openFailure?.name ?? "";
+		return (
+			<EmptyState
+				icon={IconName.Warning}
+				title={name ? t("reader.failed.title", { name }) : t("reader.loadFailed")}
+				hint={t(FAILURE_HINT_KEYS[openFailure?.failure ?? BookOpenFailure.Missing])}
+			/>
+		);
 	}
 	if (status === ReaderStatus.EpubPending) {
 		return (

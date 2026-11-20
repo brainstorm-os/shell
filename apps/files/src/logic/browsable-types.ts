@@ -61,7 +61,8 @@ export function isAppInternalType(type: string): boolean {
 }
 
 /** Hidden from the universal browser: app-internal plumbing, plus
- *  parent-scoped child content (Messages, Comments — F-318). Child rows are
+ *  parent-scoped child content (Messages, Comments — F-318 — and synced
+ *  Emails). Child rows are
  *  real user content but live inside their container, and the generic
  *  fallback viewer answers `intents.suggest` for ANY typed entity, so the
  *  opener registry alone would let them flood the top level. */

@@ -15,6 +15,7 @@
  * serializers stay parallel rather than sharing a contrived visitor.
  */
 
+import { safeExternalHref } from "./plugins/embed-providers";
 import { type SerializedEditorStateLike, type SerializedNode, TextFormat } from "./preview";
 
 function str(value: unknown, fallback = ""): string {
@@ -111,6 +112,9 @@ function renderBlock(node: SerializedNode): string {
 			const caption = str(node.caption);
 			return `![${str(node.alt)}](${src})${caption ? `\n\n*${caption}*` : ""}`;
 		}
+		case "bookmark":
+		case "web-embed":
+			return safeExternalHref(str(node.url)) ?? "";
 		case "horizontalrule":
 			return "---";
 		case "paragraph":

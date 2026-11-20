@@ -30,9 +30,9 @@ import { dragItemsForEntry } from "../logic/drag-items";
 import { hasActiveFilters } from "../logic/filters";
 import {
 	DEFAULT_LIST_COLUMNS,
-	LIST_COLUMN_WIDTH,
 	ListColumn,
 	listIconTrack,
+	listRowTemplate,
 } from "../logic/list-columns";
 import { RenameStatus } from "../logic/rename";
 import { initialSelectionRange } from "../logic/rename";
@@ -703,11 +703,7 @@ function ContentRow({
 				// set (9.8.11); tile modes keep their stylesheet layout.
 				style={
 					isListMode(store.viewMode)
-						? {
-								gridTemplateColumns: `${iconTrack} minmax(0, 1fr) ${store.listColumns
-									.map((c) => LIST_COLUMN_WIDTH[c])
-									.join(" ")}`.trimEnd(),
-							}
+						? { gridTemplateColumns: listRowTemplate(iconTrack, store.listColumns) }
 						: undefined
 				}
 				draggable={!renaming}

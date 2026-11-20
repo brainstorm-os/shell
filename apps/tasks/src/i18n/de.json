@@ -286,5 +286,7 @@
   "tasks.row.toggle.open": "„{name}“ als erledigt markieren",
   "tasks.row.toggle.done": "„{name}“ ist erledigt — als „wird nicht erledigt“ markieren",
   "tasks.row.toggle.wontDo": "„{name}“ wird nicht erledigt — wieder öffnen",
-  "tasks.quickLook.value.wontDo": "Wird nicht erledigt"
+  "tasks.quickLook.value.wontDo": "Wird nicht erledigt",
+  "tasks.tool.untitled": "Aufgabe ohne Titel",
+  "tasks.tool.createTask.fromSource": "Aus „{title}“"
 }

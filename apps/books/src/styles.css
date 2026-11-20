@@ -84,14 +84,19 @@ body {
  * open each line ran on underneath it: every paragraph appeared hard-cut
  * mid-word at the panel edge, and the glass blur turned the occluded tail of
  * each line into a grey bar inside the panel that read as a stuck loading
- * skeleton beside "Author — Empty". Reserving the panel's width on the stage
- * fixes both: the column recentres in the width that is actually visible. */
+ * skeleton beside "Author — Empty". Reserving the panel's width fixes both:
+ * the column recentres in the width that is actually visible.
+ *
+ * The reservation sits on the reader ROOT, not the stage: the footer is the
+ * stage's sibling, so a stage-only inset left it full-bleed and its
+ * next-page button (the trailing end of a space-between row) under the panel.
+ * Padding keeps the page background running beneath the glass. */
 .books__layout {
 	--books-inspector-width: 320px;
 }
 
-.books__layout[data-inspector-open="true"] .books__stage {
-	padding-inline-end: calc(var(--space-4) + var(--books-inspector-width));
+.books__layout[data-inspector-open="true"] .books {
+	padding-inline-end: var(--books-inspector-width);
 }
 
 .books__content {
@@ -387,6 +392,15 @@ body {
 	padding-top: 0;
 }
 
+/* The shared progress cell is `width: 100%` plus a -4px inline margin (a
+ * hover bleed for its editable face). As a growing flex item that makes it
+ * 8px wider than the value column, so its trailing number ran past the
+ * panel padding. Books' progress is read-only — no hover face to bleed. */
+:root .books__props .bs-cell-progress {
+	margin-inline: 0;
+	padding-inline: 0;
+}
+
 /* Separate the table of contents from the property rows with the same 1px
    divider the meta footer uses, so CONTENTS reads as its own section. */
 .books__toc {
@@ -451,6 +465,9 @@ body {
 	flex-direction: column;
 	flex: 1 1 auto;
 	min-height: 0;
+	/* Matches the inspector's own slide transition so the column glides to
+	 * its new centre instead of jumping. */
+	transition: padding-inline-end var(--motion-duration-normal, 180ms) ease;
 	background: var(--reader-bg, var(--bg));
 	color: var(--reader-text, var(--text));
 	--reader-font-family: var(--text-family-body, var(--text-family-ui));
@@ -547,9 +564,6 @@ body {
 	display: flex;
 	justify-content: center;
 	padding: var(--space-6) var(--space-4);
-	/* Matches the inspector's own slide transition so the column glides to
-	 * its new centre instead of jumping. */
-	transition: padding-inline-end var(--motion-duration-normal, 180ms) ease;
 }
 
 .books__page {

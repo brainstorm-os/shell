@@ -19,8 +19,11 @@
  *   - the sender is THIS identity        ⇒ allow (paired device / cold restore);
  *   - this device holds no DEK yet       ⇒ allow (bootstrap: nothing to substitute,
  *                                          and a cold device has no record to read);
- *   - otherwise                          ⇒ the sender must be an ACTIVE OWNER in
- *                                          the entity's local signed access record.
+ *   - otherwise                          ⇒ the sender must be an ACTIVE OWNER under
+ *                                          the owner-rooted policy (`access-record.ts`)
+ *                                          - an Owner grant she signed herself, or one
+ *                                          signed by anyone who is not an owner, is
+ *                                          not ownership.
  *
  * Fail-closed: an unreadable record, a malformed key, or a sender who resolves
  * to anything less than Owner denies the install and leaves the current DEK in
@@ -28,7 +31,13 @@
  */
 
 import type * as Y from "yjs";
-import { AccessRole, keyBytesEqual, resolveCurrentMembers, roleAtLeast } from "./access-record";
+import {
+	AccessRole,
+	type AccessTrust,
+	activeMembers,
+	hasAccessEntries,
+	keyBytesEqual,
+} from "./access-record";
 
 export type WrapInstallAuthzInput = {
 	entityId: string;
@@ -40,6 +49,8 @@ export type WrapInstallAuthzInput = {
 	holdsDek: boolean;
 	/** The entity's local Y.Doc, for its signed access record. */
 	localDoc: Y.Doc;
+	/** This device's pinned trust for that record (`AccessTrustStore.trustFor`). */
+	trust: AccessTrust;
 	/** Decode a base64 member key to bytes; a throw is treated as "not a match". */
 	decodeMemberKey: (base64: string) => Uint8Array;
 };
@@ -48,7 +59,6 @@ export type WrapInstallAuthzInput = {
 export function authorizesWrapInstall(input: WrapInstallAuthzInput): boolean {
 	if (keyBytesEqual(input.senderKey, input.selfPub)) return true;
 	if (!input.holdsDek) return true;
-	const members = resolveCurrentMembers(input.localDoc, input.entityId);
 	// Un-judgeable, so allow: this device holds a DEK but no access record at
 	// all. That state is reachable WITHOUT an attacker, because the wrap and the
 	// state that carries the record are two independent best-effort frames
@@ -60,10 +70,9 @@ export function authorizesWrapInstall(input: WrapInstallAuthzInput): boolean {
 	// device with no record cannot tell an Owner from anyone else anyway. The
 	// Viewer-rotation attack this rule exists for needs a record to be a Viewer
 	// IN, so it is unaffected.
-	if (members.length === 0) return true;
-	for (const member of members) {
-		if (!member.active) continue;
-		if (!roleAtLeast(member.role, AccessRole.Owner)) continue;
+	if (!hasAccessEntries(input.localDoc) && input.trust.root === null) return true;
+	for (const member of activeMembers(input.localDoc, input.entityId, input.trust)) {
+		if (member.role !== AccessRole.Owner) continue;
 		let memberKey: Uint8Array;
 		try {
 			memberKey = input.decodeMemberKey(member.member);

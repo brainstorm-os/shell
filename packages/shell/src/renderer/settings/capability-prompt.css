@@ -44,3 +44,50 @@
 
 /* Capability-prompt buttons use the shared <Button> primitive — see
  * renderer/ui/button.tsx. */
+
+/* Tool-approval prompt — who is asking and who would run the tool. Each party
+ * is a name plus its registry app id: a name is free text any app can choose
+ * (a third party may call itself "Notes"), the id is not. The id is quieter
+ * than the name, never hidden, and wraps rather than truncating. */
+.tool-approval__parties {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+	margin: 0;
+}
+
+.tool-approval__party {
+	display: flex;
+	align-items: baseline;
+	gap: var(--space-2);
+	min-width: 0;
+}
+
+.tool-approval__party-role {
+	flex: 0 0 auto;
+	font-size: var(--text-size-sm);
+	color: var(--color-text-secondary);
+}
+
+.tool-approval__party-who {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: var(--space-1) var(--space-2);
+	min-width: 0;
+	margin: 0;
+}
+
+.tool-approval__party-name {
+	font-size: var(--text-size-sm);
+	font-weight: 600;
+	color: var(--color-text-primary);
+	overflow-wrap: anywhere;
+}
+
+.tool-approval__party-id {
+	font-family: var(--text-family-code);
+	font-size: var(--text-size-sm);
+	color: var(--color-text-secondary);
+	overflow-wrap: anywhere;
+}

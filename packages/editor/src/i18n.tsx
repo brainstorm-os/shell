@@ -223,6 +223,29 @@ export type EditorI18nKey =
 	| "editor.embed.chooser.bookmark"
 	| "editor.embed.chooser.embed"
 	| "editor.embed.chooser.link"
+	| "editor.bookmark.urlPlaceholder.youtube"
+	| "editor.bookmark.urlPlaceholder.googleMaps"
+	// Web embeds (WebEmbedNode facade + the shared Embeds slash rows).
+	| "editor.block.webEmbed"
+	| "editor.block.webEmbed.description"
+	| "editor.block.youtube"
+	| "editor.block.youtube.description"
+	| "editor.block.googleMaps"
+	| "editor.block.googleMaps.description"
+	| "editor.embed.facade.load"
+	| "editor.embed.facade.notice"
+	| "editor.embed.frameTitle"
+	| "editor.embed.provider.youtube"
+	| "editor.embed.provider.vimeo"
+	| "editor.embed.provider.loom"
+	| "editor.embed.provider.figma"
+	| "editor.embed.provider.codesandbox"
+	| "editor.embed.provider.googleMaps"
+	| "editor.embed.provider.openStreetMap"
+	| "editor.embed.provider.spotify"
+	| "editor.embed.provider.soundCloud"
+	| "editor.embed.provider.codePen"
+	| "editor.embed.provider.miro"
 	// Comments panel (CommentsPanel — B11.9).
 	| "editor.comments.region"
 	| "editor.comments.empty"
@@ -487,6 +510,28 @@ export const EDITOR_I18N_DEFAULTS: EditorManifest = Object.freeze({
 	"editor.embed.chooser.bookmark": "Create bookmark",
 	"editor.embed.chooser.embed": "Embed",
 	"editor.embed.chooser.link": "Plain link",
+	"editor.bookmark.urlPlaceholder.youtube": "Paste a YouTube link…",
+	"editor.bookmark.urlPlaceholder.googleMaps": "Paste a Google Maps link…",
+	"editor.block.webEmbed": "Bookmark or web embed",
+	"editor.block.webEmbed.description": "A link as a card, or an embed from a supported site",
+	"editor.block.youtube": "YouTube",
+	"editor.block.youtube.description": "Embed a YouTube video",
+	"editor.block.googleMaps": "Google Maps",
+	"editor.block.googleMaps.description": "Embed a map of a place or an area",
+	"editor.embed.facade.load": "Load {provider}",
+	"editor.embed.facade.notice": "Nothing has loaded yet. Loading connects to {host}.",
+	"editor.embed.frameTitle": "{provider} embed",
+	"editor.embed.provider.youtube": "YouTube",
+	"editor.embed.provider.vimeo": "Vimeo",
+	"editor.embed.provider.loom": "Loom",
+	"editor.embed.provider.figma": "Figma",
+	"editor.embed.provider.codesandbox": "CodeSandbox",
+	"editor.embed.provider.googleMaps": "Google Maps",
+	"editor.embed.provider.openStreetMap": "OpenStreetMap",
+	"editor.embed.provider.spotify": "Spotify",
+	"editor.embed.provider.soundCloud": "SoundCloud",
+	"editor.embed.provider.codePen": "CodePen",
+	"editor.embed.provider.miro": "Miro",
 	"editor.comments.region": "Comments",
 	"editor.comments.empty": "No comments yet",
 	"editor.comments.mention.search": "Mention a member",

@@ -6,10 +6,11 @@ import {
 	bookFromEntity,
 	entityIdFromPayload,
 	fileSourceFromEntity,
-	isOpenablePdfBook,
 	readingPositionPatch,
 	resolveFileOpen,
+	staleFileMimePatch,
 } from "./book-open";
+import { SniffedKind } from "./book-sniff";
 
 describe("entityIdFromPayload", () => {
 	it("reads a string entityId", () => {
@@ -62,15 +63,10 @@ describe("bookFromEntity", () => {
 	});
 });
 
-describe("isOpenablePdfBook", () => {
-	it("accepts a pdf book with a backing file", () => {
-		expect(isOpenablePdfBook(bookFromEntity(pdfBookEntity()))).toBe(true);
-	});
-
-	it("rejects epub books, file-less books, and null", () => {
-		expect(isOpenablePdfBook(bookFromEntity(pdfBookEntity({ format: "epub" })))).toBe(false);
-		expect(isOpenablePdfBook(bookFromEntity(pdfBookEntity({ fileId: null })))).toBe(false);
-		expect(isOpenablePdfBook(null)).toBe(false);
+describe("bookFromEntity formats", () => {
+	it("round-trips fb2 and reads an unknown format as epub", () => {
+		expect(bookFromEntity(pdfBookEntity({ format: "fb2" }))?.format).toBe(BookFormat.Fb2);
+		expect(bookFromEntity(pdfBookEntity({ format: "mobi" }))?.format).toBe(BookFormat.Epub);
 	});
 });
 
@@ -108,6 +104,23 @@ describe("bookFormatFromFile", () => {
 		expect(bookFormatFromFile({ name: "paper.pdf" })).toBe(BookFormat.Pdf);
 	});
 
+	it("maps the FictionBook mime types", () => {
+		expect(bookFormatFromFile({ mime: "application/x-fictionbook+xml" })).toBe(BookFormat.Fb2);
+		expect(bookFormatFromFile({ mime: "application/x-zip-compressed-fb2" })).toBe(BookFormat.Fb2);
+	});
+
+	it("resolves the owner's already-imported file by its compound name", () => {
+		expect(
+			bookFormatFromFile({
+				mime: "application/octet-stream",
+				name: "King_Chetyre-posle-polunochi_3_Bibliotechnaya-policiya.159046.fb2.epub",
+			}),
+		).toBe(BookFormat.Epub);
+		expect(bookFormatFromFile({ mime: "application/zip", name: "King.fb2.zip" })).toBe(
+			BookFormat.Fb2,
+		);
+	});
+
 	it("returns null for non-book files and empty props", () => {
 		expect(bookFormatFromFile({ mime: "image/png", name: "shot.png" })).toBeNull();
 		expect(bookFormatFromFile(null)).toBeNull();
@@ -115,7 +128,46 @@ describe("bookFormatFromFile", () => {
 	});
 });
 
+describe("staleFileMimePatch", () => {
+	const GENERIC = "application/octet-stream";
+
+	it("gives a generically-labelled file the MIME its bytes sniffed as", () => {
+		expect(staleFileMimePatch({ mime: GENERIC }, SniffedKind.Epub)).toEqual({
+			mime: "application/epub+zip",
+		});
+		expect(staleFileMimePatch({ mime: GENERIC }, SniffedKind.Fb2)).toEqual({
+			mime: "application/x-fictionbook+xml",
+		});
+		expect(staleFileMimePatch({ mime: "application/zip" }, SniffedKind.Fb2Zip)).toEqual({
+			mime: "application/x-zip-compressed-fb2",
+		});
+		expect(staleFileMimePatch({}, SniffedKind.Pdf)).toEqual({ mime: "application/pdf" });
+	});
+
+	it("leaves a specific label alone, right or wrong", () => {
+		expect(staleFileMimePatch({ mime: "application/epub+zip" }, SniffedKind.Epub)).toBeNull();
+		expect(staleFileMimePatch({ mime: "application/pdf" }, SniffedKind.Epub)).toBeNull();
+	});
+
+	it("writes nothing when the bytes are not a book", () => {
+		expect(staleFileMimePatch({ mime: GENERIC }, SniffedKind.Zip)).toBeNull();
+		expect(staleFileMimePatch({ mime: GENERIC }, SniffedKind.Unknown)).toBeNull();
+	});
+});
+
 describe("resolveFileOpen", () => {
+	it("mints a title without the compound suffix for a conversion download", () => {
+		const result = resolveFileOpen({
+			fileId: "file-1",
+			fileProps: { name: "King.159046.fb2.epub", mime: "application/octet-stream" },
+			books: [],
+			newBookId: "bk-new",
+			now: 5,
+		});
+		expect(result?.record?.format).toBe(BookFormat.Epub);
+		expect(result?.record?.name).toBe("King.159046");
+	});
+
 	const fileProps = { name: "Deep Work.pdf", mime: "application/pdf", attachment: "brainstorm://f" };
 
 	it("reuses an existing Book/v1 that already wraps the file", () => {

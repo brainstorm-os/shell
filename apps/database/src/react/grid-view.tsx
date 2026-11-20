@@ -1142,7 +1142,7 @@ export function OpenRecordButton({
 			onDoubleClick={(event) => event.stopPropagation()}
 			onPointerDown={(event) => event.stopPropagation()}
 		>
-			<Icon name={IconName.OpenExternal} size={14} />
+			<Icon name={IconName.OpenExternal} size={16} />
 		</button>
 	);
 }

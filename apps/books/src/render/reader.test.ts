@@ -104,6 +104,35 @@ describe("reader render with a measured page box", () => {
 	});
 });
 
+describe("reader live progress", () => {
+	const footerPercent = (root: HTMLElement): number =>
+		Number(/(\d+)%/.exec(root.querySelector(".books__progress")?.textContent ?? "")?.[1]);
+
+	// The footer was the only surface that knew the live number; the shelf row
+	// and the inspector showed the stored one until the next page turn.
+	it("reports the footer's progress on mount, before any page turn", () => {
+		const { root, right } = scaffold();
+		const seen: number[] = [];
+		handle = mountReader(root, right, SAMPLE_BOOK_CONTENT, {
+			onProgressChange: (p) => seen.push(p),
+		});
+		expect(seen).toHaveLength(1);
+		expect(Math.round((seen[0] ?? -1) * 100)).toBe(footerPercent(root));
+	});
+
+	it("reports again when a page turn moves it, and stays in step with the footer", () => {
+		const { root, right } = scaffold();
+		const seen: number[] = [];
+		handle = mountReader(root, right, SAMPLE_BOOK_CONTENT, {
+			onProgressChange: (p) => seen.push(p),
+		});
+		root.querySelector<HTMLButtonElement>(".books__nav-btn:last-of-type")?.click();
+		expect(seen).toHaveLength(2);
+		expect(seen[1]).toBeGreaterThan(seen[0] ?? 1);
+		expect(Math.round((seen[1] ?? -1) * 100)).toBe(footerPercent(root));
+	});
+});
+
 describe("reader render", () => {
 	it("paints the typography controls + the first page content + page status", () => {
 		const { root, right } = scaffold();

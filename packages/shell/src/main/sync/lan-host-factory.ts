@@ -89,21 +89,54 @@ function defaultBuild(opts: {
  * Build a listener, or `null` when we must not listen.
  *
  * `null` on: no session (no device account ⇒ no handshake identity), and no
- * bindable private address. Both are "stay off", never "listen openly".
+ * bindable private address. Both are "stay off", never "listen openly". Every
+ * listener this builds, at any address, carries the same closed handshake.
  */
 export function createLanListener(deps: LanListenerFactoryDeps): BuiltLanListener | null {
 	const hostAccount = deviceAccountId(deps.access.deviceEd25519Public());
 	if (!hostAccount) return null;
-	const address = deps.addresses()[0];
-	if (!address) return null;
+	const addresses = deps.addresses();
+	if (addresses.length === 0) return null;
 	const handshake = makeLanHostHandshakeForSession(deps.access);
-	const build = deps.build;
-	return build
-		? build({ handshake, hostAccount, address })
-		: defaultBuild({
-				handshake,
-				hostAccount,
-				address,
-				...(deps.onError ? { onError: deps.onError } : {}),
-			});
+	const buildAt = (address: string): BuiltLanListener =>
+		deps.build
+			? deps.build({ handshake, hostAccount, address })
+			: defaultBuild({
+					handshake,
+					hostAccount,
+					address,
+					...(deps.onError ? { onError: deps.onError } : {}),
+				});
+
+	// The ranking is a heuristic over interface NAMES, so the top choice can be
+	// an adapter that will not bind (gone since enumeration, or held by another
+	// stack). Walk the list instead of giving up on the first: the listener
+	// that starts is the one every later call reaches.
+	let bound: BuiltLanListener | null = null;
+	return {
+		async start() {
+			let failure: unknown = null;
+			for (const address of addresses) {
+				const candidate = buildAt(address);
+				try {
+					const started = await candidate.start();
+					bound = candidate;
+					return started;
+				} catch (error) {
+					failure = error;
+					await candidate.stop().catch(() => undefined);
+				}
+			}
+			throw failure ?? new Error("createLanListener: no bindable address");
+		},
+		async stop() {
+			const listener = bound;
+			bound = null;
+			await listener?.stop();
+		},
+		webSocketCtor() {
+			if (!bound) throw new Error("createLanListener: not listening");
+			return bound.webSocketCtor();
+		},
+	};
 }

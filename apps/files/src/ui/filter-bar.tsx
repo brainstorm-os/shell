@@ -61,7 +61,7 @@ export function FilterToggleButton({
 	return (
 		<button
 			type="button"
-			className="bs-btn bs-btn--secondary toolbar__filter"
+			className="bs-select toolbar__filter"
 			data-testid="toolbar-filter"
 			aria-pressed={open}
 			aria-controls="files-filterbar"

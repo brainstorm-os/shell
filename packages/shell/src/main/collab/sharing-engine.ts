@@ -43,11 +43,19 @@ import { type FanoutDevice, type WrapFanoutResult, fanOutEntityWrap } from "../s
 import type { VaultSession } from "../vault/session";
 import {
 	AccessRole,
+	type AccessTrust,
 	type ResolvedMember,
+	activeMembers,
 	grantAccess,
+	hasAccessEntries,
+	isActiveMember,
+	mayGrant,
+	mayRevoke,
+	repairAccessRecord,
 	resolveCurrentMembers,
 	revokeAccess,
 } from "./access-record";
+import { governingContainers } from "./container-rule";
 import { childrenSourceFor, containmentRuleForParent } from "./containment-registry";
 import { inboxChannelFor } from "./inbox-channel";
 import { cacheRemoteProfile, readSelfProfileSnapshot } from "./profile-store";
@@ -57,6 +65,7 @@ import {
 	inviteProfile,
 	shareEntityWithInvite,
 } from "./share-invite";
+import { hasShareTrace } from "./share-trace";
 import { type SurvivorWrap, rewrapDekForSurvivors } from "./survivor-rewrap";
 
 function freshNonce(): Uint8Array {
@@ -83,6 +92,35 @@ export type CollabAccessView = {
 	revokedAt: number | null;
 };
 
+/** Why a child was left as it was by a collection revoke. */
+export enum IncompleteRemovalReason {
+	/** Revoking or re-keying it threw. */
+	Failed = "failed",
+	/** This identity is not an owner of the child, so it may not re-key it. */
+	NotOwner = "not-owner",
+	/** This device holds no key for the child. */
+	NoKey = "no-key",
+}
+
+/** What a revoke did. `incomplete` lists the container's children that were
+ *  NOT re-keyed away from the removed member: they can no longer WRITE them
+ *  (the container rule), but later edits to those children stay readable by
+ *  them until this is retried. Empty for a single entity. */
+export type RevokeResult = {
+	revoked: boolean;
+	incomplete: Array<{ entityId: string; reason: IncompleteRemovalReason }>;
+};
+
+/** The local identity is not allowed to make this change to the entity's
+ *  membership. Only an owner may grant or revoke; a member may remove
+ *  themselves; nobody may remove the root owner. */
+export class SharingDeniedError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "SharingDeniedError";
+	}
+}
+
 function toAccessView(m: ResolvedMember): CollabAccessView {
 	return { member: m.member, role: m.role, active: m.active, revokedAt: m.revokedAt };
 }
@@ -103,6 +141,8 @@ export class SharingEngine {
 	#pendingRepo: PendingRotationsRepository | null = null;
 	#invitesRepo: ShareInvitesRepository | null = null;
 	#draining = false;
+	/** entity id → "another pass was asked for while one was running". */
+	readonly #reasserting = new Map<string, boolean>();
 	#rosterCache: readonly FanoutDevice[] | null = null;
 	#rosterInFlight: Promise<readonly FanoutDevice[]> | null = null;
 
@@ -192,15 +232,57 @@ export class SharingEngine {
 			// the harness simply never asked for a wrap.
 			await this.#fanOutProvisionedDek(entityId, type);
 		}
-		const exposed = this.#session.exposeIdentityForPairing();
-		await this.mutateAndEmit(entityId, (doc) => {
-			grantAccess(doc, {
-				entityId,
-				member: this.#session.identity.publicKeyBase64,
-				role: AccessRole.Owner,
-				signerSecret: exposed.secretKey,
-				now: Date.now(),
-			});
+		await this.#mutateRecord(entityId, (doc, trustNow) => {
+			// The same keyed genesis grant `#shareOne` writes. A key-less one here
+			// would be the one that STAYS after a share, and a member's child
+			// cascade can only wrap to a wrapping key it reads out of a signed
+			// grant: an Owner grant without one made every provisioned channel
+			// one-way - the owner's messages reached members and no member's
+			// message ever reached the owner, with nothing logged on either side.
+			this.#writeGenesisGrant(doc, entityId, trustNow(), this.#session.deviceX25519.publicKeyBase64);
+		});
+	}
+
+	/**
+	 * The GENESIS grant: this identity's self-signed Owner grant, written into an
+	 * EMPTY record and nowhere else. It is what makes this identity the entity's
+	 * root owner on every device that later sees the record, so it must never be
+	 * signed into a record that already has a root — a member doing that would
+	 * be declaring herself the owner of someone else's entity (readers ignore
+	 * it, but it has no business being written).
+	 */
+	#writeGenesisGrant(doc: Y.Doc, entityId: string, trust: AccessTrust, x25519: string | null): void {
+		if (trust.root !== null || hasAccessEntries(doc)) return;
+		grantAccess(doc, {
+			entityId,
+			member: this.#session.identity.publicKeyBase64,
+			role: AccessRole.Owner,
+			signerSecret: this.#session.exposeIdentityForPairing().secretKey,
+			now: Date.now(),
+			x25519,
+			trust,
+		});
+	}
+
+	/**
+	 * Mutate an entity's access record. `trustNow()` is this device's pinned
+	 * trust for the doc AS IT STANDS (call it again after a write that could
+	 * have established the root). Before the mutation, anything this device
+	 * remembers that the doc no longer shows is written back; after it, the
+	 * statements just made are remembered — so a revoke this device issued can
+	 * never be un-done by deleting it from the array.
+	 */
+	async #mutateRecord<T>(
+		entityId: string,
+		mutate: (doc: Y.Doc, trustNow: () => AccessTrust) => T,
+	): Promise<T> {
+		const store = await this.#session.accessTrust();
+		return this.#mutateAndEmitReturning(entityId, (doc) => {
+			const trustNow = () => store.trustFor(doc, entityId);
+			repairAccessRecord(doc, entityId, trustNow());
+			const result = mutate(doc, trustNow);
+			trustNow();
+			return result;
 		});
 	}
 
@@ -274,7 +356,15 @@ export class SharingEngine {
 					// CONTAINER the receiver already belongs to, not on the invite. The
 					// invite stays pinned to the container alone, so one code can open a
 					// collection of any size without becoming a multi-entity credential.
-					await this.#shareOne(childId, rule.childType, opts.invite, opts.role, opts.entityId);
+					//
+					// A child this identity does not own (another member's message
+					// that has not been cascaded to us as an owner) is skipped rather
+					// than allowed to abort the rest: its own owner hands it out.
+					try {
+						await this.#shareOne(childId, rule.childType, opts.invite, opts.role, opts.entityId);
+					} catch (error) {
+						if (!(error instanceof SharingDeniedError)) throw error;
+					}
 				}
 			}
 		}
@@ -324,7 +414,15 @@ export class SharingEngine {
 	async autoShareNewChild(childId: string, childType: string, containerId: string): Promise<number> {
 		const members = await this.#activeMembersWithKeys(containerId);
 		const selfPub = this.#session.identity.publicKeyBase64;
-		const recipients = members.filter((m) => m.member !== selfPub && m.x25519 !== null);
+		const others = members.filter((m) => m.member !== selfPub);
+		const recipients = others.filter((m) => m.x25519 !== null);
+		// A member we cannot wrap to is a member who silently never receives this
+		// child, so say so. Identifiers only: the count, never a key.
+		if (recipients.length < others.length) {
+			console.warn(
+				`[sharing] ${childId}: ${others.length - recipients.length} of ${others.length} member(s) of ${containerId} have no wrapping key in their grant and will not receive it`,
+			);
+		}
 		// Solo container (only self) ⇒ nothing to fan out, exactly like LiveSync's
 		// solo-quiet rule. (A container shared only with members we can't yet wrap
 		// to also lands here; the deferred re-cascade picks them up later.)
@@ -333,6 +431,9 @@ export class SharingEngine {
 		this.#types.set(childId, childType);
 		const handle = dekStore.open(childId);
 		if (!handle) return 0;
+		// From here on this device knows which container governs the child - the
+		// one it is being shared into, not whatever its parent property says later.
+		(await this.#session.accessTrust()).pinContainer(childId, containerId);
 		const exposed = this.#session.exposeIdentityForPairing();
 		const relay = this.requireRelay();
 		let shared = 0;
@@ -340,16 +441,16 @@ export class SharingEngine {
 			for (const m of recipients) {
 				const x25519 = m.x25519 as string;
 				const recipientPub = base64ToBytes(x25519);
-				const wrap = await this.#mutateAndEmitReturning(childId, (doc) => {
+				const wrap = await this.#mutateRecord(childId, (doc, trustNow) => {
+					this.#writeGenesisGrant(doc, childId, trustNow(), this.#session.deviceX25519.publicKeyBase64);
+					// A child this identity does not own (another member's message,
+					// reached by a re-cascade) is not ours to hand out: a grant we
+					// signed would be ignored by every reader, so it is not written.
+					// The child's own owner cascades it.
+					const trust = trustNow();
+					if (!mayGrant(doc, childId, selfPub, trust)) return null;
 					grantAccess(doc, {
-						entityId: childId,
-						member: selfPub,
-						role: AccessRole.Owner,
-						signerSecret: exposed.secretKey,
-						now: Date.now(),
-						x25519: this.#session.deviceX25519.publicKeyBase64,
-					});
-					grantAccess(doc, {
+						trust,
 						entityId: childId,
 						member: m.member,
 						role: m.role,
@@ -363,12 +464,13 @@ export class SharingEngine {
 						// rule's child type — instead of trusting this signature alone.
 						via: containerId,
 					});
-					const existing = findWrapForRecipient(doc, recipientPub);
+					const existing = findWrapForRecipient(doc, recipientPub, handle.version);
 					if (existing) return existing;
 					const w = wrapDekForRecipient(handle.dek, recipientPub, childId, childType, handle.version);
 					appendWrap(doc, w);
 					return w;
 				});
+				if (wrap === null) break;
 				const inbox = inboxChannelFor(m.member);
 				await emitWrapBootstrap(childId, wrap, this.makeCtx(relay.currentPort()), inbox);
 				// F-471 — same subscribe race as `#shareOne`: this member has never
@@ -390,11 +492,14 @@ export class SharingEngine {
 	async #activeMembersWithKeys(
 		containerId: string,
 	): Promise<Array<{ member: string; role: AccessRole; x25519: string | null }>> {
+		const store = await this.#session.accessTrust();
 		const { doc } = await this.#session.ydocStore.load(containerId);
 		try {
-			return resolveCurrentMembers(doc, containerId)
-				.filter((m) => m.active)
-				.map((m) => ({ member: m.member, role: m.role, x25519: m.x25519 }));
+			return activeMembers(doc, containerId, store.trustFor(doc, containerId)).map((m) => ({
+				member: m.member,
+				role: m.role,
+				x25519: m.x25519,
+			}));
 		} finally {
 			doc.destroy();
 		}
@@ -417,6 +522,7 @@ export class SharingEngine {
 	): Promise<void> {
 		const dekStore = await this.ensureDekStore();
 		this.#types.set(entityId, type);
+		if (via !== undefined) (await this.#session.accessTrust()).pinContainer(entityId, via);
 		const exposed = this.#session.exposeIdentityForPairing();
 		// Collab-C6-b — remember the invitee's verified name locally, so THIS
 		// vault's roster resolves them on every entity from now on, not only the
@@ -442,26 +548,40 @@ export class SharingEngine {
 		const seedProps = propsRow?.properties ?? null;
 		let wrap: MemberWrapPayload;
 		try {
-			wrap = await this.#mutateAndEmitReturning(entityId, (doc) => {
+			wrap = await this.#mutateRecord(entityId, (doc, trustNow) => {
+				const selfPub = this.#session.identity.publicKeyBase64;
+				const before = trustNow();
+				// Only an owner may add a member. Refused before anything is
+				// written: readers would ignore a grant from anyone else, and a
+				// share that silently does nothing is worse than one that says no.
+				// (An empty record is the entity's first share, by its creator.)
+				const allowed =
+					before.root === null ? !hasAccessEntries(doc) : mayGrant(doc, entityId, selfPub, before);
+				if (!allowed) throw new SharingDeniedError(`only an owner of ${entityId} can share it`);
 				if (seedProps && doc.getMap(ENTITY_PROPS_MAP_NAME).size === 0) {
 					writeEntityProps(doc, seedProps);
 				}
-				// Bootstrap the OWNER's own grant (idempotent — `grantAccess`
-				// no-ops on a live grant) BEFORE granting the invitee. A normal
-				// entity (entities.create) carries no access record until its
+				// Bootstrap the OWNER's own grant BEFORE granting the invitee. A
+				// normal entity (entities.create) carries no access record until its
 				// first share, so without this the record would name only the
 				// invitee — one active member — and LiveSyncEngine's `isShared`
-				// (>1 active member) would never start syncing it. The owner's own
-				// X25519 rides the grant so a peer member's later child cascade can
-				// wrap to the owner too (design 71).
-				grantAccess(doc, {
-					entityId,
-					member: this.#session.identity.publicKeyBase64,
-					role: AccessRole.Owner,
-					signerSecret: exposed.secretKey,
-					now: Date.now(),
-					x25519: this.#session.deviceX25519.publicKeyBase64,
-				});
+				// (>1 active member) would never start syncing it. It is also the
+				// record's GENESIS grant, which is what roots every later grant in
+				// this identity. The owner's own X25519 rides it so a peer member's
+				// later child cascade can wrap to the owner too (design 71).
+				this.#writeGenesisGrant(doc, entityId, before, this.#session.deviceX25519.publicKeyBase64);
+				// A cascade child the invitee already stands on (a message they wrote
+				// before being removed and re-invited: they are its root owner, at a
+				// role no re-share could "change") needs no grant - only the CURRENT
+				// key, which a rotation since may have moved past the wrap they hold.
+				if (via !== undefined && isActiveMember(doc, entityId, invite.userPubB64, trustNow())) {
+					const recipientPub = base64ToBytes(invite.x25519PubB64);
+					const held = findWrapForRecipient(doc, recipientPub, handle.version);
+					if (held) return held;
+					const fresh = wrapDekForRecipient(handle.dek, recipientPub, entityId, type, handle.version);
+					appendWrap(doc, fresh);
+					return fresh;
+				}
 				return shareEntityWithInvite(doc, {
 					entityId,
 					invite,
@@ -472,7 +592,8 @@ export class SharingEngine {
 					type,
 					dekVersion: handle.version,
 					selfProfile,
-					selfPubkey: this.#session.identity.publicKeyBase64,
+					selfPubkey: selfPub,
+					trust: trustNow(),
 					...(via === undefined ? {} : { via }),
 				});
 			});
@@ -502,20 +623,164 @@ export class SharingEngine {
 		await this.#emitFullState(entityId);
 	}
 
-	/** Owner revokes `memberB64` (signed, append-only audit) and emits the delta. */
+	/**
+	 * Revoke `memberB64` (signed; the entry stays as audit) and emit the delta.
+	 * An owner may remove a member; a member may remove themselves (leave).
+	 * Returns false when `memberB64` is not an active member; throws
+	 * {@link SharingDeniedError} when they are and this identity may not remove
+	 * them (a non-owner removing someone else, a co-owner removing a co-owner,
+	 * anyone removing the root owner).
+	 */
 	async revoke(entityId: string, memberB64: string): Promise<boolean> {
+		return (await this.revokeMember(entityId, memberB64)).revoked;
+	}
+
+	/** {@link revoke}, saying what it could not finish (see {@link RevokeResult}). */
+	async revokeMember(entityId: string, memberB64: string): Promise<RevokeResult> {
+		const type = this.#types.get(entityId) ?? (await this.ensureEntitiesRepo()).get(entityId)?.type;
+		const isContainer = type !== undefined && containmentRuleForParent(type) !== null;
+		// Leaving is the member's own act on the container alone: the container
+		// rule already stops them writing its children on every other device.
+		if (!isContainer || memberB64 === this.#session.identity.publicKeyBase64) {
+			return { revoked: await this.#revokeOne(entityId, memberB64), incomplete: [] };
+		}
+		return this.revokeFromCollection(entityId, type, memberB64);
+	}
+
+	/**
+	 * Design 71 flow 3 — remove `memberB64` from a container AND from what it
+	 * contains.
+	 *
+	 * Revoking on the container is what takes effect: the container rule makes
+	 * every other device refuse the member's writes to, and re-keying of, every
+	 * child from the moment it sees that revoke - the children they authored
+	 * included, where no revoke on the child could ever reach them (an author is
+	 * the root owner of their own message).
+	 *
+	 * The children are then walked for CONFIDENTIALITY going forward: on each
+	 * child this identity owns, the member's grant is revoked where the policy
+	 * allows it (never on a child they authored) and the child's DEK is rotated
+	 * to the members who still stand in the container. After that, an edit to an
+	 * old message is no more readable by the removed member than a new message
+	 * is. What they were already sent stays readable to them - not a goal.
+	 *
+	 * The walk carries on past a child it cannot finish and REPORTS it: a child
+	 * this identity does not own, or holds no key for, or that threw, keeps its
+	 * old key. It is sequential and not resumable across a restart.
+	 */
+	async revokeFromCollection(
+		containerId: string,
+		containerType: string,
+		memberB64: string,
+	): Promise<RevokeResult> {
+		const revoked = await this.#revokeOne(containerId, memberB64);
+		// Not a member now, and not one we ever removed: nothing to walk. A member
+		// removed EARLIER is walked again, so a removal that was left incomplete
+		// can be finished by asking again.
+		const removed = (await this.#currentMembersOf(containerId)).find(
+			(m) => m.member === memberB64 && !m.active,
+		);
+		if (!revoked && !removed) return { revoked: false, incomplete: [] };
+		const memberDevice = removed?.x25519 ?? null;
+		const selfPub = this.#session.identity.publicKeyBase64;
 		const exposed = this.#session.exposeIdentityForPairing();
-		let revoked = false;
-		await this.mutateAndEmit(entityId, (doc) => {
-			revoked = revokeAccess(doc, {
+		const incomplete: RevokeResult["incomplete"] = [];
+		for (const childId of await this.#childrenOf(containerId, containerType)) {
+			try {
+				const owned = await this.#mutateRecord(childId, (doc, trustNow) => {
+					const trust = trustNow();
+					if (!mayGrant(doc, childId, selfPub, trust)) return false;
+					if (mayRevoke(doc, childId, selfPub, memberB64, trust)) {
+						revokeAccess(doc, {
+							entityId: childId,
+							member: memberB64,
+							signerSecret: exposed.secretKey,
+							now: Date.now(),
+							trust,
+						});
+					}
+					return true;
+				});
+				if (!owned) {
+					incomplete.push({ entityId: childId, reason: IncompleteRemovalReason.NotOwner });
+					continue;
+				}
+				const dekStore = await this.ensureDekStore();
+				const held = dekStore.open(childId);
+				if (!held) {
+					incomplete.push({ entityId: childId, reason: IncompleteRemovalReason.NoKey });
+					continue;
+				}
+				dekStore.close(held.dek);
+				// Already re-keyed away from them (an earlier, partial walk): leave it.
+				// Once a key has been rotated every holder has a wrap of it, so no
+				// wrap means no key; the ORIGINAL key is different - its author
+				// minted it and never needed one.
+				const rekeyedAway =
+					held.version > 1 &&
+					memberDevice !== null &&
+					!(await this.#holdsCurrentKey(childId, memberDevice, held.version));
+				if (rekeyedAway) continue;
+				await this.#rotateAfterRevoke(childId);
+			} catch (error) {
+				incomplete.push({ entityId: childId, reason: IncompleteRemovalReason.Failed });
+				console.warn(
+					`[sharing] revoke cascade could not finish ${childId}: ${(error as Error).message}`,
+				);
+			}
+		}
+		return { revoked, incomplete };
+	}
+
+	/** Does the child's doc carry a wrap of its CURRENT key for `deviceX25519`? */
+	async #holdsCurrentKey(entityId: string, deviceX25519: string, version: number): Promise<boolean> {
+		const { doc } = await this.#session.ydocStore.load(entityId);
+		try {
+			return findWrapForRecipient(doc, base64ToBytes(deviceX25519), version) !== null;
+		} finally {
+			doc.destroy();
+		}
+	}
+
+	/** The children of a container: what the index says points at it now, plus
+	 *  everything this device pinned to it (a child whose parent property was
+	 *  later re-pointed is still its child for authorization). */
+	async #childrenOf(containerId: string, containerType: string): Promise<string[]> {
+		const children = new Set((await this.#session.accessTrust()).containedIn(containerId));
+		const rule = containmentRuleForParent(containerType);
+		if (rule) {
+			const result = await queryVaultListSource(childrenSourceFor(rule, containerId), () =>
+				this.ensureEntitiesRepo(),
+			);
+			if (result.ok) for (const id of result.ids) children.add(id);
+		}
+		return [...children];
+	}
+
+	/** Revoke on ONE entity's record, rotating its DEK when this identity may. */
+	async #revokeOne(entityId: string, memberB64: string): Promise<boolean> {
+		const exposed = this.#session.exposeIdentityForPairing();
+		const selfPub = this.#session.identity.publicKeyBase64;
+		const outcome = await this.#mutateRecord(entityId, (doc, trustNow) => {
+			const trust = trustNow();
+			if (!isActiveMember(doc, entityId, memberB64, trust)) return { revoked: false, rotate: false };
+			if (!mayRevoke(doc, entityId, selfPub, memberB64, trust)) {
+				throw new SharingDeniedError(`not allowed to remove that member from ${entityId}`);
+			}
+			const revoked = revokeAccess(doc, {
 				entityId,
 				member: memberB64,
 				signerSecret: exposed.secretKey,
 				now: Date.now(),
+				trust,
 			});
+			// Rotation is an Owner operation — survivors only install a rotated
+			// DEK from an Owner (`authorizesWrapInstall`). A member who just left
+			// is no longer one, so there is nothing for them to rotate.
+			return { revoked, rotate: revoked && mayGrant(doc, entityId, selfPub, trustNow()) };
 		});
-		if (revoked) await this.#rotateAfterRevoke(entityId);
-		return revoked;
+		if (outcome.rotate) await this.#rotateAfterRevoke(entityId);
+		return outcome.revoked;
 	}
 
 	/**
@@ -752,21 +1017,100 @@ export class SharingEngine {
 	/** The entity's active-and-inactive member set after a mutation — the input
 	 *  to the survivor re-wrap (revoked members are `active:false`, excluded). */
 	async #currentMembersOf(entityId: string): Promise<readonly ResolvedMember[]> {
+		const store = await this.#session.accessTrust();
 		const { doc } = await this.#session.ydocStore.load(entityId);
+		let members: ResolvedMember[];
+		let containers: string[];
 		try {
-			return resolveCurrentMembers(doc, entityId);
+			const trust = store.trustFor(doc, entityId);
+			members = resolveCurrentMembers(doc, entityId, trust);
+			const repo = await this.ensureEntitiesRepo();
+			containers = await governingContainers(
+				{ session: this.#session, accessTrust: store, rowOf: (id) => repo.get(id) },
+				doc,
+				entityId,
+				trust,
+			);
 		} finally {
 			doc.destroy();
+		}
+		// The container rule, on the key side: a child's key goes only to those
+		// who still stand in its container, whatever the child's own record says
+		// (it will always say its author is an Owner).
+		for (const containerId of containers) {
+			const inContainer = new Set(
+				(await this.#activeMembersWithKeys(containerId)).map((m) => m.member),
+			);
+			members = members.map((m) => (inContainer.has(m.member) ? m : { ...m, active: false }));
+		}
+		return members;
+	}
+
+	/**
+	 * Put back anything this device remembers of `entityId`'s record that the
+	 * doc no longer shows, and emit it — called when a remote update has just
+	 * landed on the entity. Only the ROOT owner does this, and only it needs to:
+	 * a current member can blank a revoke or delete a grant in an ordinary
+	 * update, which changes nothing here (resolution reads memory) but would
+	 * mislead a device that was offline when the statement was made. Re-asserting
+	 * on receipt, rather than on the owner's next change to the record, closes
+	 * that as soon as the tampering reaches the owner.
+	 *
+	 * Coalesced per entity: a burst of inbound updates costs one pass plus one
+	 * trailing pass, never one per frame. Never throws.
+	 */
+	async reassertRecord(entityId: string): Promise<void> {
+		const pending = this.#reasserting.get(entityId);
+		if (pending !== undefined) {
+			this.#reasserting.set(entityId, true);
+			return;
+		}
+		this.#reasserting.set(entityId, false);
+		try {
+			for (let again = true; again; ) {
+				this.#reasserting.set(entityId, false);
+				const store = await this.#session.accessTrust();
+				if (store.rootOf(entityId) !== this.#session.identity.publicKeyBase64) return;
+				await this.#mutateRecord(entityId, () => undefined);
+				again = this.#reasserting.get(entityId) === true;
+			}
+		} catch (error) {
+			console.warn(`[sharing] re-assert failed for ${entityId}: ${(error as Error).message}`);
+		} finally {
+			this.#reasserting.delete(entityId);
 		}
 	}
 
 	/** The resolved access log (active + revoked audit) for `entityId`. */
 	async access(entityId: string): Promise<CollabAccessView[]> {
+		const store = await this.#session.accessTrust();
 		const { doc } = await this.#session.ydocStore.load(entityId);
 		try {
 			// One CURRENT row per member (re-grant-after-revoke wins) — not the raw
 			// per-append audit list, which would surface a stale revoked row (F-287).
-			return resolveCurrentMembers(doc, entityId).map(toAccessView);
+			// Only grants that carry authority are members at all: an entry signed
+			// by someone who was never an owner is not a row here.
+			return resolveCurrentMembers(doc, entityId, store.trustFor(doc, entityId))
+				.filter((m) => m.authorized)
+				.map(toAccessView);
+		} finally {
+			doc.destroy();
+		}
+	}
+
+	/** True when the entity's access record has ever involved anyone but this
+	 *  identity — read from what the doc HAS HELD, not from what its record
+	 *  currently lists (see `hasShareTrace`). */
+	async shareTrace(entityId: string): Promise<boolean> {
+		const selfPub = this.#session.identity.publicKeyBase64;
+		const store = await this.#session.accessTrust();
+		const { doc } = await this.#session.ydocStore.load(entityId);
+		try {
+			// Two independent witnesses, either is enough: this device's own memory
+			// of grants it has seen take effect (in `entities.db`, out of any
+			// collaborator's reach), and the tombstones in its copy of the doc.
+			const remembered = store.memoryOf(entityId).grants.some((g) => g.member !== selfPub);
+			return remembered || hasShareTrace(doc, selfPub);
 		} finally {
 			doc.destroy();
 		}

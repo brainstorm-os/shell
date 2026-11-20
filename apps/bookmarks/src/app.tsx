@@ -1119,10 +1119,10 @@ export function BookmarksApp() {
 						{...(openBookmark ? {} : { hint: t("header.inspector.disabledHint") })}
 					/>
 					<ObjectMenuMoreButton
-						className="bookmarks__header-more"
 						moreActionsLabel={t("action.moreActions")}
 						context={headerMenuContext ?? (() => null)}
 						disabled={!headerMenuContext}
+						{...(headerMenuContext ? {} : { disabledReason: t("header.more.disabledHint") })}
 					/>
 				</div>
 			</header>

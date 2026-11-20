@@ -46,6 +46,7 @@ import { VaultSession } from "../vault/session";
 import {
 	AccessRole,
 	authorizesAsShareBootstrap,
+	docTrust,
 	isAuthorizedWriter,
 	resolveMembers,
 } from "./access-record";
@@ -109,10 +110,14 @@ class ReceivingShell {
 		} catch {
 			return false;
 		}
+		const accessTrust = await this.session.accessTrust();
 		const { doc } = await this.session.ydocStore.load(entityId);
 		try {
-			if (isAuthorizedWriter(doc, entityId, senderKey)) return true;
+			if (isAuthorizedWriter(doc, entityId, senderKey, accessTrust.trustFor(doc, entityId))) {
+				return true;
+			}
 			const verdict = await authorizeShareBootstrap({
+				accessTrust,
 				localDoc: doc,
 				entityId,
 				senderKey,
@@ -205,7 +210,7 @@ class ReceivingShell {
 	async activeMembers(): Promise<string[]> {
 		const { doc } = await this.session.ydocStore.load(ENTITY);
 		try {
-			return resolveMembers(doc, ENTITY)
+			return resolveMembers(doc, ENTITY, docTrust(doc, ENTITY))
 				.filter((m) => m.active)
 				.map((m) => m.member);
 		} finally {
@@ -297,8 +302,10 @@ describe("F-288 writer authorization on the receiver's production path", () => {
 		});
 		const { doc } = await guest.ydocStore.load(ENTITY);
 		try {
-			expect(resolveMembers(doc, ENTITY).length).toBeGreaterThan(0);
-			expect(isAuthorizedWriter(doc, ENTITY, stranger.identity.publicKey)).toBe(false);
+			expect(resolveMembers(doc, ENTITY, docTrust(doc, ENTITY)).length).toBeGreaterThan(0);
+			expect(isAuthorizedWriter(doc, ENTITY, stranger.identity.publicKey, docTrust(doc, ENTITY))).toBe(
+				false,
+			);
 			expect(
 				authorizesAsShareBootstrap(
 					doc,
@@ -385,7 +392,9 @@ describe("F-288 writer authorization on the receiver's production path", () => {
 		for (const session of [owner, guest]) {
 			const { doc } = await session.ydocStore.load(ENTITY);
 			try {
-				expect(isAuthorizedWriter(doc, ENTITY, guest.identity.publicKey)).toBe(false);
+				expect(isAuthorizedWriter(doc, ENTITY, guest.identity.publicKey, docTrust(doc, ENTITY))).toBe(
+					false,
+				);
 				expect(
 					authorizesAsShareBootstrap(doc, ENTITY, guest.identity.publicKey, Y.encodeStateAsUpdate(doc)),
 					"the bootstrap branch must not rescue a Viewer",

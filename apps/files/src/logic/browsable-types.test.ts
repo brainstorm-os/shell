@@ -13,6 +13,7 @@ const TASK = "brainstorm/Task/v1";
 const VIEW = "brainstorm/CalendarView/v1";
 const MESSAGE = "brainstorm/Message/v1";
 const COMMENT = "brainstorm/Comment/v1";
+const EMAIL = "brainstorm/Email/v1";
 
 function row(id: string, type: string, deletedAt: number | null = null) {
 	return { id, type, deletedAt };
@@ -62,6 +63,21 @@ describe("unresolvedTypes", () => {
 	it("never queries conversation-child types — a Message is not top-level content (F-318)", () => {
 		const entities = [row("a", MESSAGE), row("b", COMMENT), row("c", TASK)];
 		expect(unresolvedTypes(entities, new Map())).toEqual([TASK]);
+	});
+});
+
+describe("synced mail stays in Mailbox", () => {
+	it("never queries Email — a message is not vault-root content", () => {
+		const entities = [row("a", EMAIL), row("b", EMAIL), row("c", TASK)];
+		expect(unresolvedTypes(entities, new Map())).toEqual([TASK]);
+	});
+
+	it("excludes Email even though Mailbox registers a primary opener for it", () => {
+		const cache = new Map<string, OpenerMeta | null>([
+			[NOTE, { appId: "notes", label: "Notes" }],
+			[EMAIL, { appId: "io.brainstorm.mailbox", label: "Mailbox" }],
+		]);
+		expect([...browsableTypeSet(cache)]).toEqual([NOTE]);
 	});
 });
 

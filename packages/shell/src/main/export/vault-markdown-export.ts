@@ -26,7 +26,11 @@ import {
 	serializedStateFromDoc,
 	serializedStateToMarkdown,
 } from "@brainstorm-os/editor";
-import { friendlyTypeName, isPlumbingEntityType } from "@brainstorm-os/sdk/system-entities";
+import {
+	ChildEntityType,
+	friendlyTypeName,
+	isPlumbingEntityType,
+} from "@brainstorm-os/sdk/system-entities";
 import { deriveEntityTitle } from "../entities/derive-title";
 import { STRUCTURAL_ENTITY_TYPES } from "../entities/vault-entities-service";
 import { yieldToEventLoop } from "../import/import-engine";
@@ -337,7 +341,11 @@ async function createUniqueDir(parent: string, name: string): Promise<string> {
 	}
 }
 
-function isExportable(row: EntityRow): boolean {
+// Mail is child content for BROWSING (it lives inside its account's folders),
+// but an export is the user taking their data with them: leaving their mail
+// out of it silently is data loss, not tidiness.
+export function isExportable(row: Pick<EntityRow, "type">): boolean {
+	if (row.type === ChildEntityType.Email) return true;
 	return !STRUCTURAL_ENTITY_TYPES.has(row.type) && !isPlumbingEntityType(row.type);
 }
 

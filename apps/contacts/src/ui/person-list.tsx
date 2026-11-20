@@ -235,7 +235,7 @@ export function PersonSidebar({
 				<AxisPicker
 					axes={CONTACTS_GROUPINGS}
 					active={grouping}
-					leadingIcon={IconName.View}
+					leadingIcon={IconName.KindMultiSelect}
 					labelKeyOf={(axis) => GROUP_LABEL_KEY[axis]}
 					captionKey="list.groupBy"
 					menuLabelKey="list.groupBy.menuLabel"
@@ -302,6 +302,7 @@ export function PersonSidebar({
 									<ObjectMenuTrigger
 										key={`b:${person.id}`}
 										variant="row"
+										className="contacts-row-host"
 										moreActionsLabel={t("detail.menu.more")}
 										context={() => menuContextFor(person)}
 									>
@@ -327,6 +328,7 @@ export function PersonSidebar({
 									<ObjectMenuTrigger
 										key={person.id}
 										variant="row"
+										className="contacts-row-host"
 										moreActionsLabel={t("detail.menu.more")}
 										context={() => menuContextFor(person)}
 									>

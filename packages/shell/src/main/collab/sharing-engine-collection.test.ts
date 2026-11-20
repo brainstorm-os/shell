@@ -21,7 +21,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { readEntityDocProjection } from "../entities/entity-doc-codec";
 import { LoopbackRelayPort, type RelayPort } from "../sync/relay-port";
 import { VaultSession } from "../vault/session";
-import { AccessRole, resolveCurrentMembers } from "./access-record";
+import { AccessRole, docTrust, resolveCurrentMembers } from "./access-record";
 import { type CollabRelayLike, SharingEngine } from "./sharing-engine";
 
 const CHANNEL_TYPE = "io.brainstorm.chat/Channel/v1";
@@ -74,7 +74,7 @@ describe("SharingEngine.shareCollection — cascade onto a channel's messages", 
 	async function activeMemberKeys(entityId: string): Promise<string[]> {
 		const { doc } = await owner.ydocStore.load(entityId);
 		try {
-			return resolveCurrentMembers(doc, entityId)
+			return resolveCurrentMembers(doc, entityId, docTrust(doc, entityId))
 				.filter((m) => m.active)
 				.map((m) => m.member)
 				.sort();
@@ -164,7 +164,9 @@ describe("SharingEngine.shareCollection — cascade onto a channel's messages", 
 
 		const { doc } = await owner.ydocStore.load("msg_1");
 		try {
-			const guestMember = resolveCurrentMembers(doc, "msg_1").find((m) => m.member === guestPub);
+			const guestMember = resolveCurrentMembers(doc, "msg_1", docTrust(doc, "msg_1")).find(
+				(m) => m.member === guestPub,
+			);
 			expect(guestMember?.active).toBe(true);
 			expect(guestMember?.role).toBe(AccessRole.Editor);
 			expect(guestMember?.x25519).toBe(invite.x25519PubB64);
@@ -196,7 +198,9 @@ describe("SharingEngine.shareCollection — cascade onto a channel's messages", 
 		expect(count).toBe(1); // the one guest member (self is excluded)
 		const { doc } = await owner.ydocStore.load("msg_late");
 		try {
-			const guestMember = resolveCurrentMembers(doc, "msg_late").find((m) => m.member === guestPub);
+			const guestMember = resolveCurrentMembers(doc, "msg_late", docTrust(doc, "msg_late")).find(
+				(m) => m.member === guestPub,
+			);
 			expect(guestMember?.active).toBe(true);
 			expect(guestMember?.role).toBe(AccessRole.Editor);
 		} finally {
@@ -222,7 +226,11 @@ describe("SharingEngine.shareCollection — cascade onto a channel's messages", 
 		await engine.provisionEntity("msg_2", MESSAGE_TYPE_URL, { conversation: CHANNEL });
 		const { doc: before } = await owner.ydocStore.load("msg_2");
 		try {
-			expect(resolveCurrentMembers(before, "msg_2").some((m) => m.member === guestPub)).toBe(false);
+			expect(
+				resolveCurrentMembers(before, "msg_2", docTrust(before, "msg_2")).some(
+					(m) => m.member === guestPub,
+				),
+			).toBe(false);
 		} finally {
 			before.destroy();
 		}
@@ -232,11 +240,27 @@ describe("SharingEngine.shareCollection — cascade onto a channel's messages", 
 
 		const { doc: after } = await owner.ydocStore.load("msg_2");
 		try {
-			expect(resolveCurrentMembers(after, "msg_2").find((m) => m.member === guestPub)?.active).toBe(
-				true,
-			);
+			expect(
+				resolveCurrentMembers(after, "msg_2", docTrust(after, "msg_2")).find(
+					(m) => m.member === guestPub,
+				)?.active,
+			).toBe(true);
 		} finally {
 			after.destroy();
+		}
+	});
+
+	it("a provisioned entity's Owner grant carries the owner's wrapping key", async () => {
+		await engine.provisionEntity(CHANNEL, CHANNEL_TYPE, { name: "general" });
+		const { doc } = await owner.ydocStore.load(CHANNEL);
+		try {
+			const self = resolveCurrentMembers(doc, CHANNEL, docTrust(doc, CHANNEL)).find(
+				(m) => m.member === owner.identity.publicKeyBase64,
+			);
+			expect(self?.role).toBe(AccessRole.Owner);
+			expect(self?.x25519).toBe(owner.deviceX25519.publicKeyBase64);
+		} finally {
+			doc.destroy();
 		}
 	});
 

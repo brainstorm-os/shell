@@ -32,6 +32,8 @@ export {
 	closeObjectMenu,
 	openObjectMenu,
 	type ObjectMenuCollections,
+	type ObjectMenuToolArgumentPrompt,
+	type ObjectMenuToolReporter,
 	type OpenObjectMenuOptions,
 } from "./open-object-menu";
 export {

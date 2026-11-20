@@ -31,10 +31,11 @@ import type {
 	ValueType,
 } from "@brainstorm-os/sdk-types";
 import { VersionCause, VersionPropertyChangeKind } from "@brainstorm-os/sdk-types";
-import { LiveRegion } from "@brainstorm-os/sdk/a11y";
+import { KbnAnnouncePoliteness, LiveRegion, announce } from "@brainstorm-os/sdk/a11y";
 import { CoverPicker, type CoverPickerService } from "@brainstorm-os/sdk/cover-picker";
 import { EmptyState } from "@brainstorm-os/sdk/empty-state";
 import { copyEntityBody, hasBodyDocTransport } from "@brainstorm-os/sdk/entity-body-copy";
+import { SaveDispositionKind } from "@brainstorm-os/sdk/export-file";
 import { Icon as IconGlyph, IconName } from "@brainstorm-os/sdk/icon";
 import { recallLastViewed, rememberLastViewed } from "@brainstorm-os/sdk/last-viewed";
 import { LockButton } from "@brainstorm-os/sdk/lock-button";
@@ -66,7 +67,7 @@ import type { OutlineEntry } from "./editor/outline";
 import { queuePendingEntityLinks } from "./editor/pending-link";
 import type { TransclusionEditHost } from "./editor/transclusion-edit-host";
 import { useNotesT } from "./i18n-hooks";
-import { t } from "./i18n/t";
+import { t, tCount } from "./i18n/t";
 import { ActionId } from "./keyboard/action-ids";
 import { matchesActionChord, useShortcut } from "./keyboard/use-shortcut";
 import { decideInsertIntent, refusalNoticeKey } from "./logic/insert-request";
@@ -94,10 +95,19 @@ import {
 	buildNoteExportItems,
 	runNoteExport,
 } from "./ui/note-export";
+import { useNoteTools } from "./ui/note-tools";
 import { NotesList } from "./ui/notes-list";
 import { noteObjectMenuContext } from "./ui/object-menu-context";
 import { OutlinePanel } from "./ui/outline-panel";
 import { NotesRightPanel, RightTab } from "./ui/right-panel-tabs";
+import {
+	SiteExportTone,
+	buildSiteExportItems,
+	fetchVaultAsset,
+	readThemeTokens,
+	siteExportReport,
+	sitePageAccess,
+} from "./ui/site-export";
 
 const NAV_PREF_KEY = "notes.navOpen";
 const PROPS_PREF_KEY = "notes.propsOpen";
@@ -906,6 +916,74 @@ export function NotesApp() {
 		[noteExportInput],
 	);
 
+	// "Publish website…" (IE-12) — the open note plus the sub-pages it embeds,
+	// as a zipped static site. Membership is decided against the live notes
+	// map at publish time, so a page deleted since the menu opened is left out.
+	const notesRef = useRef(notes);
+	notesRef.current = notes;
+	const publishRootId = note?.id;
+	const siteExportItems = useMemo(() => {
+		const files = runtime?.services.files;
+		const entities = runtime?.services.entities;
+		if (!files || !entities || !publishRootId || !hasBodyDocTransport(entities)) return undefined;
+		return buildSiteExportItems({
+			rootId: publishRootId,
+			title: headerTitle,
+			files,
+			transport: entities,
+			// Membership reads the LIVE notes map at publish time: a page deleted
+			// since the menu opened is left out, and a sub-page counts only by
+			// the parent its own record names.
+			getPage: (id) => {
+				const page = notesRef.current.get(id);
+				return page ? { title: page.title, parentId: page.parentPageId ?? null } : null;
+			},
+			pageAccess: (id) => sitePageAccess(runtime?.services.sharing, id),
+			fetchAsset: fetchVaultAsset,
+			readTokens: () => readThemeTokens(document.documentElement.style),
+			labels: {
+				action: t("notes.publish.action"),
+				dialogTitle: t("notes.publish.dialogTitle"),
+				filterName: t("notes.publish.filterName"),
+				pages: t("notes.publish.pages"),
+				untitled: t("notes.list.untitled"),
+				unpublished: t("notes.publish.unpublished"),
+				confirmTitle: t("notes.publish.confirmTitle", { title: headerTitle }),
+				subPagesLegend: t("notes.publish.subPagesLegend"),
+				linkedPagesLegend: t("notes.publish.linkedPagesLegend"),
+				formatLegend: t("notes.export.formatLegend"),
+				confirmAction: t("notes.publish.confirmAction"),
+				cancel: t("notes.export.cancel"),
+			},
+			onResult: (disposition, stats) => {
+				if (disposition.kind === SaveDispositionKind.Failed) {
+					console.warn("[notes/publish] publish website failed:", disposition.error);
+				}
+				const report = siteExportReport(disposition, stats, {
+					saved: (count, file) => tCount("notes.publish.saved", count, { file }),
+					pagesTruncated: (count) => t("notes.publish.pagesTruncated", { count }),
+					imagesSkipped: (count, limit) => tCount("notes.publish.imagesSkipped", count, { limit }),
+					imagesWithheld: (count) => tCount("notes.publish.imagesWithheld", count),
+					failed: t("notes.publish.failed"),
+				});
+				if (!report) return;
+				announce([report.title, report.detail].filter(Boolean).join(" "), {
+					politeness:
+						report.tone === SiteExportTone.Error
+							? KbnAnnouncePoliteness.Assertive
+							: KbnAnnouncePoliteness.Polite,
+				});
+				void Promise.resolve(
+					runtime?.services.ui?.notify?.({
+						title: report.title,
+						...(report.detail ? { body: report.detail } : {}),
+						kind: report.tone,
+					}),
+				).catch(() => {});
+			},
+		});
+	}, [runtime, publishRootId, headerTitle]);
+
 	// B11.6 — `Cmd+P` prints the open note. "Print" routes to PDF export (the
 	// document's print artifact, per B11.12), reusing the same save flow as the
 	// object-menu PDF row. preventDefault suppresses Chromium's own print
@@ -985,8 +1063,9 @@ export function NotesApp() {
 			coverItem,
 			...(saveAsTemplateItem ? [saveAsTemplateItem] : []),
 			...(noteExportItems ?? []),
+			...(siteExportItems ?? []),
 		];
-	}, [noteCover, noteExportItems, note?.id, saveNoteAsTemplate]);
+	}, [noteCover, noteExportItems, siteExportItems, note?.id, saveNoteAsTemplate]);
 
 	// The properties panel only makes sense with an open note. The persisted
 	// `propsOpen` preference is remembered, but the panel is never *shown*
@@ -1005,6 +1084,10 @@ export function NotesApp() {
 			hideHeader={Boolean(commentsAdapter)}
 		/>
 	) : null;
+
+	// Tool-10 — other apps' tools in every note's object menu, with the chips
+	// that report each call's outcome.
+	const noteTools = useNoteTools();
 
 	const shell = (
 		<div
@@ -1045,6 +1128,7 @@ export function NotesApp() {
 									noteId: note.id,
 									noteTitle: headerTitle,
 									runtime,
+									tools: noteTools.seams,
 									onRemove: onDelete,
 									onShare: () => setShareTargetId(note.id),
 									...(objectMenuExtraItems ? { extraItems: objectMenuExtraItems } : {}),
@@ -1117,6 +1201,7 @@ export function NotesApp() {
 									noteId: note.id,
 									noteTitle: headerTitle,
 									runtime,
+									tools: noteTools.seams,
 									onRemove: onDelete,
 									onShare: () => setShareTargetId(note.id),
 									...(objectMenuExtraItems ? { extraItems: objectMenuExtraItems } : {}),
@@ -1160,6 +1245,7 @@ export function NotesApp() {
 					runtime={runtime}
 					onRemoveNote={onRemoveNote}
 					onLinkInto={onLinkInto}
+					tools={noteTools.seams}
 				/>
 			</aside>
 			{navAutoHide.edgeProps && <div {...navAutoHide.edgeProps} />}
@@ -1372,6 +1458,8 @@ export function NotesApp() {
 					onClose={() => setShareTargetId(null)}
 				/>
 			) : null}
+
+			{noteTools.element}
 		</div>
 	);
 

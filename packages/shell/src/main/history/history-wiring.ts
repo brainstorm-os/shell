@@ -4,7 +4,7 @@
  */
 
 import { join } from "node:path";
-import { AccessRole, resolveMembers, roleOf } from "../collab/access-record";
+import { AccessRole, isSharedRecord, roleOf } from "../collab/access-record";
 import {
 	EntitiesRepository,
 	EntityVersionsRepository,
@@ -116,12 +116,12 @@ export async function resolveLocalHistoryRole(
 	session: VaultSession,
 	entityId: string,
 ): Promise<HistoryRole> {
+	const accessTrust = await session.accessTrust();
 	const { doc } = await session.ydocStore.load(entityId);
 	try {
-		if (resolveMembers(doc, entityId).filter((m) => m.active).length <= 1) {
-			return HistoryRole.NotShared;
-		}
-		const role = roleOf(doc, entityId, session.identity.publicKeyBase64);
+		const trust = accessTrust.trustFor(doc, entityId);
+		if (!isSharedRecord(doc, entityId, trust)) return HistoryRole.NotShared;
+		const role = roleOf(doc, entityId, session.identity.publicKeyBase64, trust);
 		return role ? ROLE[role] : HistoryRole.Viewer;
 	} finally {
 		doc.destroy();

@@ -42,7 +42,9 @@ export type BookRecord = {
 };
 
 function parseFormat(raw: unknown): BookFormat {
-	return raw === BookFormat.Pdf ? BookFormat.Pdf : BookFormat.Epub;
+	if (raw === BookFormat.Pdf) return BookFormat.Pdf;
+	if (raw === BookFormat.Fb2) return BookFormat.Fb2;
+	return BookFormat.Epub;
 }
 
 function clampProgress(raw: unknown): number {

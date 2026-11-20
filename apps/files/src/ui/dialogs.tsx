@@ -170,8 +170,8 @@ export type SortMenuProps = {
 	onClose: () => void;
 };
 
-/** The direction row's state glyph: the same caret the toolbar trigger shows,
- *  so "which way is it sorting" reads identically in both places. */
+/** The direction row's state glyph — the one place the sort direction is
+ *  drawn. The toolbar trigger's caret is the dropdown affordance, not this. */
 export function directionIcon(direction: SortDirection): IconName {
 	return direction === SortDirection.Asc ? IconName.CaretUp : IconName.CaretDown;
 }

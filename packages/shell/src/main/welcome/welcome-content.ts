@@ -124,6 +124,23 @@ function paragraph(children: Inline[]): Block {
 	return { type: "paragraph", version: 1, format: "", indent: 0, direction: null, children };
 }
 
+/** The denormalised `body` snippet + `wordCount` an editor autosave would have
+ *  written for these paragraphs. Journal reads its day preview and word count
+ *  from those two properties, never from the Y.Doc, so a planted body without
+ *  them showed "0 words" and "No entry yet." beside the entry itself. */
+function denormalized(paragraphs: Block[]): { body: string; wordCount: number } {
+	const plain = paragraphs
+		.map((block) =>
+			block.children
+				.map((inline) => (inline.type === "mention" ? inline.label : inline.text))
+				.join(""),
+		)
+		.join(" ")
+		.replace(/\s+/g, " ")
+		.trim();
+	return { body: plain, wordCount: plain ? plain.split(" ").length : 0 };
+}
+
 function body(children: Block[]): WelcomeBody {
 	return { root: { type: "root", version: 1, format: "", indent: 0, direction: null, children } };
 }
@@ -182,7 +199,7 @@ export function buildWelcomeStarterSet(now: number): WelcomeStarterEntity[] {
 		// Database/Graph show it).
 		properties: {
 			title: "Brainstorm — help & docs",
-			url: "https://brainstorm.app",
+			url: "https://docs.getbrainstorm.online",
 			savedAt: now,
 			...ts,
 		},
@@ -193,15 +210,15 @@ export function buildWelcomeStarterSet(now: number): WelcomeStarterEntity[] {
 	// projection keys entries by an `YYYY-MM-DD` title); the UTC derivation
 	// keeps the output byte-identical for a given `now`.
 	const journalDateKey = new Date(now).toISOString().slice(0, 10);
+	const journalParagraphs = [
+		paragraph([text("Your first journal entry. Today you opened Brainstorm for the first time.")]),
+		paragraph([text("A good first step: "), mention(task, "Take the product tour"), text(".")]),
+	];
 	const journal: WelcomeStarterEntity = {
 		id: JOURNAL_ID,
 		type: WelcomeEntityType.JournalEntry,
-		properties: { title: journalDateKey, ...ts },
-		body: body([
-			title(journalDateKey),
-			paragraph([text("Your first journal entry. Today you opened Brainstorm for the first time.")]),
-			paragraph([text("A good first step: "), mention(task, "Take the product tour"), text(".")]),
-		]),
+		properties: { title: journalDateKey, ...denormalized(journalParagraphs), ...ts },
+		body: body([title(journalDateKey), ...journalParagraphs]),
 	};
 
 	// The hub note mentions every other starter entity so Graph paints a

@@ -62,6 +62,7 @@ import type {
 	DropResult,
 	EntitiesService,
 	Entity,
+	EntityExposure,
 	EntityMergeResult,
 	EntityQuery,
 	ExportService,
@@ -1133,6 +1134,10 @@ function agentProposalsProxy(bridge: Bridge): AgentProposalsService {
 				[input],
 				["agents.approve"],
 			),
+		// Agent-13 — asking whether `@agent` is invocable rides `agents.mention`,
+		// the same scarce grant the invocation itself needs.
+		mentionTarget: () =>
+			callService<unknown>(bridge, "agent-proposals", "mentionTarget", [], ["agents.mention"]),
 	};
 }
 
@@ -1209,6 +1214,8 @@ function sharingProxy(bridge: Bridge): SharingService {
 			callService<SharedMember[]>(bridge, "sharing", "revoke", [input], ["sharing.share"]),
 		access: (entityId) =>
 			callService<SharedMember[]>(bridge, "sharing", "access", [entityId], ["sharing.read"]),
+		exposure: (entityId) =>
+			callService<EntityExposure | null>(bridge, "sharing", "exposure", [entityId], ["sharing.read"]),
 		// Collab-C7 — the deep-link invite (scarce, like `share`), the default
 		// share role, and the last recorded editor (also read-gated on the
 		// entity's type, resolved server-side).

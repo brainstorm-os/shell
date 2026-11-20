@@ -75,6 +75,9 @@ export type PdfReaderOptions = {
 	 *  with the stable locator + progress (0..1), mirroring the reflow
 	 *  reader's contract so the host persists both modes identically. */
 	onPositionChange?: (locator: Locator, progress: number) => void;
+	/** Fired with the progress the footer shows whenever it changes,
+	 *  including on mount — mirrors the reflow reader. Display-only. */
+	onProgressChange?: (progress: number) => void;
 	/** Fired when a link in the page is clicked — the host opens it (web links
 	 *  go to the browser via the `open` intent). Absent = links render but do
 	 *  nothing on click. */
@@ -215,6 +218,8 @@ export function mountPdfReader(
 		return isSpread() ? 2 : 1;
 	}
 
+	let reportedProgress: number | null = null;
+
 	function paint(): void {
 		if (disposed) return;
 		applyView();
@@ -231,9 +236,14 @@ export function mountPdfReader(
 			: t("reader.pageStatus", { page: String(state.pageIndex + 1), total });
 		status.textContent = pageStatus;
 		leftCanvas.setAttribute("aria-label", `${title} — ${pageStatus}`);
+		const fraction = pdfProgress(state);
 		progress.textContent = t("reader.progress", {
-			percent: String(Math.round(pdfProgress(state) * 100)),
+			percent: String(Math.round(fraction * 100)),
 		});
+		if (fraction !== reportedProgress) {
+			reportedProgress = fraction;
+			options.onProgressChange?.(fraction);
+		}
 		prev.disabled = !canGoPrevPdf(state);
 		next.disabled = !canGoNextPdf(state);
 		if (state.pageCount <= 0) return;

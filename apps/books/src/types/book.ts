@@ -1,6 +1,6 @@
 /**
- * `Book/v1` — an imported book in the vault (EPUB or PDF). The binary
- * (the .epub / .pdf) lives outside the entity via the Files host service
+ * `Book/v1` — an imported book in the vault (EPUB, FB2 or PDF). The binary
+ * (the .epub / .fb2 / .pdf) lives outside the entity via the Files host service
  * (`fileId`, wired in 9.21.2); this entity is the catalog record + the
  * per-book reading state. See and the implementation plan
  * 9.21 ladder.
@@ -15,6 +15,8 @@ export const BOOK_ENTITY_TYPE = "brainstorm/Book/v1";
 export enum BookFormat {
 	Epub = "epub",
 	Pdf = "pdf",
+	/** FictionBook 2 — plain `.fb2` or zipped `.fb2.zip`. */
+	Fb2 = "fb2",
 }
 
 /** Per-book reading position + progress (OQ-BK-4 lives at 9.21.6; the

@@ -8,14 +8,24 @@ const SECRET = deriveLanDiscoverySecret(new Uint8Array(32).fill(1));
 const NOW = 1_800_000_000_000;
 
 function fakeBackend() {
-	const published: { txt: Record<string, string>; name: string; port: number }[] = [];
+	const published: {
+		txt: Record<string, string>;
+		name: string;
+		port: number;
+		addresses: readonly string[];
+	}[] = [];
 	const updates: Record<string, string>[] = [];
 	let onRecord: ((r: unknown) => void) | null = null;
 	let stopped = 0;
 	let browseStopped = 0;
 	const backend: LanMdnsBackend = {
 		publish: async (advert) => {
-			published.push({ txt: { ...advert.txt }, name: advert.name, port: advert.port });
+			published.push({
+				txt: { ...advert.txt },
+				name: advert.name,
+				port: advert.port,
+				addresses: [...advert.addresses],
+			});
 			return {
 				updateTxt: async (txt) => {
 					updates.push({ ...txt });
@@ -70,6 +80,28 @@ function service(args: {
 	return { svc, timers };
 }
 
+function peerRecord(args: {
+	name: string;
+	port: number;
+	addresses: string[];
+	secret?: Uint8Array;
+	nowMs?: number;
+}) {
+	return {
+		name: args.name,
+		txt: buildLanAdvertTxt({
+			secret: args.secret ?? SECRET,
+			instance: args.name,
+			port: args.port,
+			addresses: args.addresses,
+			nowMs: args.nowMs ?? NOW,
+		}),
+	};
+}
+
+const PEER = "brainstorm-00000000000000aa";
+const ROGUE_PEER = "brainstorm-00000000000000bb";
+
 const HOSTING: LanDiscoveryState = {
 	advertise: true,
 	browse: true,
@@ -83,11 +115,12 @@ describe("LanDiscoveryService", () => {
 		await svc.apply();
 		expect(fake.published).toHaveLength(1);
 		expect(fake.published[0]?.port).toBe(51_820);
+		const name = fake.published[0]?.name ?? "";
+		expect(name).toBe(svc.instance);
 		expect(fake.published[0]?.txt[LanTxtKey.Tag]).toBe(
-			buildLanAdvertTxt({ secret: SECRET, port: 51_820, addresses: ["192.168.1.10"], nowMs: NOW })[
-				LanTxtKey.Tag
-			],
+			peerRecord({ name, port: 51_820, addresses: ["192.168.1.10"] }).txt[LanTxtKey.Tag],
 		);
+		expect(fake.published[0]?.addresses).toEqual(["192.168.1.10"]);
 		await svc.dispose();
 	});
 
@@ -130,24 +163,15 @@ describe("LanDiscoveryService", () => {
 		});
 		await svc.apply();
 
-		fake.emit({
-			name: "brainstorm-peer",
-			txt: buildLanAdvertTxt({
-				secret: SECRET,
-				port: 9000,
-				addresses: ["192.168.1.20"],
-				nowMs: NOW,
-			}),
-		});
-		fake.emit({
-			name: "brainstorm-rogue",
-			txt: buildLanAdvertTxt({
-				secret: deriveLanDiscoverySecret(new Uint8Array(32).fill(2)),
+		fake.emit(peerRecord({ name: PEER, port: 9000, addresses: ["192.168.1.20"] }));
+		fake.emit(
+			peerRecord({
+				name: ROGUE_PEER,
 				port: 9001,
 				addresses: ["192.168.1.30"],
-				nowMs: NOW,
+				secret: deriveLanDiscoverySecret(new Uint8Array(32).fill(2)),
 			}),
-		});
+		);
 		fake.emit({ name: "junk" });
 		fake.emit("not an object");
 
@@ -166,15 +190,7 @@ describe("LanDiscoveryService", () => {
 		await svc.apply();
 		const own = svc.instance;
 		expect(own).not.toBeNull();
-		fake.emit({
-			name: own,
-			txt: buildLanAdvertTxt({
-				secret: SECRET,
-				port: 51_820,
-				addresses: ["192.168.1.10"],
-				nowMs: NOW,
-			}),
-		});
+		fake.emit(peerRecord({ name: own ?? "", port: 51_820, addresses: ["192.168.1.10"] }));
 		expect(seen).toEqual([]);
 		await svc.dispose();
 	});
@@ -190,6 +206,17 @@ describe("LanDiscoveryService", () => {
 		expect(fake.published).toHaveLength(1);
 		expect(fake.updates).toHaveLength(1);
 		expect(svc.instance).toBe(instance);
+		// The refreshed TXT is signed for the SAME name in the NEW epoch, so a
+		// peer verifies it without the name ever changing.
+		expect(fake.updates[0]).toEqual(
+			peerRecord({
+				name: instance ?? "",
+				port: 51_820,
+				addresses: ["192.168.1.10"],
+				nowMs: now,
+			}).txt,
+		);
+		expect(fake.updates[0]?.[LanTxtKey.Tag]).not.toBe(fake.published[0]?.txt[LanTxtKey.Tag]);
 		await svc.dispose();
 	});
 
@@ -255,11 +282,114 @@ describe("LanDiscoveryService", () => {
 		});
 		await svc.apply();
 		expect(() =>
-			fake.emit({
-				name: "brainstorm-peer",
-				txt: buildLanAdvertTxt({ secret: SECRET, port: 9000, addresses: ["10.0.0.5"], nowMs: NOW }),
-			}),
+			fake.emit(peerRecord({ name: PEER, port: 9000, addresses: ["10.0.0.5"] })),
 		).not.toThrow();
+		expect(onError).toHaveBeenCalled();
+		await svc.dispose();
+	});
+
+	it("refuses a record that arrives after the vault closed, not verifying with a stale key", async () => {
+		const seen: LanPeerCandidate[] = [];
+		const fake = fakeBackend();
+		let secret: Uint8Array | null = SECRET;
+		const svc = new LanDiscoveryService({
+			readState: () => HOSTING,
+			discoverySecret: () => secret,
+			backend: fake.backend,
+			onCandidate: (c) => seen.push(c),
+			now: () => NOW,
+		});
+		await svc.apply();
+		const record = peerRecord({ name: PEER, port: 9000, addresses: ["10.0.0.5"] });
+		fake.emit(record);
+		expect(seen).toHaveLength(1);
+		secret = null;
+		fake.emit(record);
+		expect(seen).toHaveLength(1);
+		await svc.apply();
+		expect(svc.browsing).toBe(false);
+		expect(svc.advertising).toBe(false);
+		await svc.dispose();
+	});
+
+	it("verifies against the identity that is open NOW, not the one browsing started under", async () => {
+		const seen: LanPeerCandidate[] = [];
+		const fake = fakeBackend();
+		const next = deriveLanDiscoverySecret(new Uint8Array(32).fill(5));
+		let secret: Uint8Array = SECRET;
+		const svc = new LanDiscoveryService({
+			readState: () => HOSTING,
+			discoverySecret: () => secret,
+			backend: fake.backend,
+			onCandidate: (c) => seen.push(c),
+			now: () => NOW,
+		});
+		await svc.apply();
+		secret = next;
+		fake.emit(peerRecord({ name: PEER, port: 9000, addresses: ["10.0.0.5"] }));
+		expect(seen).toEqual([]);
+		fake.emit(peerRecord({ name: PEER, port: 9000, addresses: ["10.0.0.5"], secret: next }));
+		expect(seen).toHaveLength(1);
+		await svc.dispose();
+	});
+
+	it("treats a key check that throws as no key", async () => {
+		const onError = vi.fn();
+		const fake = fakeBackend();
+		const svc = new LanDiscoveryService({
+			readState: () => HOSTING,
+			discoverySecret: () => {
+				throw new Error("keystore locked");
+			},
+			backend: fake.backend,
+			onCandidate: () => undefined,
+			onError,
+			now: () => NOW,
+		});
+		await expect(svc.apply()).resolves.toBeUndefined();
+		expect(fake.published).toHaveLength(0);
+		expect(fake.browsing()).toBe(false);
+		expect(onError).toHaveBeenCalled();
+		await svc.dispose();
+	});
+
+	it("reports 'not advertising' when the responder refuses, on first publish and on rotation", async () => {
+		const onError = vi.fn();
+		let refuse = false;
+		let stops = 0;
+		const backend: LanMdnsBackend = {
+			publish: async () => {
+				if (refuse) throw new Error("records hook missing");
+				return {
+					updateTxt: async () => {
+						throw new Error("records hook missing");
+					},
+					stop: async () => {
+						stops += 1;
+					},
+				};
+			},
+			browse: () => ({ stop: () => undefined }),
+		};
+		let now = NOW;
+		const svc = new LanDiscoveryService({
+			readState: () => HOSTING,
+			discoverySecret: () => SECRET,
+			backend,
+			onCandidate: () => undefined,
+			onError,
+			now: () => now,
+			setTimer: () => 0,
+			clearTimer: () => undefined,
+		});
+		await svc.apply();
+		expect(svc.advertising).toBe(true);
+		now += LAN_DISCOVERY_EPOCH_MS;
+		refuse = true;
+		await svc.apply();
+		expect(svc.advertising).toBe(false);
+		expect(svc.instance).toBeNull();
+		expect(stops).toBe(1);
 		expect(onError).toHaveBeenCalled();
 		await svc.dispose();
 	});

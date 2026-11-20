@@ -193,11 +193,18 @@ export function Welcome() {
 						: "welcome__content"
 				}
 			>
-				<div className="welcome__brand">
-					<BrandMark size={104} className="welcome__mark" />
-					<h1 className="welcome__title">{t("shell.welcome.brand")}</h1>
-				</div>
-				<p className="welcome__tagline">{t("shell.welcome.tagline")}</p>
+				{/* The Start step carries its own heading and the tallest content
+				    (seven template tiles): with the brand hero above it the card
+				    outgrew a default window and "Create vault" sat below the fold. */}
+				{mode !== WelcomeMode.Start && (
+					<>
+						<div className="welcome__brand">
+							<BrandMark size={104} className="welcome__mark" />
+							<h1 className="welcome__title">{t("shell.welcome.brand")}</h1>
+						</div>
+						<p className="welcome__tagline">{t("shell.welcome.tagline")}</p>
+					</>
+				)}
 
 				{mode === WelcomeMode.Menu && (
 					<div className="welcome__menu">

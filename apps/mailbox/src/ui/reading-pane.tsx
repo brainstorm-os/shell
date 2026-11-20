@@ -63,7 +63,12 @@ export function ReadingPane({
 			<div className="mb-reading__head">
 				<div className="mb-reading__titlerow">
 					{showBack ? (
-						<button type="button" className="mb-iconbtn" onClick={onBack} aria-label={t("reading.back")}>
+						<button
+							type="button"
+							className="header-icon-btn"
+							onClick={onBack}
+							aria-label={t("reading.back")}
+						>
 							<Icon name={IconName.CaretLeft} />
 						</button>
 					) : null}
@@ -81,7 +86,7 @@ export function ReadingPane({
 						) : null}
 						<button
 							type="button"
-							className={`mb-iconbtn${message.flagged ? " is-on" : ""}`}
+							className="header-icon-btn"
 							onClick={onToggleFlag}
 							aria-pressed={message.flagged}
 							aria-label={message.flagged ? t("reading.unflag") : t("reading.flag")}
@@ -90,7 +95,7 @@ export function ReadingPane({
 						</button>
 						<button
 							type="button"
-							className="mb-iconbtn"
+							className="header-icon-btn"
 							onClick={onToggleRead}
 							aria-label={message.unread ? t("reading.markRead") : t("reading.markUnread")}
 						>

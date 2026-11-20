@@ -32,10 +32,11 @@ export function formatStamp(iso: string): string {
 /** A day-divider label: Today / Yesterday / a localized date. With `absolute`
  *  (Chats-3) the relative labels give way to the full date. */
 export function formatDay(dayKey: string, absolute = false, now: Date = new Date()): string {
-	const ms = Date.parse(dayKey);
-	if (!Number.isFinite(ms)) return dayKey;
-	const that = new Date(ms);
-	const startOf = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+	const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dayKey);
+	if (!parts) return dayKey;
+	// A bare `YYYY-MM-DD` parses as UTC midnight; the key is a LOCAL day.
+	const that = new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]));
+	const startOf = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
 	const diffDays = Math.round((startOf(now) - startOf(that)) / 86_400_000);
 	if (!absolute) {
 		if (diffDays === 0) return t("day.today");

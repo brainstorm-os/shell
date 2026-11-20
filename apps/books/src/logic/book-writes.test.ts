@@ -19,6 +19,7 @@ import {
 	makePositionPersister,
 	removeBookEntity,
 	writeBookPatch,
+	writerForOpenBook,
 } from "./book-writes";
 
 function book(): Book {
@@ -159,5 +160,46 @@ describe("makePositionPersister — a page turn is a property write", () => {
 		persist(makeLocator(3, 0), 0.8);
 		expect(seen).toHaveLength(2);
 		expect(seen[1]).toMatchObject({ spineLength: 3 });
+	});
+});
+
+describe("writerForOpenBook", () => {
+	const book = (id: string): Book => ({
+		id,
+		name: "Библиотечная полиция",
+		icon: null,
+		format: BookFormat.Fb2,
+		author: "Стивен Кинг",
+		fileId: `file-${id}`,
+		spineLength: 0,
+		reading: emptyReadingState(),
+		createdAt: 1,
+		updatedAt: 1,
+	});
+
+	it("passes a write through while its book is the open one", () => {
+		const write = vi.fn();
+		writerForOpenBook(write, () => true)({ author: "x" });
+		expect(write).toHaveBeenCalledWith({ author: "x" });
+	});
+
+	// The app's write path targets "the open book". A page-turn persister
+	// built for book A that fires after B opened must not park A's position
+	// (and A's "read today" stamp) on B.
+	it("drops a late position write instead of landing it on the next open book", () => {
+		const written: Array<{ id: string; patch: Record<string, unknown> }> = [];
+		let openId = "A";
+		const writeToOpenBook = (patch: Record<string, unknown>): void => {
+			written.push({ id: openId, patch });
+		};
+		const persistA = makePositionPersister(
+			writerForOpenBook(writeToOpenBook, () => openId === "A"),
+			book("A"),
+			3,
+		);
+		persistA(makeLocator(0, 100), 0.05);
+		openId = "B";
+		persistA(makeLocator(1, 0), 0.12);
+		expect(written.map((w) => w.id)).toEqual(["A"]);
 	});
 });

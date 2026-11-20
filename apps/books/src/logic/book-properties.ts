@@ -7,7 +7,12 @@
  * position-persistence path, never edited by hand).
  */
 
-import { type PropertyDef, PropertyView, ValueType } from "@brainstorm-os/sdk-types";
+import {
+	type PropertyDef,
+	PropertyFormat,
+	PropertyView,
+	ValueType,
+} from "@brainstorm-os/sdk-types";
 import { t } from "../i18n";
 import { type Book, BookFormat } from "../types/book";
 
@@ -18,19 +23,32 @@ export const BOOK_PROP_KEY = {
 	progress: "progress",
 } as const;
 
-export function bookPropertyDefs(): readonly PropertyDef[] {
-	return [
+/** The rows for a book of `format`. A reflowable EPUB has no page count of
+ *  its own — its `spineLength` counts chapter files and the reader paginates
+ *  to the viewport — so only a fixed-layout PDF carries the Pages row. */
+export function bookPropertyDefs(format: BookFormat): readonly PropertyDef[] {
+	const defs: PropertyDef[] = [
 		{ key: BOOK_PROP_KEY.author, name: t("prop.author"), icon: null, valueType: ValueType.Text },
 		{ key: BOOK_PROP_KEY.format, name: t("prop.format"), icon: null, valueType: ValueType.Text },
-		{ key: BOOK_PROP_KEY.pages, name: t("prop.pages"), icon: null, valueType: ValueType.Number },
-		{
-			key: BOOK_PROP_KEY.progress,
-			name: t("prop.progress"),
+	];
+	if (format === BookFormat.Pdf) {
+		defs.push({
+			key: BOOK_PROP_KEY.pages,
+			name: t("prop.pages"),
 			icon: null,
 			valueType: ValueType.Number,
-			display: { view: PropertyView.ProgressBar },
-		},
-	];
+		});
+	}
+	defs.push({
+		key: BOOK_PROP_KEY.progress,
+		name: t("prop.progress"),
+		icon: null,
+		valueType: ValueType.Number,
+		format: PropertyFormat.Percent,
+		range: { min: 0, max: 1 },
+		display: { view: PropertyView.ProgressBar },
+	});
+	return defs;
 }
 
 export const READONLY_BOOK_PROP_KEYS: ReadonlySet<string> = new Set([
@@ -42,16 +60,17 @@ export const READONLY_BOOK_PROP_KEYS: ReadonlySet<string> = new Set([
 const FORMAT_LABEL_KEYS = {
 	[BookFormat.Pdf]: "prop.format.pdf",
 	[BookFormat.Epub]: "prop.format.epub",
+	[BookFormat.Fb2]: "prop.format.fb2",
 } as const;
 
-/** Cell values for a book. Progress is 0..100 (the ProgressBar cell's
- *  default range). */
+/** Cell values for a book. Progress is the 0..1 fraction snapped to a whole
+ *  percent, so the cell reads the same number as the shelf row and footer. */
 export function bookToValues(book: Book): Record<string, unknown> {
 	return {
 		[BOOK_PROP_KEY.author]: book.author,
 		[BOOK_PROP_KEY.format]: t(FORMAT_LABEL_KEYS[book.format]),
 		[BOOK_PROP_KEY.pages]: book.spineLength > 0 ? book.spineLength : null,
-		[BOOK_PROP_KEY.progress]: Math.round(book.reading.progress * 100),
+		[BOOK_PROP_KEY.progress]: Math.round(book.reading.progress * 100) / 100,
 	};
 }
 

@@ -31,6 +31,7 @@
 
 import {
 	AGENT_DELEGATED_BY_PROPERTY_KEY,
+	AGENT_NO_ANSWER_REPLY,
 	AGENT_PROVENANCE_PROPERTY_KEY,
 	AgentEventKind,
 	AgentEventOutcome,
@@ -159,6 +160,8 @@ export const NO_PERMISSION_REPLY =
 	"I can't run yet — I have no AI permission in this vault. Open Settings → Team and grant me “Use AI models” (and anything else you want me to see).";
 export const GENERATE_FAILED_REPLY =
 	"I couldn't reach a model provider just now, so I have no answer. Check Settings → AI (provider + key), then mention me again.";
+export const DRAFTS_ONLY_REPLY =
+	"I drafted the items below. Nothing is saved until they are approved.";
 
 /** The turn-header marker. Untrusted bodies are escaped so they can never
  *  contain it, which is what makes a header unforgeable — see
@@ -174,7 +177,40 @@ const TURN_HEADER_OPEN = "[#";
  *  A one-character insertion, so the text still reads naturally to the model
  *  and to a human reading the transcript back. */
 export function escapeChannelBody(body: string): string {
-	return body.split(TURN_HEADER_OPEN).join("[ #");
+	return normalizeUntrustedText(body)
+		.split(TURN_HEADER_OPEN)
+		.join("[ #")
+		.split(CONTEXT_MARKER_WORD)
+		.join(CONTEXT_MARKER_INERT);
+}
+
+/** The word both delimiters of the built-in agent's quoted block are built on
+ *  (`<<<CHANNEL_CONTEXT` … `CHANNEL_CONTEXT>>>`). Broken up in every untrusted
+ *  body AND every display name, so neither can spell a delimiter. */
+export const CONTEXT_MARKER_WORD = "CHANNEL_CONTEXT";
+const CONTEXT_MARKER_INERT = "CHANNEL-CONTEXT";
+
+/** Every character Unicode treats as a line break — not just CR/LF. A model
+ *  (and any renderer) breaks a line on U+2028/U+2029/NEL/VT/FF as surely as on
+ *  `\n`, so a splitter that knows only `\n` leaves an attacker five ways to
+ *  start a line the system never prefixed. */
+const LINE_TERMINATORS = /\r\n|[\n\r\v\f\u0085\u2028\u2029]/g;
+
+/** Control characters that are not line breaks (C0 minus tab, DEL, C1), plus
+ *  the invisible format characters — zero-width and bidi overrides — that let
+ *  text read differently from how it is spelled. */
+const STRIPPED_CONTROLS =
+	// biome-ignore lint/suspicious/noControlCharactersInRegex: stripping them is the point
+	/[\u0000-\u0008\u000e-\u001f\u007f-\u0084\u0086-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g;
+
+/**
+ * Canonicalise untrusted text before ANY structural escaping: every Unicode
+ * line terminator becomes `\n`, every other control / invisible format
+ * character is dropped. It must run FIRST — stripping a zero-width character
+ * after escaping would let `[<ZWSP>#` collapse back into the marker it avoided.
+ */
+export function normalizeUntrustedText(text: string): string {
+	return text.replace(LINE_TERMINATORS, "\n").replace(STRIPPED_CONTROLS, "");
 }
 
 /** The channel transcript, projected for the model.
@@ -228,9 +264,14 @@ export function speakerLabel(displayName: string): string {
 	// Newlines would forge a turn boundary; brackets would close the header
 	// early and let the rest of the name read as its own header. A display name
 	// is attacker-chosen (anyone can set theirs), so both are stripped.
-	const flattened = displayName
-		.replace(/[\r\n\t]+/g, " ")
+	// The same canonicalisation as a body, so the Unicode line terminators and
+	// invisible characters cannot do what `\n` may not; and the delimiter word
+	// is broken up, so a name cannot spell `CHANNEL_CONTEXT>>>` either.
+	const flattened = normalizeUntrustedText(displayName)
+		.replace(/[\n\t]+/g, " ")
 		.replace(/[[\]]/g, "")
+		.split(CONTEXT_MARKER_WORD)
+		.join(CONTEXT_MARKER_INERT)
 		.trim();
 	return flattened.slice(0, 64) || "Someone";
 }
@@ -270,7 +311,7 @@ const inFlightChannels = new Set<string>();
 const lastRunAt = new Map<string, number>();
 const CHANNEL_CLOCK_MAX = 512;
 
-type ChannelMessage = {
+export type ChannelMessage = {
 	id: string;
 	body: string;
 	senderKind: string;
@@ -279,13 +320,75 @@ type ChannelMessage = {
 	seq: number;
 	createdAt: string;
 	createdBy: string;
+	/** When THIS device recorded the row (`entities.created_at`). Host-written:
+	 *  a local create stamps it from the service clock, a synced row from the
+	 *  moment it was materialised here. The only ordering key no peer can set. */
+	arrivedAt: number;
 };
+
+/** A `seq` this path will take at face value. `seq` is an ordinary synced
+ *  property, so anything outside the range an honest client could have
+ *  reached is ignored rather than clamped into influence. */
+export function isPlausibleSeq(seq: unknown): seq is number {
+	return typeof seq === "number" && Number.isSafeInteger(seq) && seq >= 0 && seq < MENTION_MAX_SEQ;
+}
+
+/**
+ * Where a reply sits: directly after the turn that summoned it. That turn was
+ * written on THIS device a moment ago, so its `seq` is local state; nothing
+ * that arrived over sync is consulted. An implausible trigger `seq` falls back
+ * to the local row count — never to the channel's largest `seq`, which is the
+ * value a peer controls.
+ */
+export function replySeqAfter(triggerSeq: unknown, localMessageCount: number): number {
+	const base = isPlausibleSeq(triggerSeq) ? triggerSeq : Math.max(localMessageCount, 0);
+	return Math.min(base + 1, MENTION_MAX_SEQ);
+}
+
+/** No single author may occupy more than this share of the context window —
+ *  by turns, and by characters. Without it one member floods the window and
+ *  every other voice falls out of what the agent reads. */
+export const MENTION_AUTHOR_SHARE = 0.5;
+
+/**
+ * Bound a channel's turns to the context window: the newest
+ * {@link MENTION_TRANSCRIPT_LIMIT} BY LOCAL ARRIVAL, with each author held to
+ * {@link MENTION_AUTHOR_SHARE} of the turns and of the character budget.
+ *
+ * `messages` must already be in arrival order (see {@link readChannelMessages}).
+ * The author key is the host-written `createdBy` plus the row's claimed
+ * `personRef`: every synced row shares one `createdBy`, so the claimed ref is
+ * what separates members there. A peer that invents a fresh ref per message
+ * evades the per-author cap — but then needs one real message per slot, which
+ * is the cost of legitimately talking that much.
+ */
+export function boundContext<T extends { body: string; createdBy: string; personRef: string }>(
+	messages: readonly T[],
+): T[] {
+	const turnCap = Math.max(1, Math.floor(MENTION_TRANSCRIPT_LIMIT * MENTION_AUTHOR_SHARE));
+	const charCap = Math.floor(MENTION_TRANSCRIPT_CHARS_MAX * MENTION_AUTHOR_SHARE);
+	const turns = new Map<string, number>();
+	const chars = new Map<string, number>();
+	const kept: T[] = [];
+	for (let i = messages.length - 1; i >= 0 && kept.length < MENTION_TRANSCRIPT_LIMIT; i--) {
+		const m = messages[i];
+		if (!m) continue;
+		const author = `${m.createdBy}\u0000${m.personRef}`;
+		const size = Math.min(m.body.length, MENTION_MESSAGE_CHARS_MAX);
+		if ((turns.get(author) ?? 0) >= turnCap) continue;
+		if ((chars.get(author) ?? 0) + size > charCap) continue;
+		turns.set(author, (turns.get(author) ?? 0) + 1);
+		chars.set(author, (chars.get(author) ?? 0) + size);
+		kept.push(m);
+	}
+	return kept.reverse();
+}
 
 function str(value: unknown): string {
 	return typeof value === "string" ? value : "";
 }
 
-function readChannelMessages(repo: EntitiesRepository, channelId: string): ChannelMessage[] {
+export function readChannelMessages(repo: EntitiesRepository, channelId: string): ChannelMessage[] {
 	// Scoped to the channel in SQL — a vault-wide Message/v1 scan per run is
 	// O(all messages) on the main process.
 	const rows = repo.query({
@@ -308,15 +411,29 @@ function readChannelMessages(repo: EntitiesRepository, channelId: string): Chann
 			seq: typeof row.properties.seq === "number" ? row.properties.seq : 0,
 			createdAt: str(row.properties.createdAt),
 			createdBy: row.createdBy,
+			arrivedAt: row.createdAt,
 		});
 	}
-	return messages.sort(
-		(a, b) => a.seq - b.seq || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
-	);
+	// Ordered by when THIS device recorded each row — never by `seq` or the
+	// `createdAt` property, both of which a peer writes. Six synced rows with a
+	// huge `seq` used to sort last and push every real turn out of the window.
+	return messages.sort((a, b) => a.arrivedAt - b.arrivedAt || a.id.localeCompare(b.id));
+}
+
+/** `messages` with the summoning turn moved to the end. It is the newest row
+ *  on this device, but a same-millisecond arrival could otherwise sort after
+ *  it, and "last" is what the model reads as "the turn to answer". */
+export function withTriggerLast<T extends { id: string }>(
+	messages: readonly T[],
+	triggerId: string,
+): T[] {
+	const trigger = messages.find((m) => m.id === triggerId);
+	const rest = messages.filter((m) => m.id !== triggerId);
+	return trigger ? [...rest, trigger] : rest;
 }
 
 /** Reassemble a ledger grant row into the `service.verb[:scope]` wire form. */
-function grantString(grant: { capability: string; scope: string | null }): string {
+export function grantString(grant: { capability: string; scope: string | null }): string {
 	return grant.scope === null ? grant.capability : `${grant.capability}:${grant.scope}`;
 }
 
@@ -371,11 +488,12 @@ async function runOneAgent(
 	 *  Passed in rather than re-listed so the whole message's fan-out sees one
 	 *  consistent directory snapshot. */
 	agents: readonly AgentRecord[],
+	/** The turn that summoned the agent — written on this device just now. */
+	trigger: { id: string; seq: unknown },
 ): Promise<void> {
 	const repo = new EntitiesRepository(await session.dataStores.open("entities"));
-	const messages = readChannelMessages(repo, channelId);
-	const lastSeq = messages[messages.length - 1]?.seq ?? 0;
-	const nextSeq = Math.min(Math.max(lastSeq, 0) + 1, MENTION_MAX_SEQ);
+	const messages = withTriggerLast(readChannelMessages(repo, channelId), trigger.id);
+	const nextSeq = replySeqAfter(trigger.seq, messages.length);
 
 	const ledger = await session.capabilityLedger();
 	const caps = ledger.listActive(agent.def.fingerprint).map(grantString);
@@ -547,7 +665,9 @@ async function runOneAgent(
 			frozenCapabilities: caps,
 			maxIterations: offeredTools.length > 0 ? MENTION_MAX_ITERATIONS : 1,
 			transcript: projectTranscript(
-				(mayReadThread ? messages : messages.slice(-1)).slice(-MENTION_TRANSCRIPT_LIMIT),
+				mayReadThread
+					? withTriggerLast(boundContext(messages), trigger.id)
+					: messages.filter((m) => m.id === trigger.id),
 				{
 					pubkey: agent.def.pubkey,
 					fingerprint: agent.def.fingerprint,
@@ -559,7 +679,7 @@ async function runOneAgent(
 	const body =
 		result.stopReason === AgentStopReason.GenerateFailed
 			? GENERATE_FAILED_REPLY
-			: result.finalAnswer.trim() || GENERATE_FAILED_REPLY;
+			: channelAnswerBody(result.finalAnswer, staged.length);
 	writeAgentReply(deps, repo, channelId, agent, body, nextSeq);
 
 	// Agent-12a — persist the run's durable account: the loop transcript
@@ -602,14 +722,14 @@ async function runOneAgent(
 			repo,
 			channelId,
 			outcome.child,
-			outcome.answer || GENERATE_FAILED_REPLY,
+			channelAnswerBody(outcome.answer, outcome.staged.length),
 			rowSeq,
 			{ [DELEGATED_BY_PROPERTY_KEY]: agent.def.fingerprint },
 		);
 		for (const artifact of outcome.staged) {
 			rowSeq = Math.min(rowSeq + 1, MENTION_MAX_SEQ);
 			writeAgentReply(deps, repo, channelId, outcome.child, proposalMessageBody(artifact), rowSeq, {
-				[CHANNEL_PROPOSAL_PROPERTY_KEY]: buildProposalProperty(artifact),
+				[CHANNEL_PROPOSAL_PROPERTY_KEY]: buildProposalProperty(artifact, { channelId }),
 				[DELEGATED_BY_PROPERTY_KEY]: agent.def.fingerprint,
 			});
 		}
@@ -621,9 +741,19 @@ async function runOneAgent(
 	for (const artifact of staged) {
 		rowSeq = Math.min(rowSeq + 1, MENTION_MAX_SEQ);
 		writeAgentReply(deps, repo, channelId, agent, proposalMessageBody(artifact), rowSeq, {
-			[CHANNEL_PROPOSAL_PROPERTY_KEY]: buildProposalProperty(artifact),
+			[CHANNEL_PROPOSAL_PROPERTY_KEY]: buildProposalProperty(artifact, { channelId }),
 		});
 	}
+}
+
+/**
+ * The text of an agent's channel reply once its run finished. A run that
+ * reached a model and came back with nothing to say is NOT a provider failure,
+ * so it gets its own line — and when it staged drafts, a line that is true of
+ * the cards that follow rather than a claim of no answer.
+ */
+export function channelAnswerBody(finalAnswer: string, stagedCount: number): string {
+	return finalAnswer.trim() || (stagedCount > 0 ? DRAFTS_ONLY_REPLY : AGENT_NO_ANSWER_REPLY);
 }
 
 /** The card's plain-text body — what a surface that does not render the card
@@ -654,7 +784,7 @@ export async function maybeRunMentionedAgents(
 		// holds the scarce `agents.mention` grant, can invite an agent into a
 		// thread.
 		if (!deps.callerMayMention(callerApp)) return;
-		const entity = created as { type?: unknown; properties?: unknown } | null;
+		const entity = created as { id?: unknown; type?: unknown; properties?: unknown } | null;
 		if (!entity || entity.type !== MESSAGE_TYPE_URL || !entity.properties) return;
 		const properties = entity.properties as Record<string, unknown>;
 		const targets = mentionTargets(MESSAGE_TYPE_URL, properties);
@@ -692,7 +822,10 @@ export async function maybeRunMentionedAgents(
 		inFlightChannels.add(channelId);
 		try {
 			for (const agent of mentioned) {
-				await runOneAgent(deps, session, agent, channelId, agents);
+				await runOneAgent(deps, session, agent, channelId, agents, {
+					id: str(entity.id),
+					seq: properties.seq,
+				});
 			}
 		} finally {
 			inFlightChannels.delete(channelId);

@@ -47,6 +47,8 @@ import { AccountRepository } from "../billing/account-repo";
 import { BillingService } from "../billing/billing-service";
 import { CreditLedgerRepository } from "../billing/credit-ledger-repo";
 import { EntitlementRepository } from "../billing/entitlement-repo";
+import { AccessTrustStore } from "../collab/access-trust";
+import { deriveInviteSecret, verifyInviteAnchor } from "../collab/invite-anchor";
 import {
 	clearAppLockPin,
 	hasAppLockPin,
@@ -95,6 +97,7 @@ import type { VaultNetworkSettings } from "../network/privacy-config";
 import { PropertiesStore } from "../properties/properties-store";
 import { DataStores } from "../storage/data-stores";
 import {
+	AccessTrustRepository,
 	AssetDeksRepository,
 	AssetsRepository,
 	EntitiesRepository,
@@ -219,6 +222,7 @@ export class VaultSession {
 	private propertiesOpening: Promise<PropertiesStore> | null = null;
 	private cachedDekStore: EntityDekStore | null = null;
 	private dekStoreOpening: Promise<EntityDekStore> | null = null;
+	private cachedAccessTrust: AccessTrustStore | null = null;
 	private cachedAssetStore: AssetStore | null = null;
 	private assetStoreOpening: Promise<AssetStore> | null = null;
 	private cachedAssetDekStore: AssetDekStore | null = null;
@@ -421,6 +425,36 @@ export class VaultSession {
 	 * idiom: concurrent first-callers race onto a shared open Promise so
 	 * two repos + two statement caches are never built and orphaned.
 	 */
+	/**
+	 * This vault's `AccessTrustStore` — the pinned root owner and remembered
+	 * signed statements every reader of a shared entity's access record resolves
+	 * against (see `collab/access-trust.ts`). Stateless over `entities.db`, so
+	 * one instance per session is a convenience, not an invariant.
+	 */
+	async accessTrust(): Promise<AccessTrustStore> {
+		this.assertOpen();
+		if (this.cachedAccessTrust) return this.cachedAccessTrust;
+		const db = await this.dataStores.open("entities");
+		this.cachedAccessTrust ??= new AccessTrustStore(
+			new AccessTrustRepository(db),
+			this.identity.publicKeyBase64,
+			{
+				// "Did the party we handed an invite to make this grant?" - answered
+				// from our own key, so it holds on every device of this identity.
+				verifyAnchor: (entityId, grant) =>
+					verifyInviteAnchor({
+						anchor: grant.anchor,
+						entityId,
+						memberPubB64: this.identity.publicKeyBase64,
+						ownerPubB64: grant.addedBy,
+						deriveSecret: (nonce, expiresAt) =>
+							deriveInviteSecret((bytes) => this.signPayload(bytes), nonce, expiresAt),
+					}),
+			},
+		);
+		return this.cachedAccessTrust;
+	}
+
 	async entityDekStore(): Promise<EntityDekStore> {
 		this.assertOpen();
 		if (this.cachedDekStore) return this.cachedDekStore;

@@ -1490,7 +1490,7 @@ function ReminderSettings(): ReactElement {
 // ── All-entries overview list (KBN-A-journal listbox). ──
 function overviewPreviewText(entry: JournalEntry): string {
 	const raw = entry.preview?.trim();
-	if (!raw) return t("noEntryYet");
+	if (!raw) return t("entryEmpty");
 	const match = /^(\d{4}-\d{2}-\d{2})\s+/.exec(raw);
 	if (match && match[1] === entry.dateKey) {
 		const rest = raw.slice(match[0].length).trim();

@@ -38,6 +38,11 @@
  *
  * `node:crypto` rather than `@noble/*` on purpose: HKDF and HMAC-SHA256 are
  * both built in, and this file must not add a dependency to the transport tree.
+ *
+ * `v2` because `v1` left the instance name outside the MAC. A `v1` device and a
+ * `v2` device do not discover each other; pairing addresses, a typed address
+ * and the relay are unaffected.
+ *
  * The file is deliberately NOT named `*relay*` — the relay-blind CI fence scans
  * that pattern for crypto imports, and this file legitimately has them.
  */
@@ -46,10 +51,10 @@ import { createHmac, hkdfSync, timingSafeEqual } from "node:crypto";
 
 /** HKDF `info`, and the MAC's domain-separation prefix. Versioned so a future
  *  derivation change is a new namespace rather than a silent reinterpretation. */
-export const LAN_DISCOVERY_INFO = "brainstorm/lan-discovery/v1";
+export const LAN_DISCOVERY_INFO = "brainstorm/lan-discovery/v2";
 
 /** HKDF salt. Fixed and public — the secrecy is entirely in the IKM. */
-const LAN_DISCOVERY_SALT = "brainstorm/lan-discovery/v1/salt";
+const LAN_DISCOVERY_SALT = "brainstorm/lan-discovery/v2/salt";
 
 /** How long one tag stays valid. Five minutes: long enough that a peer that
  *  wakes up mid-epoch still recognises a neighbour without waiting, short
@@ -72,8 +77,17 @@ export const LAN_DISCOVERY_EPOCH_SKEW = 1;
 
 const SECRET_BYTES = 32;
 
-/** The advert fields the tag commits to. Everything a dialer would act on. */
+/** The advert fields the tag commits to: everything a dialer acts on OR
+ *  displays. */
 export type LanDiscoveryTagInput = {
+	/**
+	 * The advertised instance name. It is the candidate table's de-dup key, the
+	 * freshness key for selection and text rendered in Settings, so an advert
+	 * whose name is outside the MAC can be replayed verbatim under any name an
+	 * attacker chooses: one capture then fills the table and puts arbitrary
+	 * text in a privileged list.
+	 */
+	instance: string;
 	/** Epoch the tag was minted in. */
 	epoch: number;
 	/** The advertised listener port. */
@@ -111,13 +125,21 @@ export function lanDiscoveryEpoch(nowMs: number): number {
 }
 
 /**
- * The MAC input. Canonical and unambiguous: every field is length-tagged by the
- * separator, addresses are sorted, so two different adverts cannot produce the
- * same pre-image by shuffling content across fields.
+ * The MAC input. Every field is LENGTH-PREFIXED rather than separator-joined:
+ * the instance name is attacker-influenced free text, so a separator alone
+ * would let content migrate across a field boundary (a name ending in `|80`
+ * colliding with a different port). Addresses are sorted so order is not part
+ * of the commitment.
  */
 function tagPreimage(input: LanDiscoveryTagInput): string {
-	const addresses = [...input.addresses].sort().join(",");
-	return `${LAN_DISCOVERY_INFO}|${input.epoch}|${input.port}|${addresses}`;
+	const fields = [
+		LAN_DISCOVERY_INFO,
+		input.instance,
+		String(input.epoch),
+		String(input.port),
+		...[...input.addresses].sort(),
+	];
+	return `${fields.length};${fields.map((field) => `${Buffer.byteLength(field, "utf8")}:${field}`).join("")}`;
 }
 
 /** Mint the tag for one advert in one epoch. */

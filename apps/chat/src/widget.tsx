@@ -21,7 +21,7 @@ import {
 	WidgetRoot,
 	useWidgetVisible,
 } from "@brainstorm-os/sdk/widget";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { plural, t } from "./i18n";
 import { useChatT } from "./i18n-hooks";
 import { CHANNEL_TYPE } from "./logic/chat";
@@ -107,7 +107,33 @@ export function ChatWidget({ launch }: { launch: WidgetLaunch }) {
 		query: CHAT_WIDGET_QUERY,
 	});
 
-	const { rows, channelCount } = useMemo(() => shapeRecentMessages(entities), [entities]);
+	// "You" is only this vault's own identity, so the widget has to know which
+	// author that is; until it does, an unnamed author shows as their key.
+	const roster = runtime?.services?.roster ?? null;
+	const [self, setSelf] = useState<{ ref: string; name: string } | null>(null);
+	useEffect(() => {
+		if (!roster) return;
+		let live = true;
+		roster
+			.self()
+			.then((me) => {
+				if (live) setSelf({ ref: me.pubkey, name: me.displayName ?? "" });
+			})
+			.catch(() => undefined);
+		return () => {
+			live = false;
+		};
+	}, [roster]);
+
+	const { rows, channelCount } = useMemo(
+		() =>
+			shapeRecentMessages(entities, undefined, {
+				...(self ? { selfRef: self.ref, selfName: self.name } : {}),
+				you: t("author.you"),
+				unnamed: t("members.unknown"),
+			}),
+		[entities, self],
+	);
 
 	return (
 		<WidgetRoot

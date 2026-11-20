@@ -68,7 +68,7 @@ describe("rawNodeLabel", () => {
 		const probe = { ...entity({}), type: "brainstorm/MemoProbe/v1" } as EntityRow;
 		vi.mocked(typeDisplayName).mockClear();
 		const first = rawNodeLabel(probe);
-		expect(first).toBe("MemoProbe (untitled)");
+		expect(first).toBe("Memo probe (untitled)");
 		for (let i = 0; i < 5; i += 1) expect(rawNodeLabel(probe)).toBe(first);
 		expect(typeDisplayName).toHaveBeenCalledTimes(1);
 

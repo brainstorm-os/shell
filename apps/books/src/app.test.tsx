@@ -13,6 +13,7 @@ import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BooksApp } from "./app";
+import { buildConverterEpub, buildZip } from "./logic/zip-fixture";
 
 vi.mock("@brainstorm-os/sdk/object-menu", () => ({
 	openAnchoredMenu: vi.fn(),
@@ -182,6 +183,23 @@ describe("BooksApp shelf", () => {
 		expect(el.querySelector(".books__page")?.textContent).toContain("Anchor");
 	});
 
+	// The inspector read the stored fraction as a bare number ("45") while the
+	// footer showed the live one ("23% read"); both now come from the reader.
+	it("shows the reader's live progress in the inspector, as a percentage", async () => {
+		const el = await renderApp();
+		const footer = /(\d+)%/.exec(el.querySelector(".books__progress")?.textContent ?? "")?.[1];
+		expect(footer).toBeDefined();
+		expect(Number(footer)).toBeGreaterThan(0);
+		expect(el.querySelector(".bs-cell-progress-text")?.textContent).toBe(`${footer}%`);
+	});
+
+	it("carries no Pages row for a reflowable book — the footer owns the page count", async () => {
+		const el = await renderApp();
+		const labels = [...el.querySelectorAll(".bs-props__row-label")].map((n) => n.textContent);
+		expect(labels).toContain("Progress");
+		expect(labels).not.toContain("Pages");
+	});
+
 	// F-487 — the shared `.bs-props` inspector is `position: fixed`, so it
 	// takes no layout space. Books centres a full-bleed reading measure under
 	// it, so with the panel open every line ran on underneath: paragraphs read
@@ -294,5 +312,440 @@ describe("BooksApp — auto-hide library (7.15)", () => {
 		expect(library(el).getAttribute("data-bs-autohide")).toBe("hidden");
 		expect(library(el).hasAttribute("inert")).toBe(true);
 		expect(el.querySelector(".bs-autohide-edge")).not.toBeNull();
+	});
+});
+
+/** A vault holding one book with a real backing file: the shell stub answers
+ *  `entities.get` for both rows and `fetch` serves the file's bytes. */
+function installBookWithFile(args: {
+	book: Record<string, unknown>;
+	file: Record<string, unknown>;
+	bytes: Uint8Array;
+}): { update: ReturnType<typeof vi.fn> } {
+	const book: StubEntity = {
+		id: "bk1",
+		type: "brainstorm/Book/v1",
+		properties: {
+			author: "",
+			fileId: "file1",
+			spineLength: 0,
+			reading: { position: null, progress: 0, lastReadAt: null },
+			createdAt: 1,
+			updatedAt: 1,
+			...args.book,
+		},
+	};
+	const file: StubEntity = {
+		id: "file1",
+		type: "brainstorm/File/v1",
+		properties: { attachment: "brainstorm://asset/a1", ...args.file },
+	};
+	installShell([book, file]);
+	const services = (
+		window as unknown as {
+			brainstorm: { services: { entities: Record<string, ReturnType<typeof vi.fn>> } };
+		}
+	).brainstorm.services;
+	services.entities.get = vi.fn((id: string) =>
+		Promise.resolve(id === "bk1" ? book : id === "file1" ? file : null),
+	);
+	const update = vi.fn(() => Promise.resolve(null));
+	services.entities.update = update;
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(() =>
+			Promise.resolve({
+				ok: true,
+				status: 200,
+				arrayBuffer: () =>
+					Promise.resolve(
+						args.bytes.buffer.slice(args.bytes.byteOffset, args.bytes.byteOffset + args.bytes.byteLength),
+					),
+			}),
+		),
+	);
+	return { update };
+}
+
+async function openFirstBook(el: HTMLElement): Promise<void> {
+	const row = el.querySelector<HTMLButtonElement>(".books__row");
+	await act(async () => {
+		row?.click();
+	});
+	// The open is a chain of awaited steps (rows → bytes → parse → mount).
+	for (let i = 0; i < 40; i += 1) {
+		await act(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 5));
+		});
+		const notice = el.querySelector(".books__placeholder")?.textContent ?? "";
+		if (!notice.includes("Opening book") && !notice.includes("Select a book")) break;
+	}
+}
+
+const FB2_BOOK = `<?xml version="1.0" encoding="utf-8"?><FictionBook><description><title-info><author><first-name>Стивен</first-name><last-name>Кинг</last-name></author><book-title>Библиотечная полиция</book-title></title-info></description><body><section><title><p>Глава первая</p></title><p>Первый абзац книги.</p></section><section><title><p>Глава вторая</p></title><p>Второй абзац.</p></section></body></FictionBook>`;
+
+describe("BooksApp opening a book file", () => {
+	const OWNER_FILE = "King_Chetyre-posle-polunochi_3_Bibliotechnaya-policiya.159046.fb2.epub";
+
+	it("opens the owner's already-imported EPUB and heals its stale labels", async () => {
+		const { update } = installBookWithFile({
+			// Exactly what an older build wrote: a title that kept `.fb2`, and a
+			// file row labelled as a generic binary.
+			book: { name: OWNER_FILE.replace(/\.epub$/, ""), format: "epub" },
+			file: { name: OWNER_FILE, mime: "application/octet-stream" },
+			bytes: buildConverterEpub(),
+		});
+		const el = await renderApp();
+		await openFirstBook(el);
+		expect(el.querySelector(".books__placeholder")).toBeNull();
+		expect(el.querySelector(".books__page")?.textContent).toContain("Первый текст.");
+		expect(update).toHaveBeenCalledWith("file1", { mime: "application/epub+zip" });
+		expect(update).toHaveBeenCalledWith("bk1", {
+			author: "Стивен Кинг",
+			name: "Библиотечная полиция",
+		});
+	});
+
+	it("opens an FB2 book in the reflow reader with its chapters as contents", async () => {
+		const { update } = installBookWithFile({
+			book: { name: "King", format: "fb2" },
+			file: { name: "King.fb2", mime: "application/x-fictionbook+xml" },
+			bytes: new TextEncoder().encode(FB2_BOOK),
+		});
+		const el = await renderApp();
+		await openFirstBook(el);
+		expect(el.querySelector(".books__placeholder")).toBeNull();
+		expect(el.querySelector(".books__page")?.textContent).toContain("Первый абзац книги.");
+		const toc = [...el.querySelectorAll(".books__toc-link")].map((n) => n.textContent);
+		expect(toc).toEqual(["Глава первая", "Глава вторая"]);
+		expect(update).toHaveBeenCalledWith("bk1", {
+			author: "Стивен Кинг",
+			name: "Библиотечная полиция",
+		});
+	});
+
+	it("reads an FB2 that was catalogued as an EPUB, and corrects the record", async () => {
+		const { update } = installBookWithFile({
+			book: { name: "My own title", format: "epub", author: "Me" },
+			file: { name: "book.epub", mime: "application/octet-stream" },
+			bytes: new TextEncoder().encode(FB2_BOOK),
+		});
+		const el = await renderApp();
+		await openFirstBook(el);
+		expect(el.querySelector(".books__page")?.textContent).toContain("Первый абзац книги.");
+		expect(update).toHaveBeenCalledWith("bk1", { format: "fb2" });
+		expect(update).toHaveBeenCalledWith("file1", { mime: "application/x-fictionbook+xml" });
+		// The user's own title and author are not overwritten by the file's.
+		expect(update).not.toHaveBeenCalledWith(
+			"bk1",
+			expect.objectContaining({ name: expect.anything() }),
+		);
+	});
+
+	it("names the file and says why when the format is not one Books reads", async () => {
+		installBookWithFile({
+			book: { name: "Archive", format: "epub" },
+			file: { name: "photos.zip", mime: "application/zip" },
+			bytes: buildZip([{ name: "a.jpg", data: "x" }]),
+		});
+		const el = await renderApp();
+		await openFirstBook(el);
+		const notice = el.querySelector(".books__placeholder")?.textContent ?? "";
+		expect(notice).toContain("photos.zip");
+		expect(notice).toContain("Books opens EPUB, FB2 and PDF");
+		expect(el.querySelector(".books__page")).toBeNull();
+	});
+
+	it("reports a damaged EPUB at once instead of a blank reader or an endless spinner", async () => {
+		installBookWithFile({
+			book: { name: "Broken", format: "epub" },
+			file: { name: "broken.epub", mime: "application/epub+zip" },
+			// An archive that claims to be an EPUB and has no package document.
+			bytes: buildZip([{ name: "mimetype", data: "application/epub+zip" }]),
+		});
+		const el = await renderApp();
+		await openFirstBook(el);
+		const notice = el.querySelector(".books__placeholder")?.textContent ?? "";
+		expect(notice).toContain("broken.epub");
+		expect(notice).toContain("damaged or incomplete");
+		expect(el.querySelector(".books__page")).toBeNull();
+	});
+
+	it("reports a book whose file row is gone", async () => {
+		installBookWithFile({
+			book: { name: "Orphan", format: "epub", fileId: "missing" },
+			file: { name: "x.epub" },
+			bytes: new Uint8Array(0),
+		});
+		const el = await renderApp();
+		await openFirstBook(el);
+		const notice = el.querySelector(".books__placeholder")?.textContent ?? "";
+		expect(notice).toContain("Orphan");
+		expect(notice).toContain("missing from this vault");
+	});
+});
+
+describe("BooksApp library progress with two same-titled books", () => {
+	const paragraphs = Array.from(
+		{ length: 400 },
+		(_, i) => `<p>Абзац номер ${i} — достаточно длинный текст, чтобы книга заняла много страниц.</p>`,
+	).join("");
+	const LONG_FB2 = `<FictionBook><description><title-info><author><first-name>Стивен</first-name><last-name>Кинг</last-name></author><book-title>Библиотечная полиция</book-title></title-info></description><body><section><title><p>Глава</p></title>${paragraphs}</section></body></FictionBook>`;
+
+	/** A live vault: `update` mutates the row and fires the change signal, so
+	 *  the shelf re-reads exactly as it does in the shell. */
+	function installTwoBooks(): { rows: StubEntity[]; update: ReturnType<typeof vi.fn> } {
+		const book = (id: string, fileId: string): StubEntity => ({
+			id,
+			type: "brainstorm/Book/v1",
+			properties: {
+				name: "Библиотечная полиция",
+				author: "Стивен Кинг",
+				format: "fb2",
+				fileId,
+				spineLength: 0,
+				reading: { position: null, progress: 0, lastReadAt: null },
+				createdAt: 1,
+				updatedAt: 1,
+			},
+		});
+		const file = (id: string): StubEntity => ({
+			id,
+			type: "brainstorm/File/v1",
+			properties: {
+				name: `${id}.fb2`,
+				mime: "application/x-fictionbook+xml",
+				attachment: `brainstorm://asset/${id}`,
+			},
+		});
+		const rows = [book("bkA", "fileA"), book("bkB", "fileB"), file("fileA"), file("fileB")];
+		installShell(rows);
+		const listeners = new Set<() => void>();
+		const brainstorm = (
+			window as unknown as {
+				brainstorm: {
+					services: {
+						vaultEntities: Record<string, unknown>;
+						entities: Record<string, unknown>;
+					};
+				};
+			}
+		).brainstorm;
+		brainstorm.services.vaultEntities.onChange = (listener: () => void) => {
+			listeners.add(listener);
+			return { unsubscribe: () => listeners.delete(listener) };
+		};
+		brainstorm.services.entities.get = vi.fn((id: string) =>
+			Promise.resolve(rows.find((r) => r.id === id) ?? null),
+		);
+		brainstorm.services.entities.query = vi.fn(() =>
+			Promise.resolve(
+				rows
+					.filter((r) => r.type === "brainstorm/Book/v1")
+					.map((r) => ({ ...r, properties: { ...r.properties }, updatedAt: r.properties.updatedAt })),
+			),
+		);
+		const update = vi.fn((id: string, patch: Record<string, unknown>) => {
+			const row = rows.find((r) => r.id === id);
+			if (row) row.properties = { ...row.properties, ...patch };
+			for (const listener of listeners) listener();
+			return Promise.resolve(null);
+		});
+		brainstorm.services.entities.update = update;
+		const bytes = new TextEncoder().encode(LONG_FB2);
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(() =>
+				Promise.resolve({
+					ok: true,
+					status: 200,
+					arrayBuffer: () => Promise.resolve(bytes.buffer.slice(0)),
+				}),
+			),
+		);
+		return { rows, update };
+	}
+
+	async function settle(): Promise<void> {
+		for (let i = 0; i < 12; i += 1) {
+			await act(async () => {
+				await new Promise((resolve) => setTimeout(resolve, 5));
+			});
+		}
+	}
+
+	async function clickRow(el: HTMLElement, index: number): Promise<void> {
+		const row = el.querySelectorAll<HTMLButtonElement>(".books__row")[index];
+		await act(async () => {
+			row?.click();
+		});
+		await settle();
+	}
+
+	function rowProgress(el: HTMLElement): Record<string, string> {
+		const out: Record<string, string> = {};
+		for (const row of el.querySelectorAll<HTMLElement>(".books__row")) {
+			const key = row.getAttribute("aria-current") === "true" ? "open" : "other";
+			out[key] = row.querySelector(".books__row-progress")?.textContent ?? "";
+		}
+		return out;
+	}
+
+	it("importing two books in a row keeps each one's progress its own", async () => {
+		const rows: StubEntity[] = [];
+		installShell(rows);
+		const listeners = new Set<() => void>();
+		const fire = (): void => {
+			for (const listener of listeners) listener();
+		};
+		const brainstorm = (
+			window as unknown as {
+				brainstorm: {
+					services: {
+						vaultEntities: Record<string, unknown>;
+						entities: Record<string, unknown>;
+						files?: Record<string, unknown>;
+					};
+				};
+			}
+		).brainstorm;
+		brainstorm.services.vaultEntities.onChange = (listener: () => void) => {
+			listeners.add(listener);
+			return { unsubscribe: () => listeners.delete(listener) };
+		};
+		brainstorm.services.entities.get = vi.fn((id: string) =>
+			Promise.resolve(rows.find((r) => r.id === id) ?? null),
+		);
+		brainstorm.services.entities.query = vi.fn(() =>
+			Promise.resolve(
+				rows
+					.filter((r) => r.type === "brainstorm/Book/v1")
+					.map((r) => ({ ...r, properties: { ...r.properties }, updatedAt: r.properties.updatedAt })),
+			),
+		);
+		let minted = 0;
+		brainstorm.services.entities.create = vi.fn(
+			(type: string, properties: Record<string, unknown>, id?: string) => {
+				minted += 1;
+				const row = { id: id ?? `file${minted}`, type, properties: { ...properties } };
+				rows.push(row);
+				// The broadcast lags the reply, as it does in the shell.
+				setTimeout(fire, 20);
+				return Promise.resolve({ id: row.id });
+			},
+		);
+		const update = vi.fn((id: string, patch: Record<string, unknown>) => {
+			const row = rows.find((r) => r.id === id);
+			if (row) row.properties = { ...row.properties, ...patch };
+			setTimeout(fire, 0);
+			return Promise.resolve(null);
+		});
+		brainstorm.services.entities.update = update;
+		const names = ["one.fb2", "two.fb2"];
+		let picked = 0;
+		brainstorm.services.files = {
+			requestOpen: vi.fn(() => {
+				const name = names[picked] ?? "x.fb2";
+				picked += 1;
+				return Promise.resolve([{ handleId: name, displayName: name }]);
+			}),
+			import: vi.fn(({ handle }: { handle: { displayName: string } }) =>
+				Promise.resolve({
+					assetId: handle.displayName,
+					contentHash: handle.displayName,
+					size: 1,
+					mime: "application/octet-stream",
+					name: handle.displayName,
+				}),
+			),
+		};
+		const bytes = new TextEncoder().encode(LONG_FB2);
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(() =>
+				Promise.resolve({
+					ok: true,
+					status: 200,
+					arrayBuffer: () => Promise.resolve(bytes.buffer.slice(0)),
+				}),
+			),
+		);
+
+		const el = await renderApp();
+		const importNow = async (): Promise<void> => {
+			const button = el.querySelector<HTMLButtonElement>('button[aria-label="Import a book"]');
+			expect(button).not.toBeNull();
+			await act(async () => {
+				button?.click();
+			});
+			await settle();
+			await settle();
+		};
+		await importNow();
+		await importNow();
+		const bookRows = rows.filter((r) => r.type === "brainstorm/Book/v1");
+		expect(bookRows).toHaveLength(2);
+
+		const next = el.querySelectorAll<HTMLButtonElement>(".books__nav-btn")[1];
+		for (let i = 0; i < 5; i += 1) {
+			await act(async () => {
+				next?.click();
+			});
+		}
+		await settle();
+
+		// Every reading write went to the book that is open — the second import.
+		const [first, second] = bookRows;
+		expect(first?.properties.reading).toEqual({ position: null, progress: 0, lastReadAt: null });
+		expect((second?.properties.reading as { progress: number }).progress).toBeGreaterThan(0);
+		const readingWrites = update.mock.calls.filter((call) => "reading" in call[1]);
+		expect(readingWrites.length).toBeGreaterThan(0);
+		expect(new Set(readingWrites.map((call) => call[0]))).toEqual(new Set([second?.id]));
+	});
+
+	it("advancing the open book never touches the other book's row or record", async () => {
+		const { rows, update } = installTwoBooks();
+		const el = await renderApp();
+		await clickRow(el, 0);
+		const firstOpen = el.querySelector(".books__row--active");
+		expect(firstOpen).not.toBeNull();
+		// Open the OTHER book and read on.
+		const other = [...el.querySelectorAll<HTMLButtonElement>(".books__row")].findIndex(
+			(row) => !row.classList.contains("books__row--active"),
+		);
+		await clickRow(el, other);
+		const next = el.querySelectorAll<HTMLButtonElement>(".books__nav-btn")[1];
+		for (let i = 0; i < 5; i += 1) {
+			await act(async () => {
+				next?.click();
+			});
+		}
+		await settle();
+
+		// Let the shelf re-read the vault after the page-turn writes (the live
+		// list coalesces change signals for 250 ms).
+		await act(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 400));
+		});
+
+		const written = new Set(update.mock.calls.map((call) => call[0]));
+		expect(written.size).toBe(1);
+		const [openId] = [...written];
+		const closed = rows.find((r) => r.type === "brainstorm/Book/v1" && r.id !== openId);
+		expect(closed?.properties.reading).toEqual({ position: null, progress: 0, lastReadAt: null });
+		const shown = rowProgress(el);
+		expect(shown.open).not.toBe("");
+		expect(shown.other).not.toBe(shown.open);
+		expect(shown.other).toBe("");
+		// The unopened book stays under "Not started"; only the read one moved.
+		const groups = [...el.querySelectorAll(".books__library-group")].map((group) => ({
+			label: group.querySelector(".books__library-section")?.textContent,
+			rows: group.querySelectorAll(".books__row").length,
+			open: group.querySelector(".books__row--active") !== null,
+		}));
+		expect(groups).toEqual([
+			{ label: "Today", rows: 1, open: true },
+			{ label: "Not started", rows: 1, open: false },
+		]);
 	});
 });

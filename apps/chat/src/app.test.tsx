@@ -462,6 +462,254 @@ describe("ChatApp — agent proposal cards (Agent-Teams-3)", () => {
 	});
 });
 
+describe("ChatApp — @agent in a channel (Agent-13)", () => {
+	const AGENT_APP = "io.brainstorm.agent";
+	const AGENT_REF = "app:io.brainstorm.agent";
+	const SELF = "pk-self";
+	const rosterFor = (pubkey: string) => ({
+		self: () => Promise.resolve({ pubkey, fingerprint: "fp", displayName: "Ada" }),
+		members: () => Promise.resolve([]),
+		setSelf: vi.fn(),
+	});
+
+	const pendingTask = (invokedBy: string) => ({
+		artifact: {
+			id: "prp-1",
+			kind: "task",
+			entityType: "brainstorm/Task/v1",
+			fields: { title: "Ship the release notes" },
+			summary: "Ship the release notes",
+		},
+		status: "pending",
+		invokedBy,
+	});
+
+	function agentRow(id: string, over: Partial<StubEntity> & { props?: Record<string, unknown> }) {
+		return {
+			id,
+			type: MESSAGE_TYPE,
+			ownerAppId: over.ownerAppId ?? AGENT_APP,
+			properties: {
+				conversation: "c1",
+				body: "Here is what I found.",
+				createdAt: "2026-06-20T10:00:00.000Z",
+				seq: Number(id.replace(/\D/g, "")) || 1,
+				sender: { kind: "assistant", personRef: AGENT_REF, displayName: "Agent" },
+				agentInvoker: { pubkey: SELF, displayName: "Ada" },
+				...over.props,
+			},
+		} satisfies StubEntity;
+	}
+
+	const card = () => container.querySelector<HTMLElement>('[data-testid="chat-proposal"]');
+	const approve = () =>
+		container.querySelector<HTMLButtonElement>('[data-testid="chat-proposal-approve"]');
+
+	it("renders the reply attributed to the agent, with who asked", async () => {
+		await mount([channel("c1", "general"), agentRow("m1", {})], undefined, {
+			roster: rosterFor(SELF),
+		});
+		expect(container.querySelector(".chat__author")?.textContent).toBe("Agent");
+		expect(container.querySelector('[data-testid="agent-asked-by"]')?.textContent).toBe(
+			"Asked by you",
+		);
+	});
+
+	it("SECURITY (R5): a synced `agentInvoker` name cannot relabel a vouched reply", async () => {
+		// The property is ordinary synced data — a peer can overwrite it later.
+		await mount(
+			[
+				channel("c1", "general"),
+				agentRow("m1", { props: { agentInvoker: { pubkey: "pk-x", displayName: "Mallory" } } }),
+			],
+			undefined,
+			{ roster: rosterFor(SELF) },
+		);
+		expect(container.textContent).not.toContain("Mallory");
+		expect(container.querySelector('[data-testid="agent-asked-by"]')?.textContent).toBe(
+			"Asked by you",
+		);
+	});
+
+	it("SECURITY (R5): a member cannot paint a fake 'Agent · asked by <victim> · approved' card", async () => {
+		// Everything on this row is attacker-chosen synced data; main vouches for
+		// none of it (the row was not written by this device's Agent app).
+		await mount(
+			[
+				channel("c1", "general"),
+				agentRow("m1", {
+					ownerAppId: "brainstorm",
+					props: {
+						body: "Approved: wire the money",
+						agentInvoker: { pubkey: "pk-victim", displayName: "Victoria" },
+						agentProposalPreview: {
+							kind: "task",
+							summary: "Wire the money",
+							fields: { title: "Wire the money" },
+							status: "approved",
+						},
+					},
+				}),
+			],
+			undefined,
+			{ roster: rosterFor(SELF) },
+		);
+		// Not attributed to the real agent, and the victim's name appears nowhere.
+		expect(container.querySelector(".chat__author")?.textContent).toBe("Agent (unverified)");
+		expect(container.textContent).not.toContain("Victoria");
+		expect(container.querySelector('[data-testid="agent-asked-by"]')).toBeNull();
+		expect(card()?.dataset.trust).toBe("unverified");
+		expect(card()?.textContent).toContain("Shown from another member's device · not verified");
+		// An unverified card never states an outcome as fact.
+		expect(container.querySelector('[data-testid="chat-proposal-outcome"]')?.textContent).toBe(
+			"Marked approved on their device",
+		);
+		expect(card()?.textContent).not.toContain("saved to your vault");
+	});
+
+	it("SECURITY (R5): a forged row never groups with the real agent's replies", async () => {
+		await mount(
+			[
+				channel("c1", "general"),
+				agentRow("m1", {}),
+				agentRow("m2", { ownerAppId: "brainstorm", props: { body: "forged" } }),
+			],
+			undefined,
+			{ roster: rosterFor(SELF) },
+		);
+		const authors = [...container.querySelectorAll(".chat__author")].map((n) => n.textContent);
+		expect(authors).toEqual(["Agent", "Agent (unverified)"]);
+		expect(container.querySelector('[data-testid="agent-unverified"]')?.textContent).toBe(
+			"Shown from another member's device · not verified",
+		);
+	});
+
+	it("SECURITY: model output is rendered as TEXT — markup in a reply never becomes elements", async () => {
+		const hostile =
+			'<img src=x onerror="window.__pwned=1"><script>window.__pwned=1</script>[x](javascript:alert(1))';
+		await mount([channel("c1", "general"), agentRow("m1", { props: { body: hostile } })], undefined, {
+			roster: rosterFor(SELF),
+		});
+		const line = container.querySelector(".chat__line");
+		expect(line?.textContent).toBe(hostile);
+		expect(line?.children).toHaveLength(0);
+		expect(container.querySelector(".chat__messages img, .chat__messages script")).toBeNull();
+		expect(container.querySelector('.chat__messages a[href^="javascript:"]')).toBeNull();
+		expect((window as { __pwned?: number }).__pwned).toBeUndefined();
+	});
+
+	it("SECURITY: markup in a proposal's fields is text too", async () => {
+		const proposal = pendingTask(SELF);
+		proposal.artifact.summary = "<b>bold</b><img src=x>";
+		proposal.artifact.fields.title = "<i>x</i>";
+		await mount(
+			[channel("c1", "general"), agentRow("m1", { props: { agentProposal: proposal } })],
+			undefined,
+			{ roster: rosterFor(SELF) },
+		);
+		expect(card()?.querySelector("b, i, img")).toBeNull();
+		expect(card()?.textContent).toContain("<b>bold</b>");
+	});
+
+	it("the INVOKER gets a live card and approves through the host", async () => {
+		await mount(
+			[channel("c1", "general"), agentRow("m1", { props: { agentProposal: pendingTask(SELF) } })],
+			undefined,
+			{ roster: rosterFor(SELF) },
+		);
+		expect(card()?.dataset.readonly).toBe("false");
+		expect(approve()?.disabled).toBe(false);
+		await act(async () => {
+			approve()?.click();
+		});
+		expect(approveProposal).toHaveBeenCalledWith({ messageId: "m1" });
+	});
+
+	it("SECURITY: a non-invoker sees the card READ-ONLY — disabled, with whose it is — and cannot decide", async () => {
+		await mount(
+			[channel("c1", "general"), agentRow("m1", { props: { agentProposal: pendingTask(SELF) } })],
+			undefined,
+			{ roster: rosterFor("pk-someone-else") },
+		);
+		expect(card()?.dataset.readonly).toBe("true");
+		// Present and disabled — never hidden — with the reason on the control.
+		expect(approve()?.disabled).toBe(true);
+		expect(approve()?.title).toBe("Only the person who asked the agent can approve or discard this.");
+		expect(container.querySelector('[data-testid="chat-proposal-unavailable"]')?.textContent).toBe(
+			"Only the person who asked the agent can approve or discard this.",
+		);
+		await act(async () => {
+			approve()?.click();
+			container.querySelector<HTMLButtonElement>('[data-testid="chat-proposal-discard"]')?.click();
+		});
+		expect(approveProposal).not.toHaveBeenCalled();
+		expect(discardProposal).not.toHaveBeenCalled();
+	});
+
+	it("SECURITY: before the viewer's identity resolves, the card is read-only (fail-closed)", async () => {
+		await mount([
+			channel("c1", "general"),
+			agentRow("m1", { props: { agentProposal: pendingTask(SELF) } }),
+		]);
+		expect(card()?.dataset.readonly).toBe("true");
+		expect(approve()?.disabled).toBe(true);
+	});
+
+	it("another member's vault shows the synced PREVIEW as a read-only card", async () => {
+		// What arrives over sync: no reserved property, the row owned by the
+		// type's prefix, only the display-only preview.
+		await mount(
+			[
+				channel("c1", "general"),
+				agentRow("m1", {
+					ownerAppId: "brainstorm",
+					props: {
+						agentProposalPreview: {
+							kind: "task",
+							summary: "Ship the release notes",
+							fields: { title: "Ship the release notes", bogus: "dropped" },
+							status: "pending",
+						},
+					},
+				}),
+			],
+			undefined,
+			{ roster: rosterFor("pk-bo") },
+		);
+		expect(card()?.dataset.readonly).toBe("true");
+		expect(card()?.dataset.trust).toBe("unverified");
+		expect(approve()?.title).toBe(
+			"Only the person who asked the agent can decide this, on their own device.",
+		);
+		expect(card()?.textContent).toContain("Ship the release notes");
+		expect(card()?.textContent).not.toContain("dropped");
+		expect(approve()?.disabled).toBe(true);
+	});
+
+	it("SECURITY: a synced row carrying a full reserved-shaped proposal is still not decidable", async () => {
+		await mount(
+			[
+				channel("c1", "general"),
+				agentRow("m1", {
+					ownerAppId: "brainstorm",
+					props: { agentProposal: pendingTask("pk-victim") },
+				}),
+			],
+			undefined,
+			{ roster: rosterFor("pk-victim") },
+		);
+		// No preview, and the author is not the Agent app: an ordinary message.
+		expect(card()).toBeNull();
+	});
+
+	it("SECURITY: a preview on a message that does not present as the agent grows no card", async () => {
+		const row = message("m1", "c1", "Mallory", "hi");
+		row.properties.agentProposalPreview = { kind: "task", summary: "pwned", status: "pending" };
+		await mount([channel("c1", "general"), row], undefined, { roster: rosterFor(SELF) });
+		expect(card()).toBeNull();
+	});
+});
+
 describe("ChatApp — app-icon unread badge (7.14)", () => {
 	function seededStorage(seed: Record<string, unknown>): {
 		kv: Map<string, unknown>;

@@ -24,6 +24,7 @@ import { ProposeKind } from "@brainstorm-os/sdk-types";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { type ReactElement, useState } from "react";
 import { type ChatMessageId, t } from "./i18n";
+import { AgentRowTrust } from "./logic/chat";
 import {
 	type ChannelProposal,
 	type ChannelProposalKind,
@@ -84,6 +85,9 @@ const FAILURE_MESSAGE: Record<ProposalDecisionFailure, ChatMessageId> = {
 	[ProposalDecisionFailure.NotAProposal]: "proposal.error.notAProposal",
 	[ProposalDecisionFailure.AlreadyDecided]: "proposal.error.alreadyDecided",
 	[ProposalDecisionFailure.UntrustedAgent]: "proposal.error.untrustedAgent",
+	[ProposalDecisionFailure.NotInvoker]: "proposal.error.notInvoker",
+	[ProposalDecisionFailure.NotPermitted]: "proposal.error.notPermitted",
+	[ProposalDecisionFailure.Locked]: "proposal.error.locked",
 	[ProposalDecisionFailure.Unavailable]: "proposal.error.unavailable",
 };
 
@@ -101,10 +105,20 @@ export function ProposalCard({
 	messageId,
 	proposal,
 	host,
+	readOnly = false,
+	trust,
 }: {
 	messageId: string;
 	proposal: ChannelProposal;
 	host: ProposalHost;
+	/** Agent-13 — the card belongs to someone else's `@agent` invocation. Its
+	 *  actions stay VISIBLE and disabled, with a line naming whose it is: a
+	 *  member should see that a draft is waiting, and on whom. */
+	readOnly?: boolean;
+	/** Agent-13 — set on a built-in-agent card. `Unverified` means every byte
+	 *  of it is another member's synced data: it is labelled as such, names no
+	 *  invoker, and never states an outcome as fact. */
+	trust?: AgentRowTrust;
 }): ReactElement {
 	// `busy` deliberately stays true after a SUCCESSFUL decision: the settled
 	// card arrives with the next vault snapshot, and re-enabling the buttons in
@@ -114,8 +128,25 @@ export function ProposalCard({
 	const { artifact, status } = proposal;
 	const pending = status === ChannelProposalStatus.Pending;
 
+	// Why the actions cannot be used, when they cannot. A disabled control fires
+	// no pointer events, so this is both the native title and a visible line.
+	const unverified = trust === AgentRowTrust.Unverified;
+	const blockedHint = unverified
+		? t("proposal.unverifiedHint")
+		: readOnly
+			? t("proposal.invokerOnly.generic")
+			: host.canDecide
+				? null
+				: t("proposal.unavailable");
+	const eyebrow = unverified
+		? t("proposal.eyebrow.unverified")
+		: trust === AgentRowTrust.Vouched && !readOnly
+			? t("proposal.eyebrow.you")
+			: t("proposal.eyebrow");
+	const canAct = blockedHint === null;
+
 	const decide = async (decision: ProposalDecision): Promise<void> => {
-		if (busy || !host.canDecide) return;
+		if (busy || !canAct) return;
 		setError(null);
 		setBusy(true);
 		const result = await host.decide(messageId, decision);
@@ -129,6 +160,8 @@ export function ProposalCard({
 		<section
 			className="chat__proposal"
 			data-status={status}
+			data-readonly={readOnly ? "true" : "false"}
+			data-trust={trust ?? "team"}
 			data-testid="chat-proposal"
 			aria-label={t("proposal.aria", {
 				kind: t(KIND_LABEL[artifact.kind]),
@@ -138,7 +171,7 @@ export function ProposalCard({
 			<header className="chat__proposal-head">
 				<span className="chat__proposal-eyebrow">
 					<Icon name={IconName.Sparkle} size={12} />
-					{t("proposal.eyebrow")}
+					{eyebrow}
 				</span>
 				<span className="chat__proposal-kind" data-testid="chat-proposal-kind">
 					<Icon name={KIND_ICON[artifact.kind]} size={12} />
@@ -164,10 +197,8 @@ export function ProposalCard({
 						className="bs-btn"
 						data-bs-primary=""
 						data-testid="chat-proposal-approve"
-						disabled={busy || !host.canDecide}
-						// A disabled control fires no pointer events, so the native title is
-						// the only explanation a blocked user can get.
-						{...(host.canDecide ? {} : { title: t("proposal.unavailable") })}
+						disabled={busy || !canAct}
+						{...(blockedHint ? { title: blockedHint } : {})}
 						onClick={() => void decide(ProposalDecision.Approve)}
 					>
 						{busy ? t("proposal.deciding") : t("proposal.approve")}
@@ -176,17 +207,17 @@ export function ProposalCard({
 						type="button"
 						className="bs-btn"
 						data-testid="chat-proposal-discard"
-						disabled={busy || !host.canDecide}
-						{...(host.canDecide ? {} : { title: t("proposal.unavailable") })}
+						disabled={busy || !canAct}
+						{...(blockedHint ? { title: blockedHint } : {})}
 						onClick={() => void decide(ProposalDecision.Discard)}
 					>
 						{t("proposal.discard")}
 					</button>
-					{host.canDecide ? null : (
+					{blockedHint ? (
 						<span className="chat__proposal-hint" data-testid="chat-proposal-unavailable">
-							{t("proposal.unavailable")}
+							{blockedHint}
 						</span>
-					)}
+					) : null}
 				</div>
 			) : (
 				<div className="chat__proposal-actions">
@@ -195,7 +226,9 @@ export function ProposalCard({
 							name={status === ChannelProposalStatus.Approved ? IconName.CheckCircle : IconName.Close}
 							size={13}
 						/>
-						{status === ChannelProposalStatus.Approved ? t("proposal.approved") : t("proposal.discarded")}
+						{status === ChannelProposalStatus.Approved
+							? t(unverified ? "proposal.unverified.approved" : "proposal.approved")
+							: t(unverified ? "proposal.unverified.discarded" : "proposal.discarded")}
 					</span>
 					{status === ChannelProposalStatus.Approved && proposal.createdEntityId ? (
 						<button

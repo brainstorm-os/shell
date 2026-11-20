@@ -15,6 +15,7 @@ import {
 	type AppToolInput,
 	type AppToolRecord,
 	AppToolSurface,
+	BUILTIN_AGENT_APP_ID,
 	ToolCallInitiator,
 	ToolFrictionDecision,
 	ValueType,
@@ -39,6 +40,7 @@ import { makeToolsServiceHandler } from "./tools-service";
 const CALLER = "io.brainstorm.notes";
 const PROVIDER = "io.example.rewrite";
 const TOOL = appToolId(PROVIDER, "rewrite");
+const THING_TYPE = "io.example/Thing/v1";
 
 function envelope(args: unknown[], app = CALLER): Envelope {
 	return {
@@ -55,7 +57,9 @@ function envelope(args: unknown[], app = CALLER): Envelope {
 function ledgerGranting(pairs: ReadonlyArray<[string, string]>): CapabilityLedger {
 	const held = new Set(pairs.map(([app, cap]) => `${app}::${cap}`));
 	return {
-		has: (app: string, cap: string) => held.has(`${app}::${cap}`),
+		// `*` matches any scope, as the real ledger's `has()` does.
+		has: (app: string, cap: string) =>
+			held.has(`${app}::${cap}`) || held.has(`${app}::${cap.split(":")[0]}:*`),
 		listActive: (app: string) =>
 			pairs
 				.filter(([a]) => a === app)
@@ -149,10 +153,14 @@ describe("tools.call (Tool-4)", () => {
 		opts: Partial<Parameters<typeof makeToolsServiceHandler>[0]> = {},
 		grants: ReadonlyArray<[string, string]> = [
 			[CALLER, toolsCallCapability(PROVIDER)],
+			[CALLER, "entities.read:*"],
 			[PROVIDER, TOOLS_PROVIDE_CAPABILITY],
 		],
 	) =>
 		makeToolsServiceHandler({
+			// Every entityRef argument is resolved from the store; cases about
+			// other gates get an object of a type the default caller may read.
+			resolveEntityType: async () => THING_TYPE,
 			getRepo: () => repo,
 			getLedger: async () => ledgerGranting(grants),
 			getCallHost: () => host as never,
@@ -453,6 +461,240 @@ describe("tools.call (Tool-4)", () => {
 		).resolves.toEqual({ value: "done" });
 	});
 
+	it("holds a writes-vault tool to the same lock (Tool-10)", async () => {
+		// The provider writes its OWN data, but the broker cannot see what it does
+		// with the id it is handed — so a locked object is not handed over at all.
+		const source: AppToolInput = {
+			name: "source",
+			description: "what to make a task from",
+			required: true,
+			valueType: ValueType.EntityRef,
+		};
+		repo.insertMany([tool({ effect: AppToolEffect.WritesVault, input: [source] })]);
+		const grants: ReadonlyArray<[string, string]> = [
+			[CALLER, toolsCallCapability(PROVIDER)],
+			[CALLER, "entities.read:*"],
+			[PROVIDER, TOOLS_PROVIDE_CAPABILITY],
+			[PROVIDER, "entities.write:io.example/Thing/v1"],
+		];
+		await expect(
+			handler(
+				{ resolveEntityLocked: async () => true },
+				grants,
+			)(envelope([{ tool: TOOL, args: { source: "e1" } }])),
+		).rejects.toMatchObject({ name: "Denied" });
+		expect(host.call).not.toHaveBeenCalled();
+		expect(records.at(-1)).toMatchObject({ outcome: "refused", reason: "locked-object" });
+		await expect(
+			handler(
+				{ resolveEntityLocked: async () => false },
+				grants,
+			)(envelope([{ tool: TOOL, args: { source: "e1" } }])),
+		).resolves.toEqual({ value: "done" });
+	});
+
+	it("refuses a writes-vault tool whose provider holds no write grant (Tool-10)", async () => {
+		repo.insertMany([tool({ effect: AppToolEffect.WritesVault })]);
+		await expect(
+			handler({}, [
+				[CALLER, toolsCallCapability(PROVIDER)],
+				[PROVIDER, TOOLS_PROVIDE_CAPABILITY],
+				[PROVIDER, "entities.read:*"],
+			])(envelope([{ tool: TOOL }])),
+		).rejects.toMatchObject({ name: "Unavailable" });
+		expect(host.call).not.toHaveBeenCalled();
+		expect(records.at(-1)).toMatchObject({ outcome: "refused", reason: "provider-effect" });
+	});
+
+	it("an AGENT's writes-vault call always asks the shell, and a decline writes nothing (Tool-10)", async () => {
+		const t = tool({ effect: AppToolEffect.WritesVault });
+		repo.insertMany([t]);
+		const AGENT = "ed25519:0123456789abcdef";
+		const grants: ReadonlyArray<[string, string]> = [
+			[AGENT, toolsCallCapability(PROVIDER)],
+			[PROVIDER, TOOLS_PROVIDE_CAPABILITY],
+			[PROVIDER, "entities.write:io.example/Thing/v1"],
+		];
+		// Already approved at its current declaration: the ask below is the
+		// EFFECT's, not a first-use prompt — it recurs on every agent call.
+		const approvals = approvalsFor([t]);
+		const no = approver(false);
+		await expect(
+			handler(
+				{ getApprovals: async () => approvals, getApprovalHost: () => no as never },
+				grants,
+			)(envelope([{ tool: TOOL }], AGENT)),
+		).rejects.toMatchObject({ name: "NeedsConfirm" });
+		expect(no.asked).toHaveLength(1);
+		expect(no.asked[0]).toMatchObject({ agentInitiated: true, callerAppId: AGENT });
+		expect(host.call).not.toHaveBeenCalled();
+		// `confirmed: true` from the caller buys nothing — the agent cannot
+		// approve itself.
+		await expect(
+			handler(
+				{ getApprovals: async () => approvals, getApprovalHost: () => no as never },
+				grants,
+			)(envelope([{ tool: TOOL, confirmed: true }], AGENT)),
+		).rejects.toMatchObject({ name: "NeedsConfirm" });
+		expect(host.call).not.toHaveBeenCalled();
+		const yes = approver(true);
+		for (let i = 0; i < 2; i += 1) {
+			await expect(
+				handler(
+					{ getApprovals: async () => approvals, getApprovalHost: () => yes as never },
+					grants,
+				)(envelope([{ tool: TOOL }], AGENT)),
+			).resolves.toEqual({ value: "done" });
+		}
+		expect(yes.asked).toHaveLength(2);
+	});
+
+	describe("security fixes after the Tool-10 review", () => {
+		const ref = (over: Partial<AppToolInput> = {}): AppToolInput => ({
+			name: "source",
+			description: "the object",
+			required: true,
+			valueType: ValueType.EntityRef,
+			...over,
+		});
+		const NOTE = "io.brainstorm.notes/Note/v1";
+		const base: ReadonlyArray<[string, string]> = [
+			[CALLER, toolsCallCapability(PROVIDER)],
+			[PROVIDER, TOOLS_PROVIDE_CAPABILITY],
+			[PROVIDER, "entities.write:io.example/Thing/v1"],
+		];
+
+		it("refuses an entityRef the CALLER may not read — no confused-deputy read", async () => {
+			repo.insertMany([
+				tool({ effect: AppToolEffect.WritesVault, input: [ref({ allowedTypes: [NOTE] })] }),
+			]);
+			const ask = approver(true);
+			const opts = {
+				resolveEntityType: async () => NOTE,
+				resolveEntityLocked: async () => false,
+				getApprovalHost: () => ask as never,
+			};
+			// Holds the tool grant, the tool allows the type — but the caller has
+			// no read grant on notes, so it must not learn anything through Tasks.
+			const refused = await handler(
+				opts,
+				base,
+			)(envelope([{ tool: TOOL, args: { source: "n1" } }])).catch((e: Error) => e);
+			expect(refused).toMatchObject({ name: "Denied" });
+			expect(host.call).not.toHaveBeenCalled();
+			expect(ask.asked).toEqual([]);
+			expect(records.at(-1)).toMatchObject({ outcome: "refused", reason: "entity-read" });
+
+			// A read grant on ANOTHER type does not help.
+			await expect(
+				handler(opts, [...base, [CALLER, "entities.read:brainstorm/Task/v1"]])(
+					envelope([{ tool: TOOL, args: { source: "n1" } }]),
+				),
+			).rejects.toMatchObject({ name: "Denied" });
+			expect(host.call).not.toHaveBeenCalled();
+
+			// The exact type, or the wildcard, does.
+			for (const read of [`entities.read:${NOTE}`, "entities.read:*"]) {
+				await expect(
+					handler(opts, [...base, [CALLER, read]])(envelope([{ tool: TOOL, args: { source: "n1" } }])),
+				).resolves.toEqual({ value: "done" });
+			}
+		});
+
+		it("checks the read grant on an UNCONSTRAINED entityRef too, and on every list item", async () => {
+			repo.insertMany([tool({ input: [ref({ count: { min: 1, max: 3 } })] })]);
+			const types: Record<string, string> = { a: NOTE, b: "io.example/Secret/v1" };
+			const opts = { resolveEntityType: async (id: string) => types[id] ?? null };
+			const grants: ReadonlyArray<[string, string]> = [
+				[CALLER, toolsCallCapability(PROVIDER)],
+				[CALLER, `entities.read:${NOTE}`],
+				[PROVIDER, TOOLS_PROVIDE_CAPABILITY],
+			];
+			await expect(
+				handler(opts, grants)(envelope([{ tool: TOOL, args: { source: ["a"] } }])),
+			).resolves.toEqual({ value: "done" });
+			host.call.mockClear();
+			const unreadable = await handler(
+				opts,
+				grants,
+			)(envelope([{ tool: TOOL, args: { source: ["a", "b"] } }])).catch((e: Error) => e);
+			const missing = await handler(
+				opts,
+				grants,
+			)(envelope([{ tool: TOOL, args: { source: ["a", "nope"] } }])).catch((e: Error) => e);
+			expect(unreadable).toMatchObject({ name: "Denied" });
+			// Unreadable and non-existent answer identically.
+			expect((missing as Error).message).toBe((unreadable as Error).message);
+			expect(host.call).not.toHaveBeenCalled();
+		});
+
+		it("refuses an entityRef when no type resolver is wired", async () => {
+			repo.insertMany([tool({ input: [ref()] })]);
+			await expect(
+				handler({ resolveEntityType: undefined as never })(
+					envelope([{ tool: TOOL, args: { source: "e1" } }]),
+				),
+			).rejects.toMatchObject({ name: "Denied" });
+			expect(host.call).not.toHaveBeenCalled();
+		});
+
+		it("the built-in Agent app is an AGENT initiator: writes-vault asks every time", async () => {
+			const t = tool({ effect: AppToolEffect.WritesVault });
+			repo.insertMany([t]);
+			const grants: ReadonlyArray<[string, string]> = [
+				[BUILTIN_AGENT_APP_ID, toolsCallCapability(PROVIDER)],
+				[PROVIDER, TOOLS_PROVIDE_CAPABILITY],
+				[PROVIDER, "entities.write:io.example/Thing/v1"],
+			];
+			// A STANDING approval at the current declaration — the only thing left
+			// to ask about is the effect itself.
+			const approvals = approvalsFor([t]);
+			const yes = approver(true);
+			for (let i = 0; i < 2; i += 1) {
+				await handler(
+					{ getApprovals: async () => approvals, getApprovalHost: () => yes as never },
+					grants,
+				)(envelope([{ tool: TOOL }], BUILTIN_AGENT_APP_ID));
+			}
+			expect(yes.asked).toHaveLength(2);
+			expect(yes.asked.every((a) => a.agentInitiated)).toBe(true);
+			expect(records.every((r) => r.initiator === ToolCallInitiator.Agent)).toBe(true);
+
+			const no = approver(false);
+			await expect(
+				handler(
+					{ getApprovals: async () => approvals, getApprovalHost: () => no as never },
+					grants,
+				)(envelope([{ tool: TOOL }], BUILTIN_AGENT_APP_ID)),
+			).rejects.toMatchObject({ name: "NeedsConfirm" });
+			expect(host.call).toHaveBeenCalledTimes(2);
+		});
+
+		it("re-checks the lock AFTER the approval prompt, immediately before dispatch", async () => {
+			repo.insertMany([tool({ effect: AppToolEffect.WritesVault, input: [ref()] })]);
+			let locked = false;
+			// The user locks the object while the prompt is open, then clicks Allow.
+			const lockingApprover = {
+				request: async () => {
+					locked = true;
+					return true;
+				},
+			};
+			await expect(
+				handler(
+					{
+						resolveEntityLocked: async () => locked,
+						getApprovals: async () => approvalsFor(),
+						getApprovalHost: () => lockingApprover as never,
+					},
+					[...base, [CALLER, "entities.read:*"]],
+				)(envelope([{ tool: TOOL, args: { source: "e1" } }])),
+			).rejects.toMatchObject({ name: "Denied" });
+			expect(host.call).not.toHaveBeenCalled();
+			expect(records.at(-1)).toMatchObject({ outcome: "refused", reason: "locked-object" });
+		});
+	});
+
 	it("treats an unresolvable lock as LOCKED", async () => {
 		const target: AppToolInput = {
 			name: "target",
@@ -569,6 +811,9 @@ describe("tools.call (Tool-4)", () => {
 		expect(decideAppToolFriction(AppToolEffect.ReadsVault, UserGesture)).toBe(AutoRun);
 		expect(decideAppToolFriction(AppToolEffect.ReadsVault, Agent)).toBe(Confirm);
 		expect(decideAppToolFriction(AppToolEffect.External, UserGesture)).toBe(Confirm);
+		// Tool-10 — a provider-side write: the click confirms, an agent asks.
+		expect(decideAppToolFriction(AppToolEffect.WritesVault, UserGesture)).toBe(AutoRun);
+		expect(decideAppToolFriction(AppToolEffect.WritesVault, Agent)).toBe(Confirm);
 	});
 
 	it("asks for an external call and runs it once approved", async () => {

@@ -56,12 +56,30 @@ describe("child entity types (F-318)", () => {
 		expect(isChildEntityType("brainstorm/Message/v1")).toBe(true);
 	});
 
+	it("classifies a synced Email — it lives in its account's folders, read inside Mailbox", () => {
+		expect(isChildEntityType(ChildEntityType.Email)).toBe(true);
+		expect(isChildEntityType("brainstorm/Email/v1")).toBe(true);
+	});
+
+	it("keeps the mail CONTAINERS and fetched attachments out", () => {
+		// A MailFolder is a container (the Channel of mail), a MailAccount is a
+		// deliberate creation with its own management UX, and a fetched
+		// attachment is an ordinary File/v1 that stands on its own.
+		for (const type of [
+			"brainstorm/MailFolder/v1",
+			"brainstorm/MailAccount/v1",
+			"brainstorm/File/v1",
+		]) {
+			expect(isChildEntityType(type), type).toBe(false);
+			expect(isSystemEntityType(type), type).toBe(false);
+		}
+	});
+
 	it("keeps standalone content and containers out", () => {
 		for (const type of [
 			"io.brainstorm.chat/Channel/v1",
 			"brainstorm/Conversation/v1",
 			"brainstorm/Note/v1",
-			"brainstorm/Email/v1",
 			"brainstorm/Task/v1",
 			"",
 		]) {
@@ -132,8 +150,33 @@ describe("typeDisplayName (F-320 singular type caption)", () => {
 
 	it("stays the singular of friendlyTypeName's plural", () => {
 		expect(friendlyTypeName("brainstorm/Task/v1")).toBe("Tasks");
-		expect(friendlyTypeName("brainstorm/BrowsingHistory/v1")).toBe("BrowsingHistories");
+		expect(friendlyTypeName("brainstorm/BrowsingHistory/v1")).toBe("Browsing histories");
 		expect(friendlyTypeName("brainstorm/Task")).toBe("Tasks");
 		expect(friendlyTypeName("")).toBe("");
+	});
+});
+
+describe("camel-case type names read as words", () => {
+	it("splits a camel-case segment into sentence-cased words", () => {
+		expect(friendlyTypeName("brainstorm/CodeFile/v1")).toBe("Code files");
+		expect(friendlyTypeName("brainstorm/MailAccount/v1")).toBe("Mail accounts");
+		expect(friendlyTypeName("io.brainstorm.chat/UserState/v1")).toBe("User states");
+		expect(typeDisplayName("brainstorm/WorkflowRun/v1")).toBe("Workflow run");
+	});
+
+	it("keeps an acronym run capitalised", () => {
+		expect(typeDisplayName("brainstorm/PDFFile/v1")).toBe("PDF file");
+		expect(typeDisplayName("brainstorm/UserID/v1")).toBe("User ID");
+		expect(typeDisplayName("brainstorm/MyPDFFile/v1")).toBe("My PDF file");
+		expect(friendlyTypeName("brainstorm/URL/v1")).toBe("URLs");
+		expect(typeDisplayName("brainstorm/PlanB/v1")).toBe("Plan B");
+	});
+
+	it("leaves single words and already-separated names untouched", () => {
+		expect(friendlyTypeName("brainstorm/Person/v1")).toBe("Persons");
+		expect(friendlyTypeName("brainstorm/Company/v1")).toBe("Companies");
+		expect(friendlyTypeName("brainstorm/content_calendar/v1")).toBe("Content calendars");
+		expect(friendlyTypeName("brainstorm/graph-export/v1")).toBe("Graph exports");
+		expect(typeDisplayName("brainstorm/task/v1")).toBe("Task");
 	});
 });

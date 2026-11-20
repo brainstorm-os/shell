@@ -24,6 +24,7 @@ import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext
 import { $getNearestNodeFromDOMNode, type NodeKey } from "lexical";
 import { useEffect } from "react";
 import { BLOCK_ACTIONS } from "./commands";
+import { setHostNoteId } from "./host-note";
 import { useNoteContextOptional } from "./note-context";
 
 export function BlockContextMenuPlugin({ documentId }: { documentId?: string } = {}) {
@@ -32,6 +33,14 @@ export function BlockContextMenuPlugin({ documentId }: { documentId?: string } =
 	const t = useEditorT();
 	const host = useNoteContextOptional();
 	const noteId = documentId ?? host?.noteId;
+
+	// Mounted in every Notes editor (the open note and each inline
+	// transclusion), with that editor's own note id already resolved — the one
+	// place that can tell commands which note they are running in.
+	useEffect(() => {
+		setHostNoteId(editor, noteId);
+		return () => setHostNoteId(editor, undefined);
+	}, [editor, noteId]);
 
 	useEffect(() => {
 		const root = editor.getRootElement();

@@ -434,4 +434,69 @@ export const ENTITIES_MIGRATIONS: SqliteMigration[] = [
 			`);
 		},
 	},
+	{
+		version: 14,
+		description: "entities.db v14 — access_roots + access_statements (0.16.0 sharing authorization)",
+		up: (db) => {
+			// The membership of a shared entity is a log of signed statements INSIDE
+			// the entity's own doc, which every member can write. Two things about
+			// it therefore have to live where a collaborator cannot reach:
+			//
+			//  - `access_roots` — the entity's root owner, pinned the first time
+			//    this device sees the record (trust on first use from whoever handed
+			//    us the DEK) and never replaced. Authority chains from it.
+			//  - `access_statements` — the signed grants and revokes this device has
+			//    seen take effect. The doc is only their transport: deleting one
+			//    from the array does not un-revoke or un-grant here.
+			//
+			// No FK to `entities`: a root is pinned at the share bootstrap gate, when
+			// the row may not exist yet, and a pruned entity must not silently lose
+			// its pin. LOCAL state — never syncs, never crosses the wire.
+			db.exec(`
+				CREATE TABLE access_roots (
+					entity_id  TEXT PRIMARY KEY,
+					root_pub   TEXT NOT NULL,
+					pinned_at  INTEGER NOT NULL
+				);
+				CREATE TABLE access_statements (
+					entity_id  TEXT NOT NULL,
+					kind       TEXT NOT NULL,
+					sig        TEXT NOT NULL,
+					body       TEXT NOT NULL,
+					seen_at    INTEGER NOT NULL,
+					PRIMARY KEY (entity_id, kind, sig)
+				);
+			`);
+		},
+	},
+	{
+		version: 15,
+		description: "entities.db v15 — entity_containers (0.16.0 container rule for shared children)",
+		up: (db) => {
+			// The container a shared CHILD entity (a channel's message, a project's
+			// task) was first seen in on this device. A child is written only by a
+			// current Editor+ of its container, and the container consulted is this
+			// pin - never the child's own parent property, which its author can
+			// rewrite in the very update being judged. First pin wins. LOCAL state.
+			db.exec(`
+				CREATE TABLE entity_containers (
+					entity_id     TEXT PRIMARY KEY,
+					container_id  TEXT NOT NULL,
+					pinned_at     INTEGER NOT NULL
+				);
+				CREATE INDEX idx_entity_containers_container ON entity_containers(container_id);
+			`);
+		},
+	},
+	{
+		version: 16,
+		description: "entities.db v16 — access_statements.signer (bounded per-signer statement memory)",
+		up: (db) => {
+			// Who signed each remembered statement, so the memory can be bounded
+			// PER SIGNER: one member must not be able to fill it and crowd out the
+			// root's revokes. Rows written before this carry '' and count against
+			// nobody's quota.
+			db.exec("ALTER TABLE access_statements ADD COLUMN signer TEXT NOT NULL DEFAULT ''");
+		},
+	},
 ];

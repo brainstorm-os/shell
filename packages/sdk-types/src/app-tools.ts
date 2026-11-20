@@ -46,6 +46,13 @@ export enum AppToolEffect {
 	 *  persists on its own (doc 75 / OQ-ANS-4, generalized from the agent to
 	 *  every app). */
 	ProposesWrite = "proposes-write",
+	/** Writes the PROVIDER's own vault data, under the provider's own grants
+	 *  (Tool-10) — "create a task from this". Never the caller's data: the
+	 *  caller hands over values and gets values back, exactly as for every
+	 *  other effect. Declared separately from `pure` because a provider that
+	 *  persists on call has a side effect a human should be asked about when
+	 *  no human chose the moment. */
+	WritesVault = "writes-vault",
 }
 
 /** Who initiated a tool call. DERIVED from the verified caller principal at
@@ -83,6 +90,10 @@ export enum ToolFrictionDecision {
  *   - `proposes-write` — returns a proposal that a human must approve before
  *     anything persists, so the approval gesture exists by construction and
  *     the call itself needs no second one.
+ *   - `writes-vault` — the provider persists into its OWN data on call. From
+ *     a user gesture the click is the confirmation (the same standing a "New
+ *     task" button has); an agent's call ALWAYS confirms, through the shell,
+ *     because nothing is staged for a human to approve afterwards.
  *   - `external` — always confirms; leaving the machine is the one effect a
  *     user cannot undo. */
 export function decideAppToolFriction(
@@ -94,6 +105,7 @@ export function decideAppToolFriction(
 		case AppToolEffect.ProposesWrite:
 			return ToolFrictionDecision.AutoRun;
 		case AppToolEffect.ReadsVault:
+		case AppToolEffect.WritesVault:
 			return initiator === ToolCallInitiator.UserGesture
 				? ToolFrictionDecision.AutoRun
 				: ToolFrictionDecision.Confirm;
@@ -322,6 +334,11 @@ export function appToolFingerprint(tool: AppToolRegistration): string {
 		tool.description,
 		tool.effect,
 		[...(tool.surfaces ?? [])].sort(),
+		// Which objects the tool is offered on is part of what was approved: an
+		// update that widens `appliesTo` (or empties it, which means ANY type)
+		// puts the same approved tool in front of objects the user never agreed
+		// to hand it. Sorted — order is not a change.
+		[...(tool.appliesTo ?? [])].sort(),
 		(tool.input ?? []).map((i) => [
 			i.name,
 			i.description,
@@ -727,7 +744,7 @@ export function validateAppTool(value: unknown): AppToolValidation {
 	if (!isAppToolEffect(t.effect)) {
 		return {
 			ok: false,
-			reason: "tool.effect must be pure | reads-vault | external | proposes-write",
+			reason: "tool.effect must be pure | reads-vault | writes-vault | external | proposes-write",
 			field: "effect",
 		};
 	}
@@ -778,6 +795,7 @@ export function isAppToolEffect(value: unknown): value is AppToolEffect {
 	return (
 		value === AppToolEffect.Pure ||
 		value === AppToolEffect.ReadsVault ||
+		value === AppToolEffect.WritesVault ||
 		value === AppToolEffect.External ||
 		value === AppToolEffect.ProposesWrite
 	);

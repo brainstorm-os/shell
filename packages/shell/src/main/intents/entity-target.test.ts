@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { EntitiesRepository, EntityRow } from "../storage/entities-repo";
-import { makeEntityTargetResolver, mimeFromProperties } from "./entity-target";
+import {
+	makeEntityTargetResolver,
+	mimeFromProperties,
+	routingMimeFromProperties,
+} from "./entity-target";
 
 function fakeRepo(get: (id: string) => EntityRow | null): EntitiesRepository {
 	return { get } as unknown as EntitiesRepository;
@@ -32,7 +36,54 @@ describe("mimeFromProperties", () => {
 	});
 });
 
+describe("routingMimeFromProperties", () => {
+	const GENERIC = "application/octet-stream";
+
+	it("keeps a specific stored MIME, whatever the name says", () => {
+		expect(routingMimeFromProperties({ mime: "application/pdf", name: "x.epub" })).toBe(
+			"application/pdf",
+		);
+	});
+
+	it("routes a generically-labelled book file by its final extension", () => {
+		const name = "King_Chetyre-posle-polunochi_3_Bibliotechnaya-policiya.159046.fb2.epub";
+		expect(routingMimeFromProperties({ mime: GENERIC, name })).toBe("application/epub+zip");
+		expect(routingMimeFromProperties({ mime: GENERIC, name: "Book.FB2" })).toBe(
+			"application/x-fictionbook+xml",
+		);
+		expect(routingMimeFromProperties({ mime: "application/zip", name: "Book.fb2.zip" })).toBe(
+			"application/x-zip-compressed-fb2",
+		);
+	});
+
+	it("leaves a generic file that is not a book generic", () => {
+		expect(routingMimeFromProperties({ mime: GENERIC, name: "blob.bin" })).toBe(GENERIC);
+		expect(routingMimeFromProperties({ mime: "application/zip", name: "photos.zip" })).toBe(
+			"application/zip",
+		);
+	});
+
+	it("never invents a MIME for an entity that stores none", () => {
+		expect(routingMimeFromProperties({ name: "draft.epub" })).toBeUndefined();
+	});
+});
+
 describe("makeEntityTargetResolver", () => {
+	it("resolves an EPUB stored as a generic binary to the EPUB MIME", async () => {
+		const resolve = makeEntityTargetResolver(async () =>
+			fakeRepo(() =>
+				row({
+					type: "brainstorm/File/v1",
+					properties: { mime: "application/octet-stream", name: "Dune.fb2.epub" },
+				}),
+			),
+		);
+		expect(await resolve("ent_1")).toEqual({
+			type: "brainstorm/File/v1",
+			mime: "application/epub+zip",
+		});
+	});
+
 	it("returns null when no vault session is open", async () => {
 		const resolve = makeEntityTargetResolver(async () => null);
 		expect(await resolve("ent_1")).toBeNull();

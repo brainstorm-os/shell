@@ -1,10 +1,13 @@
 /**
- * WebEmbedNode — a sandboxed `<iframe>` for an allowlisted provider
- * (YouTube / Vimeo / Loom / Figma / CodeSandbox). The embeddable URL is
- * computed by `classifyUrl` at insert time and frozen on the node, so
- * the renderer never iframes an arbitrary origin and never needs the
- * network itself. The iframe is `sandbox`ed to the minimum the players
- * need and `referrerpolicy="no-referrer"`.
+ * WebEmbedNode — the one node behind every external embed provider
+ * (catalogue in `plugins/embed-providers.ts`). It persists the URL the
+ * user gave; what actually renders is re-derived from that URL by
+ * `classifyEmbed` on every render, so neither a hand-edited document nor a
+ * CRDT peer writing `__embedUrl` directly can point the iframe anywhere
+ * the allowlist would not.
+ *
+ * Nothing loads on render: the block is a local click-to-load facade
+ * until the user asks for the provider's content.
  */
 
 import {
@@ -14,8 +17,16 @@ import {
 	type NodeKey,
 	type SerializedLexicalNode,
 } from "lexical";
-import type { JSX } from "react";
-import { EmbedKind, classifyUrl } from "../plugins/embed-providers";
+import { type JSX, type ReactNode, useMemo, useState } from "react";
+import { useEditorT } from "../i18n";
+import { AudioIcon, EmbedIcon, GlobeIcon, MapPinIcon, PlayIcon } from "../icons";
+import {
+	EMBED_PROVIDERS,
+	EmbedAspect,
+	EmbedKind,
+	classifyEmbed,
+	safeExternalHref,
+} from "../plugins/embed-providers";
 
 export const WEB_EMBED_NODE_TYPE = "web-embed";
 const WEB_EMBED_NODE_VERSION = 1 as const;
@@ -26,23 +37,17 @@ function coerceKind(raw: unknown): EmbedKind {
 	return typeof raw === "string" && KNOWN_KINDS.has(raw) ? (raw as EmbedKind) : EmbedKind.Bookmark;
 }
 
-// The serialized `embedUrl` is attacker-controlled when it arrives via CRDT
-// sync or clipboard paste, so it is never trusted: re-run the provider
-// allowlist on the (also untrusted, but classified afresh) `url` and accept
-// the iframe only when classifyUrl itself produces an embeddable provider —
-// mirroring the insert path's embed-vs-bookmark decision in embed-plugin.tsx.
+// A serialized node only keeps its provider when a fresh classification of
+// its `url` agrees with the declared kind; otherwise it imports as a link.
 function reclassifyEmbed(
 	rawUrl: unknown,
 	rawKind: unknown,
 ): { embedUrl: string | null; kind: EmbedKind } {
-	if (typeof rawUrl !== "string") return { embedUrl: null, kind: EmbedKind.Bookmark };
-	const c = classifyUrl(rawUrl);
-	if (!c || c.kind === EmbedKind.Bookmark || !c.embedUrl) {
+	const match = typeof rawUrl === "string" ? classifyEmbed(rawUrl) : null;
+	if (!match || coerceKind(rawKind) !== match.kind) {
 		return { embedUrl: null, kind: EmbedKind.Bookmark };
 	}
-	const declared = coerceKind(rawKind);
-	if (declared !== c.kind) return { embedUrl: null, kind: EmbedKind.Bookmark };
-	return { embedUrl: c.embedUrl, kind: c.kind };
+	return { embedUrl: match.embedUrl, kind: match.kind };
 }
 
 export type SerializedWebEmbedNode = SerializedLexicalNode & {
@@ -99,7 +104,7 @@ export class WebEmbedNode extends DecoratorNode<JSX.Element> {
 	}
 
 	override decorate(): JSX.Element {
-		return <WebEmbedView url={this.__url} embedUrl={this.__embedUrl} kind={this.__kind} />;
+		return <WebEmbedView url={this.__url} />;
 	}
 
 	override isInline(): false {
@@ -107,42 +112,92 @@ export class WebEmbedNode extends DecoratorNode<JSX.Element> {
 	}
 }
 
-function WebEmbedView({
-	url,
-	embedUrl,
-	kind,
-}: {
-	url: string;
-	embedUrl: string | null;
-	kind: EmbedKind;
-}) {
-	// A null embedUrl means the (re-validated) URL is not an allowlisted
-	// provider — never iframe it; degrade to a plain link, matching the
-	// insert path's bookmark fallback.
-	if (!embedUrl) {
+const ASPECT_ICON: Readonly<Record<EmbedAspect, () => ReactNode>> = {
+	[EmbedAspect.Video]: PlayIcon,
+	[EmbedAspect.Map]: MapPinIcon,
+	[EmbedAspect.Canvas]: EmbedIcon,
+	[EmbedAspect.Audio]: AudioIcon,
+	[EmbedAspect.AudioList]: AudioIcon,
+};
+
+export function WebEmbedView({ url: syncedUrl }: { url: string }): JSX.Element {
+	// Yjs writes `__url` straight onto the node, bypassing importJSON, so a
+	// peer can put any JSON value here; a throw would take the editor down.
+	const url = typeof syncedUrl === "string" ? syncedUrl : "";
+	const t = useEditorT();
+	const match = useMemo(() => classifyEmbed(url), [url]);
+	// Lexical keys a decorator's portal by node key, so this component — and
+	// its state — survives a peer rewriting the node's URL. Consent therefore
+	// names the exact frame target it was given for, not just "this block".
+	const [consentedEmbedUrl, setConsentedEmbedUrl] = useState<string | null>(null);
+
+	if (!match) {
+		const href = safeExternalHref(url);
 		return (
-			<div className="notes__embed" data-kind={EmbedKind.Bookmark}>
-				<a href={url} target="_blank" rel="noreferrer noopener" className="notes__embed-link">
-					{url}
-				</a>
+			<div className="notes__embed notes__embed--link" data-kind={EmbedKind.Bookmark}>
+				<GlobeIcon />
+				{href ? (
+					<a
+						href={href}
+						target="_blank"
+						rel="noopener noreferrer nofollow"
+						className="notes__embed-link"
+					>
+						{url}
+					</a>
+				) : (
+					<span className="notes__embed-link">{url}</span>
+				)}
 			</div>
 		);
 	}
-	// iframe-src-exempt — Web-embed nodes intentionally load a remote URL
-	// (YouTube / Vimeo / etc.); this is the explicit non-opaque-origin case
-	// the block-frame primitive does NOT cover (block-frame is srcdoc-only
-	// for BP blocks; web embeds are user-supplied URLs).
+
+	const provider = EMBED_PROVIDERS[match.kind];
+	const name = t(provider.labelKey);
+	const frameHost = new URL(provider.frameOrigin).host;
+	const Glyph = ASPECT_ICON[match.aspect];
+
+	if (consentedEmbedUrl !== match.embedUrl) {
+		return (
+			<div className="notes__embed" data-kind={match.kind} data-aspect={match.aspect}>
+				<button
+					type="button"
+					className="notes__embed-facade"
+					onClick={() => setConsentedEmbedUrl(match.embedUrl)}
+					aria-label={t("editor.embed.facade.load", { provider: name })}
+				>
+					<span className="notes__embed-facade-glyph" aria-hidden="true">
+						<Glyph />
+					</span>
+					<span className="notes__embed-facade-name">{name}</span>
+					<span className="notes__embed-facade-url">{url}</span>
+					<span className="notes__embed-facade-cta">
+						{t("editor.embed.facade.load", { provider: name })}
+					</span>
+					<span className="notes__embed-facade-notice">
+						{t("editor.embed.facade.notice", { host: frameHost })}
+					</span>
+				</button>
+			</div>
+		);
+	}
+
+	// `credentialless` is not in React's attribute table; a lower-case string
+	// attribute passes straight through to the DOM.
+	const partition = provider.credentialless ? { credentialless: "" } : {};
 	return (
-		<div className="notes__embed" data-kind={kind}>
+		<div className="notes__embed" data-kind={match.kind} data-aspect={match.aspect} data-loaded="">
 			<iframe
 				className="notes__embed-frame"
-				// iframe-src-exempt
-				src={embedUrl}
-				title={url}
-				loading="lazy"
+				// iframe-src-exempt — the one sanctioned remote-origin frame: src is
+				// rebuilt by classifyEmbed on an allowlisted provider origin (block-frame
+				// is srcdoc-only and does not cover third-party players).
+				src={match.embedUrl}
+				title={t("editor.embed.frameTitle", { provider: name })}
 				referrerPolicy="no-referrer"
-				sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
-				allow="fullscreen; picture-in-picture; clipboard-write"
+				sandbox={provider.sandbox}
+				allow={provider.allow}
+				{...partition}
 			/>
 		</div>
 	);

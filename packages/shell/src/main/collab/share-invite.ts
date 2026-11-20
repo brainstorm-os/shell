@@ -52,7 +52,14 @@ import {
 	findWrapForRecipient,
 	wrapDekForRecipient,
 } from "../credentials/member-wraps";
-import { type AccessRole, grantAccess, roleOf } from "./access-record";
+import {
+	AccessRole,
+	type AccessTrust,
+	docTrust,
+	grantAccess,
+	hasAccessEntries,
+	roleOf,
+} from "./access-record";
 import { publishDocProfile } from "./doc-profiles";
 import {
 	INVITE_DEFAULT_TTL_MS,
@@ -343,6 +350,9 @@ export function shareEntityWithInvite(
 		/** The owner's own pubkey — the key `selfProfile` is filed under. Required
 		 *  whenever `selfProfile` is given. */
 		selfPubkey?: string;
+		/** This device's pinned trust for the entity's record. Omitted ⇒ derived
+		 *  from the doc with the signer as `self` (the in-process harness). */
+		trust?: AccessTrust;
 		/** Collab-C5-invite-anchor — the container this entity descends from, when
 		 *  the share is a COLLECTION cascade rather than a direct one. A child's
 		 *  grant carries the container id instead of an invite anchor: the receiver
@@ -394,7 +404,24 @@ export function shareEntityWithInvite(
 	// Grants are append-only and `grantAccess` no-ops on a live grant, so a
 	// re-share at a *different* role would silently fail to change anything.
 	// Surface that instead: a role change is revoke-then-re-share, not re-share.
-	const currentRole = roleOf(doc, opts.entityId, opts.invite.userPubB64);
+	// A share into an EMPTY record is the entity's first, by its creator: their
+	// self-signed Owner grant is the record's genesis, the root every later grant
+	// chains from. (`SharingEngine` writes it first, with the owner's wrapping
+	// key; this covers a caller that shares straight into a fresh doc.)
+	const firstShare = !hasAccessEntries(doc);
+	if (firstShare) {
+		grantAccess(doc, {
+			entityId: opts.entityId,
+			member: ownerPubB64,
+			role: AccessRole.Owner,
+			signerSecret: opts.signerSecret,
+			now: opts.now,
+			trust: { root: null },
+		});
+	}
+	const trust =
+		firstShare || !opts.trust ? docTrust(doc, opts.entityId, { self: ownerPubB64 }) : opts.trust;
+	const currentRole = roleOf(doc, opts.entityId, opts.invite.userPubB64, trust);
 	if (currentRole !== null && currentRole !== opts.role) {
 		throw new Error(
 			`shareEntityWithInvite: ${opts.invite.userPubB64} is already a member at role "${currentRole}"; change a role via revokeAccess then re-share`,
@@ -410,7 +437,7 @@ export function shareEntityWithInvite(
 	}
 	publishDocProfile(doc, opts.invite.userPubB64, inviteProfile(opts.invite));
 
-	const existingWrap = findWrapForRecipient(doc, recipientPub);
+	const existingWrap = findWrapForRecipient(doc, recipientPub, opts.dekVersion);
 	if (currentRole !== null && existingWrap !== null) return existingWrap;
 
 	grantAccess(doc, {
@@ -419,6 +446,7 @@ export function shareEntityWithInvite(
 		role: opts.role,
 		signerSecret: opts.signerSecret,
 		now: opts.now,
+		trust,
 		// Record the invitee's verified X25519 wrapping key INSIDE the signed
 		// grant (collection-sharing, design 71): a later child cascade reads it
 		// from the access record to wrap the child DEK to this member, with the

@@ -286,5 +286,7 @@
   "tasks.row.toggle.open": "Marquer « {name} » comme terminée",
   "tasks.row.toggle.done": "« {name} » est terminée — marquer comme abandonnée",
   "tasks.row.toggle.wontDo": "« {name} » est abandonnée — rouvrir",
-  "tasks.quickLook.value.wontDo": "Abandonnée"
+  "tasks.quickLook.value.wontDo": "Abandonnée",
+  "tasks.tool.untitled": "Tâche sans titre",
+  "tasks.tool.createTask.fromSource": "Depuis « {title} »"
 }

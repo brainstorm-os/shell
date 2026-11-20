@@ -12,6 +12,7 @@ import {
 } from "@brainstorm-os/protocol/selective-sync-types";
 import { UPDATE_STATE_EVENT } from "@brainstorm-os/protocol/update-wire-types";
 import {
+	AGENT_PROPOSAL_PREVIEW_PROPERTY_KEY,
 	AGENT_TRACE_SERVICE,
 	ANTHROPIC_PROVIDER_ID,
 	APP_TAB_COMMAND_CHANNEL,
@@ -19,6 +20,7 @@ import {
 	ActionTrustTier,
 	AgentEventKind,
 	AgentRouting,
+	BUILTIN_AGENT_APP_ID,
 	GEMINI_PROVIDER_ID,
 	GLM_PROVIDER_ID,
 	INVITE_LINK_PREFIX,
@@ -53,6 +55,7 @@ import {
 	shell,
 	webContents,
 } from "electron";
+import { ENVELOPE_PROTOCOL_VERSION } from "../ipc/envelope";
 import { BackgroundActivityStore } from "./activity/background-activity-store";
 import { SEMANTIC_MODEL_OP_ID, operationFromSemanticStatus } from "./activity/semantic-activity";
 import { listAgents } from "./agents/agent-directory";
@@ -65,10 +68,16 @@ import {
 	maybeRunAssignedAgent,
 	recordAssignmentRun,
 } from "./agents/assignment-runner";
+import {
+	type BuiltinAgentRunnerDeps,
+	maybeRunBuiltinAgent,
+	resolveBuiltinAgentMentionTarget,
+} from "./agents/builtin-agent-runner";
 import { ChannelProposalStatus } from "./agents/channel-proposals";
 import {
 	AGENTS_MENTION_CAPABILITY,
 	type MentionRunnerDeps,
+	grantString,
 	maybeRunMentionedAgents,
 } from "./agents/mention-runner";
 import { AgentTraceRecorder, makeBrokerTraceObserver } from "./agents/trace/agent-trace-recorder";
@@ -146,13 +155,10 @@ import { BundleExportScopeKind } from "./bundle/bundle-format";
 import { exportVaultBundle } from "./bundle/vault-export";
 import { importVaultBundle } from "./bundle/vault-import";
 import { makeCalDavServiceHandler } from "./caldav/caldav-service";
-import { isAuthorizedWriter, keyBytesEqual, resolveMembers } from "./collab/access-record";
 import { createAutoShareReactor } from "./collab/auto-share-reactor";
 import { ContactsStore, contactsStorePath } from "./collab/contacts-store";
-import { deriveInviteSecret } from "./collab/invite-anchor";
 import { LastEditRecorder } from "./collab/last-edit-recorder";
-import { ShareBootstrapVerdict, authorizeShareBootstrap } from "./collab/share-bootstrap-authz";
-import { authorizesWrapInstall } from "./collab/wrap-install-authz";
+import { createSyncAuthz } from "./collab/sync-authz";
 import { makeConnectorsServiceHandler } from "./connectors/connectors-service";
 import { makeNetworkEgress } from "./connectors/egress";
 import { buildConnectorsServiceDeps } from "./connectors/wiring";
@@ -391,12 +397,14 @@ import {
 	getPresenceRouter,
 	installPresenceRouter,
 } from "./sync/presence-wiring";
+import { makeRemoteDocApplier } from "./sync/remote-doc-applier";
 import { RestoreEngine } from "./sync/restore-engine";
 import { getRestoreEngine, setRestoreEngine } from "./sync/restore-wiring";
 import { SelectiveSyncStore, selectiveSyncPolicyPath } from "./sync/selective-sync-store";
 import { ThemePreviewService, makeThemeServiceHandler } from "./theme/theme-preview-service";
 import { AppCallHost } from "./tools/app-call-host";
 import { getToolApprovalHost } from "./tools/tool-approval-host";
+import { makeToolEntityResolvers } from "./tools/tool-entity-resolvers";
 import { makeToolsServiceHandler } from "./tools/tools-service";
 import { wireAppCallIpc } from "./tools/wire-app-call";
 import { wireToolApprovalIpc } from "./tools/wire-tool-approval";
@@ -3311,6 +3319,23 @@ void app.whenReady().then(async () => {
 	// well-formed pair. Scoped to the fresh-vault open (the same
 	// `ensureRootFolder().created` signal as the welcome seed) so an existing
 	// vault's chosen appearance is never overwritten.
+	// A vault this build just created has no earlier version to compare
+	// against, so "What's new" has nothing to say to it. Without the stamp the
+	// popover read the missing marker as "every release unseen" and a first-time
+	// user's first sight of their dashboard was the full release history.
+	const stampChangelogSeenOnFreshVault = async (): Promise<void> => {
+		const session = getActiveVaultSession();
+		if (!session) return;
+		try {
+			const { loadBundledChangelog } = await import("./ipc/help-handlers");
+			const newest = loadBundledChangelog().releases[0];
+			if (!newest) return;
+			(await session.dashboardStore()).setLastSeenChangelogVersion(newest.version);
+		} catch (error) {
+			console.warn(`[brainstorm] changelog stamp failed: ${(error as Error).message}`);
+		}
+	};
+
 	const seedNewVaultDefaults = async (): Promise<void> => {
 		const session = getActiveVaultSession();
 		if (!session) return;
@@ -3614,6 +3639,7 @@ void app.whenReady().then(async () => {
 		}
 		const freshVault = await ensureRootFolder();
 		if (freshVault) {
+			await stampChangelogSeenOnFreshVault();
 			await seedWelcomeOnFreshVault();
 			await seedNewVaultDefaults();
 			// The welcome seed creates entities through the privileged in-process
@@ -3769,6 +3795,9 @@ void app.whenReady().then(async () => {
 	// here at construction; the live-sync engine's `applyRemoteUpdate` routes
 	// inbound decrypted frames through it (off the broker — never app-callable).
 	let applyRemoteDocFn: ApplyRemoteDocFn | null = null;
+	// Set once the sharing engine holder exists (further down); a remote update
+	// that lands before then simply does not trigger a re-assert.
+	let reassertAccessRecord: ((entityId: string) => void) | null = null;
 	// 10.16 — version history. The restore closure comes out of the entities
 	// service at construction (off the broker); the engine is per session.
 	let restoreEntityFn: RestoreEntityFn | null = null;
@@ -3992,39 +4021,18 @@ void app.whenReady().then(async () => {
 				// object (verified inbound sender, or this device on a local edit).
 				const lastEditRecorder = new LastEditRecorder(entitiesRepo.lastEdits);
 				const shareInvites = new ShareInvitesRepository(entitiesDb);
-				// Collab-C5 - see `authorizesWrapInstall`: a DEK ROTATION must come
-				// from an Owner (or ourselves), or any member could re-key an entity
-				// out from under its owner. Fail-closed on any read error.
-				const authorizeWrapInstall = async (
-					entityId: string,
-					senderPubB64: string,
-				): Promise<boolean> => {
-					// See the note on the writer predicate: base64url decoding is
-					// lossy, not throwing, so length-check the key outright.
-					const senderKey = base64UrlToBytes(senderPubB64);
-					if (senderKey.length !== ED25519_PUBLIC_BYTES) return false;
-					try {
-						const existing = dekStore.open(entityId);
-						const holdsDek = existing !== null;
-						if (existing) dekStore.close(existing.dek);
-						if (!holdsDek) return true; // bootstrap: no key to substitute
-						const { doc } = await session.ydocStore.load(entityId);
-						try {
-							return authorizesWrapInstall({
-								entityId,
-								senderKey,
-								selfPub: session.identity.publicKey,
-								holdsDek,
-								localDoc: doc,
-								decodeMemberKey: base64ToBytes,
-							});
-						} finally {
-							doc.destroy();
-						}
-					} catch {
-						return false;
-					}
-				};
+				// The record-reading decisions (is it shared, may this sender write,
+				// may this sender rotate the DEK) live in `createSyncAuthz`, all under
+				// the owner-rooted policy and this vault's pinned trust.
+				const syncAuthz = createSyncAuthz({
+					session,
+					dekStore,
+					accessTrust: await session.accessTrust(),
+					shareInvites,
+					typeOf: (id) => entitiesRepo.get(id)?.type ?? null,
+					propertiesOf: (id) => entitiesRepo.get(id)?.properties ?? null,
+				});
+				const authorizeWrapInstall = syncAuthz.authorizeWrapInstall;
 				const engine = installLiveSyncEngine({
 					getRelay: () => getActiveRelay(),
 					onEdit: (entityId, editor) => lastEditRecorder.note(entityId, editor),
@@ -4036,76 +4044,20 @@ void app.whenReady().then(async () => {
 					// (whose type the engine already holds), so this fallback is
 					// effectively unused — return null rather than touch the repo.
 					resolveEntityType: () => null,
-					// Shared ⇔ the signed access record lists >1 ACTIVE member.
-					// Read off the persisted doc (the worker persists synchronously
-					// before `loadDoc` returns, so the record is current here).
-					isShared: async (entityId) => {
-						const { doc } = await session.ydocStore.load(entityId);
-						try {
-							return resolveMembers(doc, entityId).filter((m) => m.active).length > 1;
-						} catch {
-							return false;
-						} finally {
-							doc.destroy();
-						}
-					},
-					// Collab-C5 (F-288) — a remote update applies only if its
-					// authenticated sender is an Editor+ member of the entity;
-					// a Viewer's signed edit drops here. Reads the same persisted
-					// access record `isShared` does. Fail-closed on any error (a
-					// doc we can't read the record from doesn't get written to).
-					//
-					// Two branches exist above the persisted-record check because a
-					// record is not always LOCAL yet, and denying those cases is a
-					// deadlock rather than a safe refusal:
-					//   1. our OWN sovereign key - a paired device and the cold-restore
-					//      backfill both re-deliver this identity's own data, and a
-					//      never-shared entity has no access record at all to check;
-					//   2. the share BOOTSTRAP - the first frame of a new share carries
-					//      the signed record that authorizes it. Signatures alone cannot
-					//      root that (an attacker signs their own grants), so
-					//      `authorizeShareBootstrap` additionally demands an out-of-band
-					//      anchor: the granter's echo of the single-use secret from an
-					//      invite THIS vault minted, or - for a collection cascade - a
-					//      container this vault is already a member of.
-					authorizeWriter: async (senderPubB64, entityId, plaintext) => {
-						// `Buffer.from(s, "base64url")` does NOT throw on junk - it drops
-						// invalid characters and returns a short buffer - so state the
-						// invariant explicitly rather than relying on a catch that can
-						// never fire.
-						const senderKey = base64UrlToBytes(senderPubB64);
-						if (senderKey.length !== ED25519_PUBLIC_BYTES) return false;
-						if (keyBytesEqual(senderKey, session.identity.publicKey)) return true;
-						const { doc } = await session.ydocStore.load(entityId);
-						try {
-							if (isAuthorizedWriter(doc, entityId, senderKey)) return true;
-							const verdict = await authorizeShareBootstrap({
-								localDoc: doc,
-								entityId,
-								senderKey,
-								selfPubB64: session.identity.publicKeyBase64,
-								incomingState: plaintext,
-								now: Date.now(),
-								invites: shareInvites,
-								deriveInviteSecret: (nonce, expiresAt) =>
-									deriveInviteSecret((bytes) => session.signPayload(bytes), nonce, expiresAt),
-								loadDoc: async (id) => (await session.ydocStore.load(id)).doc,
-								typeOf: (id) => entitiesRepo.get(id)?.type ?? null,
-							});
-							if (verdict !== ShareBootstrapVerdict.Allow) {
-								console.warn(`[collab] share bootstrap refused for ${entityId}: ${verdict}`);
-							}
-							return verdict === ShareBootstrapVerdict.Allow;
-						} catch {
-							return false;
-						} finally {
-							doc.destroy();
-						}
-					},
-					applyRemoteUpdate: async (entityId, _type, update, sender) => {
-						await applyRemoteDocFn?.(entityId, Buffer.from(update).toString("base64"));
-						if (sender) historyBinding.current()?.noteWrite(entityId, [memberPrincipal(sender)]);
-					},
+					isShared: syncAuthz.isShared,
+					authorizeWriter: syncAuthz.authorizeWriter,
+					applyRemoteUpdate: makeRemoteDocApplier({
+						apply: () => applyRemoteDocFn,
+						noteSender: (entityId, sender) =>
+							historyBinding.current()?.noteWrite(entityId, [memberPrincipal(sender)]),
+						onApplied: (entityId) => {
+							broadcastVaultEntitiesStaleSignal(launchSetup.getLauncherSync()?.allWindows() ?? []);
+							scheduleSearchReindex();
+							// The root owner puts back any access statement an inbound
+							// update deleted or blanked (`SharingEngine.reassertRecord`).
+							reassertAccessRecord?.(entityId);
+						},
+					}),
 					// PRES-2b — a decrypted remote AWARENESS frame (cursors / "who's
 					// here") for a tracked entity. Route it into this session's presence
 					// router, which merges it into the proxy awareness and pushes the
@@ -4311,6 +4263,27 @@ void app.whenReady().then(async () => {
 		// run + events for every channel mention turn.
 		trace: agentTraceRecorder,
 	};
+	// Agent-13 — `@agent` in a Chat channel: the installed Agent APP as the
+	// principal, on the invoker's device. Shares the actuation gate (verified
+	// caller holds `agents.mention`, author is this device's identity) with the
+	// team-agent runner above; "installed" is the registry's answer.
+	const builtinAgentDeps: BuiltinAgentRunnerDeps = {
+		getSession: agentMentionDeps.getSession,
+		getSelfPubkey: agentMentionDeps.getSelfPubkey,
+		callerMayMention: agentMentionDeps.callerMayMention,
+		isAgentInstalled: async () => {
+			const session = getActiveVaultSession();
+			if (!session) return false;
+			return (
+				new AppsRepository(await session.dataStores.open("registry")).getActive(
+					BUILTIN_AGENT_APP_ID,
+				) !== null
+			);
+		},
+		getServiceHandler: agentMentionDeps.getServiceHandler,
+		onWrote: agentMentionDeps.onWrote,
+		trace: agentTraceRecorder,
+	};
 	workers.broker.registerService(
 		HISTORY_SERVICE,
 		makeHistoryServiceHandler({
@@ -4358,6 +4331,8 @@ void app.whenReady().then(async () => {
 				// Agent-Teams-3 — fire-and-forget; a runner failure never breaks
 				// the create it piggybacks on (the runner swallows internally).
 				void maybeRunMentionedAgents(agentMentionDeps, result, envelope.app);
+				// Agent-13 — same posture for the built-in `@agent`.
+				void maybeRunBuiltinAgent(builtinAgentDeps, result, envelope.app);
 			}
 		}
 		return result;
@@ -4569,12 +4544,11 @@ void app.whenReady().then(async () => {
 			// Tool-8 — the read-only lock is a synced entity property, and it has to
 			// hold on EVERY write path or it is decoration (the lesson the read-only
 			// lock fleet already taught). Unreadable ⇒ treated as locked.
-			resolveEntityLocked: async (entityId: string) => {
-				const repo = await getEntitiesRepoForActiveSession();
-				const row = repo?.get(entityId);
-				if (!row) return true;
-				return (row.properties as Record<string, unknown> | undefined)?.locked === true;
-			},
+			// SECURITY — a tool declaring `allowedTypes` on an entityRef argument
+			// is checked against the entity's REAL type from entities.db, never
+			// the caller's claim about it (per-type read isolation; the same rule
+			// the presence service follows).
+			...makeToolEntityResolvers(getEntitiesRepoForActiveSession),
 			// Tool-5 — the user's per-tool approvals, so an app UPDATE that
 			// rewrites a tool re-prompts instead of inheriting the friction its
 			// old description earned.
@@ -4595,14 +4569,6 @@ void app.whenReady().then(async () => {
 			resolveAppLabel: async (appId) => {
 				const repo = await getAppsRepoForActiveSession();
 				return repo ? resolveAppName(repo, appId) : undefined;
-			},
-			// SECURITY — a tool declaring `allowedTypes` on an entityRef argument
-			// is checked against the entity's REAL type from entities.db, never
-			// the caller's claim about it (per-type read isolation; the same rule
-			// the presence service follows).
-			resolveEntityType: async (entityId) => {
-				const repo = await getEntitiesRepoForActiveSession();
-				return repo?.get(entityId)?.type ?? null;
 			},
 			getRepo: async () => {
 				const session = getActiveVaultSession();
@@ -4681,6 +4647,27 @@ void app.whenReady().then(async () => {
 					entityId: createdEntityId ?? null,
 				});
 			},
+			// Agent-13 — the composer's "can I offer @agent?" question.
+			resolveMentionTarget: (app) => resolveBuiltinAgentMentionTarget(builtinAgentDeps, app),
+			// Agent-13 — mirror a decided built-in card onto its synced preview,
+			// AS the Agent app through the real entities service (its own
+			// `entities.write` on Message/v1 is the ceiling), so the update reaches
+			// the other members of a shared channel like any message edit.
+			syncProposalPreview: async (messageId, preview) => {
+				const handler = workers?.broker.getServiceHandler("entities");
+				const session = getActiveVaultSession();
+				if (!handler || !session) return;
+				const ledger = await session.capabilityLedger();
+				await handler({
+					v: ENVELOPE_PROTOCOL_VERSION,
+					msg: `builtin-agent-preview-${messageId}`,
+					app: BUILTIN_AGENT_APP_ID,
+					service: "entities",
+					method: "update",
+					args: [{ id: messageId, patch: { [AGENT_PROPOSAL_PREVIEW_PROPERTY_KEY]: preview } }],
+					caps: ledger.listActive(BUILTIN_AGENT_APP_ID).map(grantString),
+				});
+			},
 		}),
 	);
 
@@ -4753,11 +4740,20 @@ void app.whenReady().then(async () => {
 		getSession: () => getActiveVaultSession(),
 		getRelay: () => getActiveRelay(),
 	});
+	reassertAccessRecord = (entityId) => {
+		if (getActiveVaultSession()) void autoShareEngine().reassertRecord(entityId);
+	};
 	createAutoShareReactor(automationsChangeEmitter, {
 		getEngine: () => (getActiveVaultSession() ? autoShareEngine() : null),
 		readEntityProperties: async (entityId) => {
 			const repo = await getEntitiesRepoForActiveSession();
 			return repo?.get(entityId)?.properties ?? null;
+		},
+		// The creator has to live-sync its own child as well: nothing opens a
+		// message's doc, so without this its later edits never emit and edits by
+		// other members arrive on a channel this device never subscribed.
+		onShared: (entityId, type) => {
+			void getLiveSyncEngine()?.refreshMembership(entityId, type);
 		},
 	});
 

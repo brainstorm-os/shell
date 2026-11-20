@@ -45,6 +45,7 @@ import {
 	AppToolEffect,
 	type AppToolInput,
 	type AppToolRecord,
+	BUILTIN_AGENT_APP_ID,
 	ToolCallInitiator,
 	ToolFrictionDecision,
 	ValueType,
@@ -137,11 +138,13 @@ export type ToolsCallOptions = {
 	 *  refusal, never a silent success. */
 	getCallHost?: () => AppCallHost | null;
 	/** Resolve an entity's REAL type from the store. Required before a tool
-	 *  declaring `allowedTypes` may be called; the caller's claim about a
-	 *  referenced object's type is never trusted. */
+	 *  taking ANY `entityRef` may be called: the type decides both the
+	 *  declaration's `allowedTypes` and the caller's own `entities.read` grant.
+	 *  The caller's claim about a referenced object's type is never trusted. */
 	resolveEntityType?: (entityId: string) => Promise<string | null>;
-	/** Is this object read-only? Required before a `proposes-write` tool may
-	 *  touch it; absent ⇒ treated as locked (fail closed). */
+	/** Is this object read-only? Required before a `proposes-write` or
+	 *  `writes-vault` tool may touch it; absent ⇒ treated as locked (fail
+	 *  closed). */
 	resolveEntityLocked?: (entityId: string) => Promise<boolean>;
 	/** The shell-owned approval prompt (Tool-8). Absent = nothing can be
 	 *  approved, so a call needing approval refuses rather than proceeding. */
@@ -244,28 +247,45 @@ export function holdsExactScope(
 	}
 }
 
-/** Every entityRef argument whose declaration narrows `allowedTypes` is
- *  checked against the entity's REAL type from the store.
+/** Why an entityRef argument was refused — the AUDIT reason. The caller is
+ *  told the same thing in every case (see {@link ENTITY_REFUSAL}). */
+enum EntityRefusal {
+	/** The object's stored type is not one the declaration allows. */
+	Type = "entity-type",
+	/** The CALLER holds no `entities.read` grant for the object's stored type. */
+	Read = "entity-read",
+}
+
+/** One answer for "wrong type", "you may not read it" and "no such object" —
+ *  anything more specific is an existence / type oracle over the vault. */
+const ENTITY_REFUSAL = "not an allowed entity for this tool";
+
+/** Every entityRef argument is checked against the entity's REAL type from the
+ *  store, twice over:
  *
- * This is the half of the declaration Tool-3 could not enforce (a pure module
- * has no business reading the vault). Trusting the caller here would be the
- * per-type read-isolation bypass in its classic form: pass the id of an object
- * whose type the tool was never granted, and let the provider read it back. */
-async function enforceAllowedTypes(
+ *   - against the declaration's `allowedTypes`, when it narrows them. This is
+ *     the half Tool-3 could not enforce (a pure module has no business reading
+ *     the vault). Trusting the caller here would be the per-type
+ *     read-isolation bypass in its classic form: pass the id of an object
+ *     whose type the tool was never granted, and let the provider read it back.
+ *   - against the CALLER's own `entities.read:<type>` grant, always. A tool is
+ *     a deputy: the provider reads the object under ITS grants and answers the
+ *     caller. Without this an app holding only `tools.call:<provider>/<tool>`
+ *     reads, through the provider, objects it has no read grant for (found by
+ *     the Tool-10 review — a caller with no note access got a note's title
+ *     back in the tool result). The provider's breadth is not the caller's.
+ *
+ * An entityRef that cannot be resolved is refused: a reference we cannot type
+ * is a reference we cannot authorize. */
+async function enforceEntityRefs(
 	inputs: readonly AppToolInput[],
 	args: Readonly<Record<string, unknown>>,
+	callerAppId: string,
+	ledger: CapabilityLedger,
 	options: ToolsCallOptions,
-): Promise<string | null> {
-	const constrained = inputs.filter(
-		(i) =>
-			i.valueType === ValueType.EntityRef && i.allowedTypes !== undefined && i.allowedTypes.length > 0,
-	);
-	if (constrained.length === 0) return null;
-	if (!options.resolveEntityType) {
-		// A declaration we cannot check is a declaration we cannot honour.
-		return "entity-type resolution unavailable";
-	}
-	for (const input of constrained) {
+): Promise<{ reason: EntityRefusal; message: string } | null> {
+	const refs = inputs.filter((i) => i.valueType === ValueType.EntityRef);
+	for (const input of refs) {
 		// `Object.hasOwn`, not `=== undefined`: an argument may legally be named
 		// `valueOf` or `toString`, and on any object WITH a prototype an omitted
 		// one reads back as the inherited FUNCTION. `validateAppToolArgs` already
@@ -273,19 +293,29 @@ async function enforceAllowedTypes(
 		if (!Object.hasOwn(args, input.name)) continue;
 		const supplied = args[input.name];
 		if (supplied === undefined) continue;
+		const refused = (reason: EntityRefusal) => ({
+			reason,
+			message: `${input.name}: ${ENTITY_REFUSAL}`,
+		});
+		// A declaration we cannot check is a declaration we cannot honour.
+		if (!options.resolveEntityType) return refused(EntityRefusal.Type);
 		const ids = isMultiValued(input.count) ? (supplied as unknown[]) : [supplied];
 		for (const id of ids) {
-			if (typeof id !== "string") return `${input.name}: expected an entity id`;
+			if (typeof id !== "string") return refused(EntityRefusal.Type);
 			let actual: string | null;
 			try {
 				actual = await options.resolveEntityType(id);
 			} catch {
-				return `${input.name}: entity type unresolvable`;
+				return refused(EntityRefusal.Type);
 			}
-			if (actual === null || !input.allowedTypes?.includes(actual)) {
-				// Same message whether the object is of the wrong type or does not
-				// exist — otherwise this is an existence oracle over the vault.
-				return `${input.name}: not an allowed entity for this tool`;
+			if (actual === null) return refused(EntityRefusal.Type);
+			const allowed = input.allowedTypes ?? [];
+			if (allowed.length > 0 && !allowed.includes(actual)) return refused(EntityRefusal.Type);
+			// `ledger.has` (not the exact-scope check `tools.call` itself uses):
+			// `entities.read:*` is a real, consented grant and satisfies this, as
+			// it does at the entities service.
+			if (!holds(ledger, callerAppId, `entities.read:${actual}`)) {
+				return refused(EntityRefusal.Read);
 			}
 		}
 	}
@@ -320,6 +350,11 @@ async function lockedTarget(
 	return null;
 }
 
+/** The effects a read-only lock refuses. */
+function writesOrProposes(effect: AppToolEffect): boolean {
+	return effect === AppToolEffect.ProposesWrite || effect === AppToolEffect.WritesVault;
+}
+
 export async function handleToolsCall(
 	envelope: Envelope,
 	options: ToolsCallOptions,
@@ -343,8 +378,17 @@ export async function handleToolsCall(
 	// fullwidth-colon variant all miss a prefix test and land in the laxer
 	// branch. Asking the positive question ("is this an app?") has no such tail,
 	// because `APP_ID_PATTERN` forbids `:` outright.
+	//
+	// And one well-formed app id is NOT a human: the built-in Agent app runs the
+	// model's turns under its own app id (`@agent` in Chat, the Agent app's own
+	// loop). Classing it by shape made it a `UserGesture`, so a `writes-vault`
+	// tool with a standing approval would have auto-run for the model with no
+	// prompt — the opposite of that effect's contract. Latent (the Agent holds
+	// no `tools.call` today); closed here so granting it one later is safe.
 	const initiator =
-		!isAgentPrincipal(envelope.app) && APP_ID_PATTERN.test(envelope.app)
+		envelope.app !== BUILTIN_AGENT_APP_ID &&
+		!isAgentPrincipal(envelope.app) &&
+		APP_ID_PATTERN.test(envelope.app)
 			? ToolCallInitiator.UserGesture
 			: ToolCallInitiator.Agent;
 	let providerAppId = parsed.appId;
@@ -437,10 +481,10 @@ export async function handleToolsCall(
 	const args = validation.args;
 	const argKeys = Object.keys(args).sort();
 
-	const typeError = await enforceAllowedTypes(tool.input, args, options);
-	if (typeError) {
-		record("refused", "entity-type", argKeys);
-		throw makeError("Denied", `tools.call: ${typeError}`);
+	const entityRefusal = await enforceEntityRefs(tool.input, args, envelope.app, ledger, options);
+	if (entityRefusal) {
+		record("refused", entityRefusal.reason, argKeys);
+		throw makeError("Denied", `tools.call: ${entityRefusal.message}`);
 	}
 
 	// Tool-8 — a locked object is read-only, and the lock has to hold on EVERY
@@ -450,7 +494,13 @@ export async function handleToolsCall(
 	// object and comes back with a change to it, so it is a write path — the
 	// proposal would be built against something the user froze. Refused BEFORE
 	// the provider sees the id, so a locked object is not even readable this way.
-	if (tool.effect === AppToolEffect.ProposesWrite) {
+	//
+	// Tool-10 — `writes-vault` is held to the same rule. Its write lands in the
+	// provider's own data, not in the referenced object, but the broker cannot
+	// see what a provider does with an id once it has it, and a provider holding
+	// a wide write grant COULD aim at the object it was handed. Refusing here is
+	// the only place the answer does not depend on the provider behaving.
+	if (writesOrProposes(tool.effect)) {
 		const locked = await lockedTarget(tool.input, args, options);
 		if (locked) {
 			record("refused", "locked-object", argKeys);
@@ -509,6 +559,7 @@ export async function handleToolsCall(
 		const accepted = await approver
 			.request({
 				callerAppId: envelope.app,
+				callerLabel: (await options.resolveAppLabel?.(envelope.app)) ?? envelope.app,
 				tool,
 				providerLabel: (await options.resolveAppLabel?.(tool.appId)) ?? tool.appId,
 				reason: approvalReasonFor(approval),
@@ -526,6 +577,18 @@ export async function handleToolsCall(
 	if (!host) {
 		record("refused", "no-call-host");
 		throw makeError("Unavailable", "tools.call: the app call channel is unavailable");
+	}
+
+	// The approval prompt can sit open for two minutes, and the first lock check
+	// ran before it. An object locked in that window must not be handed over on
+	// the strength of a check that is now stale — so the lock is read from the
+	// store again here, with nothing awaited between this and the dispatch.
+	if (writesOrProposes(tool.effect)) {
+		const locked = await lockedTarget(tool.input, args, options);
+		if (locked) {
+			record("refused", "locked-object", argKeys);
+			throw makeError("Denied", `tools.call: ${locked} is locked`);
+		}
 	}
 
 	let result: Awaited<ReturnType<AppCallHost["call"]>>;

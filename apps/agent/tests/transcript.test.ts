@@ -31,6 +31,18 @@ describe("sortMessages", () => {
 });
 
 describe("buildAiMessages", () => {
+	it("drops an assistant turn that had no answer", () => {
+		const out = buildAiMessages([
+			msg({ id: "1", role: MessageRole.User, body: "asdasd", createdAt: "2026-06-07T00:00:01.000Z" }),
+			msg({ id: "2", role: MessageRole.Assistant, body: " ", createdAt: "2026-06-07T00:00:02.000Z" }),
+			msg({ id: "3", role: MessageRole.User, body: "hello", createdAt: "2026-06-07T00:00:03.000Z" }),
+		]);
+		expect(out.slice(1)).toEqual([
+			{ role: MessageRole.User, content: "asdasd" },
+			{ role: MessageRole.User, content: "hello" },
+		]);
+	});
+
 	it("prepends the system prompt and keeps user/assistant turns in order", () => {
 		const out = buildAiMessages([
 			msg({ id: "1", role: MessageRole.User, body: "Hi", createdAt: "2026-06-07T00:00:01.000Z" }),

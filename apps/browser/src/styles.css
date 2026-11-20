@@ -63,7 +63,10 @@ body {
 	align-items: center;
 	gap: var(--space-1, var(--space-1));
 	height: 30px;
-	min-width: 96px;
+	/* Floor sized for the chrome (12 + 14 favicon + 8 + 4 + 18 close + 4) plus a
+	 * short title: at 96px only ~36px was left and "New tab" ellipsised to
+	 * "Ne…" beside 190px neighbours. The strip scrolls, so a floor is safe. */
+	min-width: 128px;
 	max-width: 220px;
 	padding: 0 var(--space-1, var(--space-1)) 0 var(--space-3, var(--space-3));
 	border-radius: var(--radius-md);
@@ -219,6 +222,16 @@ img.browser__tab-favicon {
 	flex: none;
 	width: 30px;
 	height: 30px;
+}
+
+/* The browser menu wears the shared ⋯ glyph. It sits in the toolbar, not the
+ * `.app-header`, so the SDK's quiet-until-hover resting opacity would dim it
+ * against its always-visible neighbours. */
+.browser__navbtn.bs-object-menu__more {
+	display: inline-flex;
+	width: 30px;
+	height: 30px;
+	opacity: 1;
 }
 
 .browser__security {

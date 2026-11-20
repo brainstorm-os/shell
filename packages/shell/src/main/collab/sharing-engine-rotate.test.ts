@@ -33,7 +33,7 @@ import { installEntityDek } from "../entities/install-wrap";
 import { EntitiesRepository } from "../storage/entities-repo";
 import { LoopbackRelayPort, type RelayPort } from "../sync/relay-port";
 import { VaultSession } from "../vault/session";
-import { AccessRole, resolveCurrentMembers } from "./access-record";
+import { AccessRole, docTrust, resolveCurrentMembers } from "./access-record";
 import { type CollabRelayLike, SharingEngine } from "./sharing-engine";
 
 const ENTITY = "ent_secret_doc";
@@ -173,7 +173,7 @@ describe("SharingEngine.revoke — ROT-3a rotates the DEK for forward secrecy", 
 		// The revoked member is no longer an active member of the entity.
 		const { doc } = await owner.ydocStore.load(ENTITY);
 		try {
-			const active = resolveCurrentMembers(doc, ENTITY)
+			const active = resolveCurrentMembers(doc, ENTITY, docTrust(doc, ENTITY))
 				.filter((m) => m.active)
 				.map((m) => m.member);
 			expect(active).not.toContain(guestA.identity.publicKeyBase64);

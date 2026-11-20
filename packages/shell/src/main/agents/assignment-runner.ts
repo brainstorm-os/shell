@@ -479,7 +479,7 @@ export function recordAssignmentRun(
 	write(0, answer || ASSIGNMENT_NO_ANSWER);
 	staged.forEach((artifact, i) => {
 		write(i + 1, `Proposed ${artifact.kind}: ${artifact.summary} — approve it to save it.`, {
-			[CHANNEL_PROPOSAL_PROPERTY_KEY]: buildProposalProperty(artifact),
+			[CHANNEL_PROPOSAL_PROPERTY_KEY]: buildProposalProperty(artifact, { channelId: entityId }),
 		});
 	});
 }

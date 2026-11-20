@@ -27,6 +27,10 @@ export const EFFECT_REQUIREMENTS: Readonly<Record<AppToolEffect, readonly string
 	// filter unsatisfiable — a control that can never pass is a control nobody
 	// notices regressing.
 	[AppToolEffect.ReadsVault]: ["entities.read"],
+	// Tool-10 — a provider that persists on call must still hold a write grant.
+	// The entities service is what actually refuses a write the provider has no
+	// grant for; this only stops OFFERING a tool that could never do its job.
+	[AppToolEffect.WritesVault]: ["entities.write"],
 	[AppToolEffect.External]: ["network.egress"],
 	// A proposal is inert until a human approves it, so the tool itself needs
 	// nothing; the approving write is gated where it happens.

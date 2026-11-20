@@ -41,8 +41,8 @@ button {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 28px;
-	height: 28px;
+	width: var(--control-height-sm, 24px);
+	height: var(--control-height-sm, 24px);
 	border: 0;
 	border-radius: var(--radius-sm);
 	background: transparent;
@@ -74,23 +74,6 @@ button {
 	font-size: var(--text-size-sm);
 	font-weight: var(--text-weight-medium);
 	white-space: nowrap;
-}
-
-/* The header object-menu ⋯ uses the shared `.bs-object-menu__more` button
-   (3 dots) but sits among the header actions, so it reads as a header button:
-   dim-resting like the other glyphs, full + tinted on hover. */
-.bookmarks__header-more {
-	opacity: 0.7;
-	color: var(--text-dim);
-}
-.bookmarks__header-more:hover {
-	opacity: 1;
-	background: var(--hover);
-	color: var(--text);
-}
-.bookmarks__header-more:focus-visible {
-	outline: 2px solid var(--color-focus-ring);
-	outline-offset: -1px;
 }
 
 .bookmarks {
@@ -742,6 +725,13 @@ body.is-resizing .bookmarks__resize {
 
 .bookmarks__card:hover .bookmarks__card-actions,
 .bookmarks__card:focus-within .bookmarks__card-actions {
+	opacity: 1;
+}
+
+/* The wrapper's reveal-on-hover already keeps the resting card quiet; the
+ * shared 0.55 resting dim on top of it left the revealed ⋯ at ~2:1 on the
+ * hovered card — dimmer than the shared disabled face reads elsewhere. */
+.bookmarks__card-actions .bs-object-menu__more:not([aria-disabled="true"]) {
 	opacity: 1;
 }
 

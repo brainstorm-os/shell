@@ -161,8 +161,8 @@ body.is-resizing .contacts__resize {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 28px;
-	height: 28px;
+	width: var(--control-height-sm, 24px);
+	height: var(--control-height-sm, 24px);
 	border: none;
 	border-radius: var(--radius-md);
 	background: transparent;
@@ -274,32 +274,43 @@ body.is-resizing .contacts__resize {
 	padding-bottom: var(--space-2);
 }
 
-/* Row chrome matches the Notes/Journal sidebar: rounded, inset highlight,
-   tighter gap (was a square full-bleed hover with an oversized gap). */
+/* Row chrome matches the Notes/Journal sidebar: rounded, inset highlight.
+   The FACE lives on the object-menu host, not the button: the ⋯ is the
+   host's trailing layout child, so a highlight painted on the button stops
+   short of it and leaves the ⋯ floating on the bare sidebar. */
+.contacts-row-host {
+	width: 100%;
+	border: var(--border-width) solid transparent;
+	border-radius: var(--radius-md);
+	background-clip: padding-box;
+}
+
+.contacts-row-host:hover {
+	background: var(--hover);
+}
+
+.contacts-row-host:has(.contacts-row--active) {
+	background: var(--accent-soft);
+	border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
 .contacts-row {
 	display: flex;
 	align-items: center;
 	gap: var(--space-2);
-	width: 100%;
+	flex: 1 1 auto;
+	min-width: 0;
 	padding: var(--space-1) var(--space-2);
-	border: var(--border-width) solid transparent;
+	border: 0;
 	border-radius: var(--radius-md);
 	background: transparent;
-	background-clip: padding-box;
 	color: inherit;
 	text-align: start;
 	cursor: pointer;
 }
 
-.contacts-row:hover {
-	background: var(--hover);
-}
-
-.contacts-row--active,
-.contacts-row--active:hover {
-	background: var(--accent-soft);
+.contacts-row--active {
 	color: var(--text);
-	border-color: color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
 .contacts-row__avatar {

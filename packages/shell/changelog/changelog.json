@@ -3,6 +3,577 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.16.0",
+      "date": "2026-11-20",
+      "icon": "🤝",
+      "title": "Ask the agent in Chat, publish a website, and apps that work together",
+      "summary": "Mention the agent in a channel and approve what it proposes. Turn a note into a task in one click, publish a page tree as a website, and embed maps and music. Plus a pass over every app and your first day.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Ask the agent in Chat"
+        },
+        {
+          "kind": "p",
+          "text": "Mention the agent in any channel and it answers in the thread. When it wants to create something, it shows a card and waits for you."
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "@agent in a channel.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Type "
+            },
+            {
+              "text": "@agent",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " and your request. The reply is posted in the channel, marked as asked by you."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Nothing is saved until you approve.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " A proposed task or note appears as a card with "
+            },
+            {
+              "text": "Approve",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " and "
+            },
+            {
+              "text": "Discard",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ". Only the person who asked can approve it."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "It runs on your device.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Your own model and your own settings are used. Other people's messages are treated as background, never as instructions to your agent."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Apps can do things for each other"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Create a task from a note.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Open a note's menu and choose "
+            },
+            {
+              "text": "Create task",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ". Tasks adds it to your inbox. The first time, Brainstorm asks whether Notes may use this tool, and shows exactly which apps are involved."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Publish a website"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "A page and its sub-pages become a site.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Choose "
+            },
+            {
+              "text": "Publish website…",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " on a note. You get a ZIP with ordinary web pages, styled with your current theme, that you can host anywhere."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "You confirm the pages first.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Brainstorm lists every page that will be included. Linked pages are offered but left unticked, and nothing outside the list is published."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "More embeds"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Maps, music and more.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Paste a link from Google Maps, OpenStreetMap, Spotify, SoundCloud, CodePen or Miro, alongside YouTube, Vimeo, Loom, Figma and CodeSandbox."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Nothing loads until you click.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Each embed shows a card first and connects to the provider only when you press "
+            },
+            {
+              "text": "Load",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ". YouTube videos, which used to fail with a player error, now play."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Safer sharing"
+        },
+        {
+          "kind": "p",
+          "text": "Who can change the member list of something you share is now enforced, not assumed."
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Only owners manage members.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " An editor or viewer can no longer add people, remove people or change roles. The person who created a shared object always stays its owner."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Removing someone from a channel is complete.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " They can no longer edit earlier messages, their own included, and the channel's messages are re-keyed for the people who remain."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Chat between people works as you expect.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " A message from someone else appears in an open channel straight away, edits to a message reach everyone, and "
+            },
+            {
+              "text": "You",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " names only your own messages."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "ℹ️",
+          "text": [
+            {
+              "text": "If you share with someone on 0.15. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Sharing keeps working. One change: only the original owner of an object can invite someone who is on 0.16."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Sync on your own network"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Safer device discovery.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Finding your other devices on a local network no longer reveals your computer's name or its other network addresses, and a device stays discoverable after the first ten minutes."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "ℹ️",
+          "text": [
+            {
+              "text": "Mixed versions. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "A device on 0.15 and one on 0.16 will not find each other automatically on a local network. Pairing by address and syncing through a relay work as before. Update both to restore discovery."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Your first day"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "A new vault opens on your dashboard.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " It used to open on the full release history, which says nothing to someone who just arrived. "
+            },
+            {
+              "text": "What's new",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " still appears after an update."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Create vault is always in view.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Choosing a starting point no longer pushes the button below the bottom of the window."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "The starter journal entry reads as an entry.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Journal no longer shows "
+            },
+            {
+              "text": "0 words",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " and "
+            },
+            {
+              "text": "No entry yet",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " next to text that is plainly there."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "The starter bookmark opens our documentation.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " It pointed at the wrong address."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Chat",
+              "marks": ["bold"]
+            },
+            {
+              "text": " tells you to start your first channel when there are none, in place of asking you to pick one."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Fixes"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Books.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Books that would not open now do, including "
+            },
+            {
+              "text": "FB2",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " files and EPUBs with a damaged table of contents. If a book still cannot be opened, Books says why."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Files.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Emails no longer fill your vault with rows called untitled. They are named by their subject and stay in Mailbox. Row actions no longer cover the date."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Agent.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " The agent no longer answers with raw data or lists its own tools. If it has no answer, it says so."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Icon picker.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Emoji show as emoji again in the installed app, where every one was a broken image. The "
+            },
+            {
+              "text": "Upload",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " tab is a real drop zone, and it and "
+            },
+            {
+              "text": "Library",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " are there in every app."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Chat.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Day dividers follow your local time. A message sent just after midnight used to sit under the previous day."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Books.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " The library, the properties panel and the reader footer agree on how far you have read, and the panel no longer covers the next-page button."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Browser.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " A blank tab restored from your last session shows the start page, where it used to show nothing."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Split view.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Each pane leaves room for the window buttons only on its own edge, so the right pane's header is no longer short of space."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Polish"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Database.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Number columns line up from header to total, values without a colour are visible as chips in light themes, and list names read as words: "
+            },
+            {
+              "text": "Code files",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ", not CodeFiles."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Files.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Filter, Sort and View share one look, the sort menu no longer cuts off its last row, and the selection bar stays clear of the files beneath it."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Tasks.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " The checkbox ring is easy to see in dark themes."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Every app.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " The "
+            },
+            {
+              "text": "⋯",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " menu in the header looks as available as it is, sidebars in Chat and Preview match the rest, and several messages now say "
+            },
+            {
+              "text": "objects",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " where they said entities."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Mailbox and Journal.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " An account's address is shown as written, and an entry with no text says so."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.15.0",
       "date": "2026-10-19",
       "icon": "🧭",

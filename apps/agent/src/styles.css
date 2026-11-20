@@ -376,6 +376,10 @@ body {
 	font-style: italic;
 }
 
+.agent__msg-no-answer {
+	color: var(--color-text-secondary);
+}
+
 /* Rich user turns (composer-authored): paragraph rhythm like the composer's —
    the pre-wrap on the bubble would otherwise double the paragraph breaks. */
 .agent__msg-rich {

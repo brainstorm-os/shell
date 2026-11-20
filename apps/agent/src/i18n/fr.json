@@ -103,6 +103,7 @@
   "error.quotaExhausted": "L'app Agent a épuisé son budget d'IA de 30 jours. Augmentez ou effacez le budget dans Paramètres → IA pour continuer à discuter.",
   "error.generic": "Une erreur s'est produite lors de la génération d'une réponse.",
   "provenance.via": "via {model}",
+  "reply.noAnswer": "Je n'avais pas de réponse à cela. Essayez de reformuler.",
   "widget.label": "Agent",
   "widget.count.one": "{count} conversation",
   "widget.count.other": "{count} conversations",

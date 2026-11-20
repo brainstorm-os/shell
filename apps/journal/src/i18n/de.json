@@ -3,6 +3,7 @@
   "next": "Weiter",
   "today": "Heute",
   "noEntryYet": "Noch kein Eintrag.",
+  "entryEmpty": "Nichts geschrieben",
   "writeHint": "Beginnen Sie, Ihren Eintrag zu schreiben…",
   "openInNotes": "In Notes öffnen",
   "standaloneHint": "Eigenständige Ausführung — öffnen Sie Notes in der Shell, um dies zu nutzen",

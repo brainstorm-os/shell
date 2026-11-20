@@ -59,8 +59,8 @@ body {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 28px;
-	height: 28px;
+	width: var(--control-height-sm, 24px);
+	height: var(--control-height-sm, 24px);
 	border: none;
 	border-radius: var(--radius-md);
 	background: transparent;
@@ -119,7 +119,7 @@ body {
 	flex-direction: column;
 	min-height: 0;
 	border-right: 1px solid var(--border-subtle);
-	background: var(--bg-subtle);
+	background: var(--bg);
 	z-index: 2;
 	transition:
 		transform var(--motion-duration-normal, 180ms) ease,
@@ -482,6 +482,12 @@ body {
 	color: var(--text-dim);
 }
 
+.chat__line-invoker {
+	display: block;
+	font-size: var(--text-size-xs);
+	color: var(--text-dim);
+}
+
 .chat__proposal-error {
 	margin: 0;
 	font-size: var(--text-size-sm);
@@ -834,7 +840,9 @@ body {
 	height: 24px;
 	opacity: 0;
 	background: var(--bg-elev);
-	border: 1px solid var(--border-subtle);
+	border: 1px solid var(--border-strong);
+	color: var(--text);
+	gap: var(--space-0_5);
 }
 
 .chat__line-wrap:hover .chat__line-more,

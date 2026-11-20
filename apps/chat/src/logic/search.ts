@@ -11,7 +11,14 @@
  * the whole history.
  */
 
-import { CHANNEL_TYPE, type EntityLike, MESSAGE_TYPE, toChannel, toMessage } from "./chat";
+import {
+	type AuthorLabels,
+	CHANNEL_TYPE,
+	type EntityLike,
+	MESSAGE_TYPE,
+	toChannel,
+	toMessage,
+} from "./chat";
 
 export const SEARCH_RESULT_LIMIT = 50;
 export const SEARCH_MIN_QUERY = 2;
@@ -52,7 +59,12 @@ export function snippetFor(body: string, terms: readonly string[]): string {
 export function searchMessages(
 	entities: readonly EntityLike[],
 	query: string,
-	options: { scope: SearchScope; channelId: string | null; limit?: number },
+	options: {
+		scope: SearchScope;
+		channelId: string | null;
+		limit?: number;
+		authorLabels?: AuthorLabels;
+	},
 ): SearchHit[] {
 	if (query.trim().length < SEARCH_MIN_QUERY) return [];
 	const terms = queryTerms(query);
@@ -64,7 +76,7 @@ export function searchMessages(
 	const hits: SearchHit[] = [];
 	for (const e of entities) {
 		if (e.type !== MESSAGE_TYPE) continue;
-		const m = toMessage(e);
+		const m = toMessage(e, options.authorLabels ? { authorLabels: options.authorLabels } : {});
 		const channelName = channelNames.get(m.channelId);
 		if (channelName === undefined) continue;
 		if (options.scope === SearchScope.Channel && m.channelId !== options.channelId) continue;

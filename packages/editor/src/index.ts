@@ -516,13 +516,22 @@ export {
 } from "./plugins/block-embed-picker-plugin";
 export { type EmbedInsertion, applyEmbedInsertion } from "./plugins/embed-insert";
 export {
+	EMBED_PROVIDERS,
+	EmbedAspect,
 	EmbedKind,
+	EmbedLoadPolicy,
+	type EmbedMatch,
+	type EmbedProvider,
+	type EmbedProviderKind,
 	type UrlClassification,
+	classifyEmbed,
 	classifyUrl,
 	faviconUrl,
 	isLoneUrl,
 	parseHttpUrl,
+	safeExternalHref,
 } from "./plugins/embed-providers";
+export { WEB_EMBED_COMMAND_IDS, createWebEmbedCommands } from "./web-embed-commands";
 
 export {
 	$createCalloutNode,
@@ -724,9 +733,22 @@ export {
 	TextFormat,
 	renderEditorState,
 } from "./preview";
-export { serializedStateToHtml } from "./serialize-html";
+export { type SerializeHtmlOptions, serializedStateToHtml } from "./serialize-html";
 export { serializedStateToMarkdown } from "./serialize-markdown";
 export { serializedStateFromDoc } from "./serialized-state-from-doc";
+export {
+	MAX_SITE_ASSET_BYTES,
+	MAX_SITE_PAGES,
+	type SiteArchive,
+	type SiteArchiveInput,
+	type SiteArchiveLabels,
+	type SitePageAccess,
+	type SitePageInfo,
+	type SitePlan,
+	type SitePlanInput,
+	buildSiteArchive,
+	planSite,
+} from "./publish-site";
 export { baselineTheme, mergeTheme, richTextTheme } from "./theme";
 export {
 	blockParentOf,

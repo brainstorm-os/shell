@@ -35,6 +35,39 @@ function titleFor(request: ToolApprovalPromptRequest): string {
 	return t("tools.approval.title");
 }
 
+/** Mirrors main's `TOOL_APPROVAL_LABEL_MAX`. Main already clamps; this is the
+ *  renderer refusing to trust that it did, on a surface where a long name
+ *  would push the app id out of sight. */
+const PARTY_NAME_MAX = 48;
+
+function clampName(name: string): string {
+	const points = Array.from(name);
+	if (points.length <= PARTY_NAME_MAX) return name;
+	return `${points.slice(0, PARTY_NAME_MAX).join("").trimEnd()}…`;
+}
+
+/** One party to the call: its name, and — always — its registry app id.
+ *
+ * A manifest `name` is free text, so any app may call itself "Notes". The id
+ * is minted by the registry and cannot be chosen to collide with an installed
+ * app's, which makes it the half of this row that identifies anything. It is
+ * quieter than the name, not hidden: the name is what a person reads first,
+ * the id is what tells two same-named apps apart. Both are text nodes. */
+function Party({ role, name, appId, testId }: PartyProps) {
+	const shown = clampName(name);
+	return (
+		<div className="tool-approval__party" data-testid={testId}>
+			<dt className="tool-approval__party-role">{role}</dt>
+			<dd className="tool-approval__party-who">
+				{shown !== appId && <span className="tool-approval__party-name">{shown}</span>}
+				<span className="tool-approval__party-id">{appId}</span>
+			</dd>
+		</div>
+	);
+}
+
+type PartyProps = { role: string; name: string; appId: string; testId: string };
+
 export function ToolApprovalPromptHost() {
 	const [request, setRequest] = useState<ToolApprovalPromptRequest | null>(null);
 	const declineRef = useRef<HTMLButtonElement | null>(null);
@@ -66,18 +99,32 @@ export function ToolApprovalPromptHost() {
 						{request.reason === "declaration-changed"
 							? t("tools.approval.changed.body", {
 									tool: request.toolTitle,
-									provider: request.providerLabel,
+									provider: clampName(request.providerLabel),
 								})
 							: t("tools.approval.body", {
 									tool: request.toolTitle,
-									provider: request.providerLabel,
-									caller: request.callerAppId,
+									provider: clampName(request.providerLabel),
+									caller: clampName(request.callerLabel),
 								})}
 					</p>
+					<dl className="tool-approval__parties">
+						<Party
+							role={t("tools.approval.party.caller")}
+							name={request.callerLabel}
+							appId={request.callerAppId}
+							testId="tool-approval-caller"
+						/>
+						<Party
+							role={t("tools.approval.party.provider")}
+							name={request.providerLabel}
+							appId={request.providerAppId}
+							testId="tool-approval-provider"
+						/>
+					</dl>
 					{/* Provider-authored text, rendered as data. */}
 					<p className="capability-prompt__capability">{request.toolDescription}</p>
 					<div className="capability-prompt__actions">
-						<Button ref={declineRef} onClick={() => respond(false)}>
+						<Button ref={declineRef} variant={ButtonVariant.Neutral} onClick={() => respond(false)}>
 							{t("tools.approval.decline")}
 						</Button>
 						<Button variant={ButtonVariant.Primary} onClick={() => respond(true)}>

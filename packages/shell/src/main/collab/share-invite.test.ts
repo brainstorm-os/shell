@@ -12,7 +12,7 @@ import {
 } from "../sync/envelope-pipeline";
 import { LoopbackRelayPort } from "../sync/relay-port";
 import { randomBytes } from "../test-support/crypto-test-helpers";
-import { AccessRole, activeMembers, isActiveMember, roleOf } from "./access-record";
+import { AccessRole, activeMembers, docTrust, isActiveMember, roleOf } from "./access-record";
 import { INVITE_NONCE_BYTES } from "./invite-anchor";
 import {
 	SHARE_INVITE_VERSION,
@@ -120,11 +120,16 @@ describe("share-invite — shareEntityWithInvite (owner orchestration)", () => {
 		});
 
 		// Authorization: a signature-valid, active grant for the invitee's USER key.
-		expect(isActiveMember(doc, ENTITY_ID, invite.userPubB64)).toBe(true);
-		expect(roleOf(doc, ENTITY_ID, invite.userPubB64)).toBe(AccessRole.Editor);
-		const members = activeMembers(doc, ENTITY_ID);
-		expect(members).toHaveLength(1);
-		expect(members[0]?.addedBy).toBe(bytesToBase64(owner.publicKey));
+		expect(isActiveMember(doc, ENTITY_ID, invite.userPubB64, docTrust(doc, ENTITY_ID))).toBe(true);
+		expect(roleOf(doc, ENTITY_ID, invite.userPubB64, docTrust(doc, ENTITY_ID))).toBe(
+			AccessRole.Editor,
+		);
+		const members = activeMembers(doc, ENTITY_ID, docTrust(doc, ENTITY_ID));
+		// The owner's genesis grant (the first share writes it) + the invitee's.
+		expect(members.map((m) => m.member).sort()).toEqual(
+			[bytesToBase64(owner.publicKey), invite.userPubB64].sort(),
+		);
+		expect(members.every((m) => m.addedBy === bytesToBase64(owner.publicKey))).toBe(true);
 
 		// Key delivery: the invitee opens the wrap with their X25519 secret and
 		// recovers the exact DEK.
@@ -150,7 +155,7 @@ describe("share-invite — shareEntityWithInvite (owner orchestration)", () => {
 			}),
 		).toThrow(/verification/);
 		// Nothing was authorized.
-		expect(activeMembers(doc, ENTITY_ID)).toHaveLength(0);
+		expect(activeMembers(doc, ENTITY_ID, docTrust(doc, ENTITY_ID))).toHaveLength(0);
 	});
 
 	it("rejects an empty entityId before mutating the doc (no dangling grant)", () => {
@@ -188,7 +193,9 @@ describe("share-invite — shareEntityWithInvite (owner orchestration)", () => {
 			/already a member/,
 		);
 		// The role is unchanged — the original grant stands.
-		expect(roleOf(doc, ENTITY_ID, invite.userPubB64)).toBe(AccessRole.Viewer);
+		expect(roleOf(doc, ENTITY_ID, invite.userPubB64, docTrust(doc, ENTITY_ID))).toBe(
+			AccessRole.Viewer,
+		);
 	});
 
 	it("is idempotent — re-sharing returns the same wrap, no duplicates", () => {
@@ -209,7 +216,8 @@ describe("share-invite — shareEntityWithInvite (owner orchestration)", () => {
 		const second = shareEntityWithInvite(doc, { ...opts, now: 2000 });
 
 		expect(second).toEqual(first);
-		expect(activeMembers(doc, ENTITY_ID)).toHaveLength(1);
+		// The owner + the invitee, once each.
+		expect(activeMembers(doc, ENTITY_ID, docTrust(doc, ENTITY_ID))).toHaveLength(2);
 		// One wrap on the doc, not two.
 		const wraps = doc.getMap("brainstorm.meta").get("wraps") as Y.Array<unknown>;
 		expect(wraps.length).toBe(1);
@@ -283,7 +291,9 @@ describe("share-invite — wrap reaches the collaborator over the relay (C2 flow
 		// the grant — that's how they confirm a real authorization backs the wrap.
 		const collabDoc = new Y.Doc();
 		Y.applyUpdate(collabDoc, Y.encodeStateAsUpdate(ownerDoc));
-		expect(isActiveMember(collabDoc, ENTITY_ID, invite.userPubB64)).toBe(true);
+		expect(
+			isActiveMember(collabDoc, ENTITY_ID, invite.userPubB64, docTrust(collabDoc, ENTITY_ID)),
+		).toBe(true);
 
 		const relays = LoopbackRelayPort.pair(2);
 		const ownerRelay = relays[0];

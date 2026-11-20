@@ -15,7 +15,10 @@
 	align-items: center;
 	max-width: 100%;
 	min-height: 26px;
-	margin: 0 -6px;
+	/* Same 4px bleed as plain / tag / link / progress: with the 2px padding
+	 * every value starts on one x. At 6px a pill sat 2px left of its
+	 * neighbours in the same property block. */
+	margin: 0 -4px;
 	padding: var(--space-0_5);
 	border: 0;
 	border-radius: var(--radius-sm);
@@ -80,7 +83,7 @@
 	width: 100%;
 	min-width: 0;
 	min-height: 26px;
-	margin: 0 -6px;
+	margin: 0 -4px;
 	padding: calc(var(--space-0_5) - var(--border-width));
 	border: var(--border-width) solid transparent;
 	border-radius: var(--radius-sm);
@@ -91,11 +94,9 @@
 	outline: none;
 }
 
-/* The plain face uses tighter chrome (-4px bleed, 4px radius) than the pill
- * — its editor overlays the same footprint. */
+/* The plain face uses a tighter radius than the pill — its editor overlays
+ * the same footprint. */
 .bs-cell-plain-input {
-	margin: 0 -4px;
-	padding: calc(var(--space-0_5) - var(--border-width));
 	border-radius: var(--radius-xs);
 }
 
@@ -883,6 +884,7 @@
 	display: inline-flex;
 	align-items: center;
 	min-height: 26px;
+	margin: 0 -4px;
 	padding: var(--space-0_5);
 	color: var(--text);
 	font-size: var(--text-size-md);
@@ -900,17 +902,13 @@
 
 /* ── The ONE empty affordance ──────────────────────────────────────── */
 /* Every cell kind renders the same `labels.cellEmpty` word, so it gets the
- * same face: faint, and one step DOWN from the value type size so it never
- * reads as a real value. This block is last in the file on purpose — the
- * scalar / multiline / progress empties are modifiers on their own cell
- * element, which declares `--text-size-md` at equal specificity, so only
+ * same face: the value's own type size in the tertiary ink — colour alone
+ * says "no value". A step down in size put the word off the row label's
+ * baseline, since label and value centre on different x-heights. This block
+ * is last in the file on purpose — the scalar / multiline / progress empties
+ * are modifiers on their own cell element at equal specificity, and Date /
+ * EntityRef / Tag / File / Rating once hardcoded their own size, so only
  * source order makes the shared face win.
- *
- * Before this, Date / EntityRef / Tag / File / Rating hardcoded
- * `--text-size-sm` while Pill / Plain / Multiline / Progress set colour only
- * and inherited `md` — two "Empty" faces in ONE property block (the 329 audit
- * caught Tasks' Duration rows Estimate + Logged rendering visibly larger than
- * Status / Due / Project / Tags directly above and below them).
  *
  * `.bs-cell-formula--empty` is deliberately NOT here: it renders an em-dash
  * for "this formula has nothing to compute", not the Empty affordance. */
@@ -925,5 +923,5 @@
 .bs-cell-link-empty,
 .bs-cell-file-empty {
 	color: var(--text-faint);
-	font-size: var(--text-size-sm);
+	font-size: var(--text-size-md);
 }

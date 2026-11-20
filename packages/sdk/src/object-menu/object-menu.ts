@@ -24,7 +24,7 @@
  * appears when the app passes an `onRemove` handler.
  */
 
-import type { AppToolRecord, ContributedAction } from "@brainstorm-os/sdk-types";
+import type { AppToolRecord, AppToolSurface, ContributedAction } from "@brainstorm-os/sdk-types";
 import { IconName } from "../icon/icon-registry";
 import { NavigationMode, openEntity } from "../open-entity";
 
@@ -145,9 +145,13 @@ export type ObjectMenuRuntime = {
 		 *  exposes it; absent ⇒ no tool rows splice in and the menu degrades to
 		 *  its built-ins, exactly as it does without `suggestActions`. */
 		appTools?: {
+			// `AppToolSurface`, not `string`: the real `AppToolsService.list` takes
+			// the enum, and a wider parameter here made the host's own service
+			// unassignable to this slot — the seam could not be wired without a
+			// cast (found by Tool-10, the first app to wire it).
 			list?: (input?: {
 				appliesTo?: string;
-				surface?: string;
+				surface?: AppToolSurface;
 			}) => Promise<readonly AppToolRecord[]>;
 			call?: (input: {
 				tool: string;

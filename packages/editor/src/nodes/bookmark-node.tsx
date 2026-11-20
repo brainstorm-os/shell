@@ -20,10 +20,18 @@ import {
 	type NodeKey,
 	type SerializedLexicalNode,
 } from "lexical";
-import { type JSX, useCallback, useState } from "react";
-import { useEditorT } from "../i18n";
+import { type JSX, useCallback, useEffect, useRef, useState } from "react";
+import { type EditorI18nKey, useEditorT } from "../i18n";
 import { GlobeIcon } from "../icons";
-import { EmbedKind, classifyUrl, faviconUrl, parseHttpUrl } from "../plugins/embed-providers";
+import {
+	EMBED_PROVIDERS,
+	EmbedKind,
+	type EmbedProviderKind,
+	classifyEmbed,
+	faviconUrl,
+	parseHttpUrl,
+	safeExternalHref,
+} from "../plugins/embed-providers";
 import { $createWebEmbedNode } from "./web-embed-node";
 
 export const BOOKMARK_NODE_TYPE = "bookmark";
@@ -35,30 +43,65 @@ export type SerializedBookmarkNode = SerializedLexicalNode & {
 	url: string;
 	title: string;
 	description: string;
+	/** Set by a provider slash row (`/youtube`, `/maps`): the URL prompt is
+	 *  that provider's, and a link the allowlist accepts becomes an embed
+	 *  on save instead of a card. Absent on an ordinary bookmark. */
+	embedHint?: EmbedProviderKind;
 };
+
+const HINT_PLACEHOLDER: Partial<Record<EmbedProviderKind, EditorI18nKey>> = {
+	[EmbedKind.YouTube]: "editor.bookmark.urlPlaceholder.youtube",
+	[EmbedKind.GoogleMaps]: "editor.bookmark.urlPlaceholder.googleMaps",
+};
+
+/** Yjs writes node fields directly, bypassing importJSON — a peer can put any
+ *  JSON value where the view expects a string. */
+function text(raw: unknown): string {
+	return typeof raw === "string" ? raw : "";
+}
+
+function coerceHint(raw: unknown): EmbedProviderKind | null {
+	return typeof raw === "string" && Object.hasOwn(EMBED_PROVIDERS, raw)
+		? (raw as EmbedProviderKind)
+		: null;
+}
 
 export class BookmarkNode extends DecoratorNode<JSX.Element> {
 	__url: string;
 	__title: string;
 	__description: string;
+	__embedHint: EmbedProviderKind | null;
 
 	static override getType(): string {
 		return BOOKMARK_NODE_TYPE;
 	}
 
 	static override clone(node: BookmarkNode): BookmarkNode {
-		return new BookmarkNode(node.__url, node.__title, node.__description, node.__key);
+		return new BookmarkNode(
+			node.__url,
+			node.__title,
+			node.__description,
+			node.__embedHint,
+			node.__key,
+		);
 	}
 
-	constructor(url: string, title = "", description = "", key?: NodeKey) {
+	constructor(
+		url: string,
+		title = "",
+		description = "",
+		embedHint: EmbedProviderKind | null = null,
+		key?: NodeKey,
+	) {
 		super(key);
 		this.__url = url;
 		this.__title = title;
 		this.__description = description;
+		this.__embedHint = embedHint;
 	}
 
 	static override importJSON(s: SerializedBookmarkNode): BookmarkNode {
-		return new BookmarkNode(s.url, s.title ?? "", s.description ?? "");
+		return new BookmarkNode(s.url, s.title ?? "", s.description ?? "", coerceHint(s.embedHint));
 	}
 
 	override exportJSON(): SerializedBookmarkNode {
@@ -68,6 +111,7 @@ export class BookmarkNode extends DecoratorNode<JSX.Element> {
 			url: this.__url,
 			title: this.__title,
 			description: this.__description,
+			...(this.__embedHint ? { embedHint: this.__embedHint } : {}),
 		};
 	}
 
@@ -99,9 +143,10 @@ export class BookmarkNode extends DecoratorNode<JSX.Element> {
 		return (
 			<BookmarkView
 				nodeKey={this.getKey()}
-				url={this.__url}
-				title={this.__title}
-				description={this.__description}
+				url={text(this.__url)}
+				title={text(this.__title)}
+				description={text(this.__description)}
+				embedHint={coerceHint(this.__embedHint)}
 			/>
 		);
 	}
@@ -116,11 +161,13 @@ function BookmarkView({
 	url,
 	title,
 	description,
+	embedHint,
 }: {
 	nodeKey: NodeKey;
 	url: string;
 	title: string;
 	description: string;
+	embedHint: EmbedProviderKind | null;
 }) {
 	const t = useEditorT();
 	const host = parseHttpUrl(url)?.hostname.replace(/^www\./, "") ?? url;
@@ -132,23 +179,33 @@ function BookmarkView({
 	const [draftUrl, setDraftUrl] = useState(url);
 	const [draftTitle, setDraftTitle] = useState(title);
 	const [draftDesc, setDraftDesc] = useState(description);
-	const embeddable = (() => {
-		const c = classifyUrl(url);
-		return c && c.kind !== EmbedKind.Bookmark && c.embedUrl
-			? { embedUrl: c.embedUrl, kind: c.kind }
-			: null;
-	})();
+	const urlInputRef = useRef<HTMLInputElement | null>(null);
+	// Focus has to be taken: the caret is still in the document when the card
+	// mounts, so without this the pasted link was typed into the note instead.
+	useEffect(() => {
+		if (editing) urlInputRef.current?.focus();
+	}, [editing]);
+	const embeddable = classifyEmbed(url);
+	const href = safeExternalHref(url);
+	const urlPlaceholder = t(
+		(embedHint ? HINT_PLACEHOLDER[embedHint] : undefined) ?? "editor.bookmark.urlPlaceholder",
+	);
 
 	const commit = useCallback(() => {
 		const nextUrl = draftUrl.trim();
+		const hinted = embedHint ? classifyEmbed(nextUrl) : null;
 		editor.update(() => {
 			const node = $getNodeByKey(nodeKey);
 			if (!$isBookmarkNode(node)) return;
+			if (hinted) {
+				node.replace($createWebEmbedNode(nextUrl, hinted.embedUrl, hinted.kind));
+				return;
+			}
 			node.setUrl(nextUrl);
 			node.setMeta(draftTitle.trim(), draftDesc.trim());
 		});
 		setEditing(false);
-	}, [editor, nodeKey, draftUrl, draftTitle, draftDesc]);
+	}, [editor, nodeKey, draftUrl, draftTitle, draftDesc, embedHint]);
 
 	const convertToEmbed = useCallback(() => {
 		if (!embeddable) return;
@@ -162,42 +219,49 @@ function BookmarkView({
 
 	if (editing) {
 		return (
-			<div className="notes__bookmark notes__bookmark--editing">
+			<form
+				className="notes__bookmark notes__bookmark--editing"
+				onSubmit={(event) => {
+					event.preventDefault();
+					commit();
+				}}
+			>
 				<input
+					ref={urlInputRef}
 					className="notes__bookmark-input"
 					type="url"
 					value={draftUrl}
-					placeholder={t("editor.bookmark.urlPlaceholder")}
-					aria-label={t("editor.bookmark.urlPlaceholder")}
+					placeholder={urlPlaceholder}
+					aria-label={urlPlaceholder}
 					onChange={(e) => setDraftUrl(e.target.value)}
 				/>
-				<input
-					className="notes__bookmark-input"
-					value={draftTitle}
-					placeholder={t("editor.bookmark.titlePlaceholder")}
-					aria-label={t("editor.bookmark.titlePlaceholder")}
-					onChange={(e) => setDraftTitle(e.target.value)}
-				/>
-				<textarea
-					className="notes__bookmark-input notes__bookmark-input--desc"
-					value={draftDesc}
-					placeholder={t("editor.bookmark.descPlaceholder")}
-					aria-label={t("editor.bookmark.descPlaceholder")}
-					onChange={(e) => setDraftDesc(e.target.value)}
-				/>
+				{embedHint ? null : (
+					<>
+						<input
+							className="notes__bookmark-input"
+							value={draftTitle}
+							placeholder={t("editor.bookmark.titlePlaceholder")}
+							aria-label={t("editor.bookmark.titlePlaceholder")}
+							onChange={(e) => setDraftTitle(e.target.value)}
+						/>
+						<textarea
+							className="notes__bookmark-input notes__bookmark-input--desc"
+							value={draftDesc}
+							placeholder={t("editor.bookmark.descPlaceholder")}
+							aria-label={t("editor.bookmark.descPlaceholder")}
+							onChange={(e) => setDraftDesc(e.target.value)}
+						/>
+					</>
+				)}
 				<div className="notes__bookmark-actions">
-					<button
-						type="button"
-						className="notes__bookmark-btn notes__bookmark-btn--primary"
-						onClick={commit}
-					>
+					<button type="submit" className="notes__bookmark-btn notes__bookmark-btn--primary">
 						{t("editor.bookmark.save")}
 					</button>
 					<button type="button" className="notes__bookmark-btn" onClick={() => setEditing(false)}>
 						{t("editor.bookmark.cancel")}
 					</button>
 				</div>
-			</div>
+			</form>
 		);
 	}
 
@@ -205,7 +269,7 @@ function BookmarkView({
 		<div className="notes__bookmark">
 			<a
 				className="notes__bookmark-link"
-				href={url}
+				{...(href ? { href } : {})}
 				target="_blank"
 				rel="noopener noreferrer nofollow"
 			>
@@ -264,8 +328,13 @@ function BookmarkView({
 	);
 }
 
-export function $createBookmarkNode(url: string, title = "", description = ""): BookmarkNode {
-	return new BookmarkNode(url, title, description);
+export function $createBookmarkNode(
+	url: string,
+	title = "",
+	description = "",
+	embedHint: EmbedProviderKind | null = null,
+): BookmarkNode {
+	return new BookmarkNode(url, title, description, embedHint);
 }
 
 export function $isBookmarkNode(node: LexicalNode | null | undefined): node is BookmarkNode {

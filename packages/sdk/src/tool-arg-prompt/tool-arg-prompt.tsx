@@ -45,6 +45,7 @@ import {
 	buildToolArgs,
 	initialToolArgDraft,
 	promptedInputs,
+	toolArgsFromTarget,
 } from "./arg-prompt-logic";
 
 export type ToolArgPromptTranslate = (
@@ -275,15 +276,20 @@ export function useToolArgumentPrompt(t: ToolArgPromptTranslate): {
 	const [pending, setPending] = useState<PendingArgRequest | null>(null);
 
 	const promptForToolArgs = useCallback(
-		(tool: AppToolRecord, options?: { target?: ToolArgPromptTarget }) =>
-			new Promise<Readonly<Record<string, unknown>> | null>((resolve) => {
+		(tool: AppToolRecord, options?: { target?: ToolArgPromptTarget }) => {
+			// Tool-10 — nothing to ask ⇒ no form. The target the user opened the
+			// menu on is the tool's whole input.
+			const direct = options?.target ? toolArgsFromTarget(tool.input, options.target) : null;
+			if (direct !== null) return Promise.resolve(direct);
+			return new Promise<Readonly<Record<string, unknown>> | null>((resolve) => {
 				setPending((prev) => {
 					// A second request while one is open supersedes it; the first
 					// caller gets a cancel, never a hang.
 					prev?.resolve(null);
 					return { tool, ...(options?.target ? { target: options.target } : {}), resolve };
 				});
-			}),
+			});
+		},
 		[],
 	);
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { base64ToBytes } from "../credentials/crypto";
 import { generateIdentity, publicKeyToBase64 } from "../credentials/identity";
-import { AccessRole, grantAccess, revokeAccess } from "./access-record";
+import { AccessRole, docTrust, grantAccess, revokeAccess } from "./access-record";
 import { authorizesWrapInstall } from "./wrap-install-authz";
 
 const ENTITY = "ent_wrap_authz";
@@ -31,6 +31,8 @@ function check(doc: Y.Doc, sender: Uint8Array, self: Uint8Array, holdsDek: boole
 		selfPub: self,
 		holdsDek,
 		localDoc: doc,
+		// As this device would resolve it: `self` is the local identity.
+		trust: docTrust(doc, ENTITY, { self: publicKeyToBase64(self) }),
 		decodeMemberKey: base64ToBytes,
 	});
 }
@@ -105,19 +107,24 @@ describe("authorizesWrapInstall - who may install / rotate a per-entity DEK", ()
 		}
 	});
 
-	it("DENIES a REVOKED owner (a removed member cannot re-key what they lost)", () => {
+	it("DENIES a REVOKED co-owner (a removed member cannot re-key what they lost)", () => {
+		// The ROOT owner cannot be revoked at all under the authorization policy,
+		// so the removable owner is a co-owner the root added.
+		const coOwner = generateIdentity();
 		const doc = docWith([
 			{ party: owner, role: AccessRole.Owner, by: owner },
+			{ party: coOwner, role: AccessRole.Owner, by: owner },
 			{ party: me, role: AccessRole.Editor, by: owner },
 		]);
 		try {
+			expect(check(doc, coOwner.publicKey, me.publicKey, true)).toBe(true);
 			revokeAccess(doc, {
 				entityId: ENTITY,
-				member: publicKeyToBase64(owner.publicKey),
+				member: publicKeyToBase64(coOwner.publicKey),
 				signerSecret: owner.secretKey,
 				now: 9_000,
 			});
-			expect(check(doc, owner.publicKey, me.publicKey, true)).toBe(false);
+			expect(check(doc, coOwner.publicKey, me.publicKey, true)).toBe(false);
 		} finally {
 			doc.destroy();
 		}
@@ -146,6 +153,7 @@ describe("authorizesWrapInstall - who may install / rotate a per-entity DEK", ()
 					selfPub: me.publicKey,
 					holdsDek: true,
 					localDoc: doc,
+					trust: docTrust(doc, ENTITY, { self: publicKeyToBase64(me.publicKey) }),
 					decodeMemberKey: () => {
 						throw new Error("bad key");
 					},

@@ -126,6 +126,11 @@ export type ReaderOptions = {
 	 *  it. The preview drop leaves it unset (in-memory only). Mirrors
 	 *  `onTypographyChange`. */
 	onPositionChange?: (locator: Locator, progress: number) => void;
+	/** Fired with the progress the footer shows whenever it changes —
+	 *  including on mount and on a re-pagination that moves no locator
+	 *  (progress is measured to the end of the visible page, so a resize
+	 *  changes it). Display-only: nothing is persisted off this. */
+	onProgressChange?: (progress: number) => void;
 	/** The book whose highlights these are — the `Highlight/v1.bookId`. */
 	bookId?: string;
 	/** The highlight persistence seam. 9.21.6 wires these to `Highlight/v1`
@@ -231,6 +236,8 @@ export function mountReader(
 		}
 	}
 
+	let reportedProgress: number | null = null;
+
 	function paint(): void {
 		applyTypographyVars();
 		const current = currentPage(state);
@@ -255,9 +262,14 @@ export function mountReader(
 			page: String(state.pageIndex + 1),
 			total: String(total),
 		});
+		const fraction = readingProgress(state);
 		progress.textContent = t("reader.progress", {
-			percent: String(Math.round(readingProgress(state) * 100)),
+			percent: String(Math.round(fraction * 100)),
 		});
+		if (fraction !== reportedProgress) {
+			reportedProgress = fraction;
+			options.onProgressChange?.(fraction);
+		}
 		prev.disabled = !canGoPrev(state);
 		next.disabled = !canGoNext(state);
 	}

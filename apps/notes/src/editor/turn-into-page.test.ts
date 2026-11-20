@@ -21,6 +21,7 @@ import {
 	PAGE_ENTITY_TYPE,
 	replaceBlocksWithPageRef,
 	snapshotBlocksAsPage,
+	subPageProperties,
 	turnBlocksIntoPage,
 } from "./turn-into-page";
 
@@ -181,6 +182,18 @@ describe("turnBlocksIntoPage", () => {
 		expect(rootTypes(editor)).toEqual(["title", "page-ref", "list", "paragraph"]);
 	});
 
+	it("records the page it was created under on the new page's own record", async () => {
+		const editor = makeEditor();
+		const k = seed(editor);
+		const d = { ...deps(), parentId: "n_host" };
+		await turnBlocksIntoPage(editor, new Set([k.a, k.b]), d);
+		expect(d.create).toHaveBeenCalledWith(
+			PAGE_ENTITY_TYPE,
+			{ title: "Plan", createdAt: 42, updatedAt: 42, parentPageId: "n_host" },
+			"n_new",
+		);
+	});
+
 	it("changes nothing when the create fails", async () => {
 		const editor = makeEditor();
 		const k = seed(editor);
@@ -229,5 +242,17 @@ describe("turn into page — undo", () => {
 		undo.undo();
 		expect(JSON.stringify(binding.root.getSharedType().toDelta())).toBe(before);
 		expect(undo.undoStack.length).toBe(1);
+	});
+});
+
+describe("subPageProperties", () => {
+	it("names the parent only when there is one", () => {
+		expect(subPageProperties("T", 5, "n_host")).toEqual({
+			title: "T",
+			createdAt: 5,
+			updatedAt: 5,
+			parentPageId: "n_host",
+		});
+		expect(subPageProperties("T", 5, undefined)).toEqual({ title: "T", createdAt: 5, updatedAt: 5 });
 	});
 });

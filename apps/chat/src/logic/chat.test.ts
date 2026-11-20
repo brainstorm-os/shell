@@ -6,13 +6,15 @@ import {
 	RosterRole,
 	SenderKind,
 } from "@brainstorm-os/sdk-types";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
 	AUTHOR_COLORS,
+	type AuthorLabels,
 	CHANNEL_TYPE,
 	type EntityLike,
 	MESSAGE_TYPE,
 	authorColor,
+	authorLabel,
 	buildChannelProperties,
 	buildMessageProperties,
 	channelMessages,
@@ -22,6 +24,7 @@ import {
 	initials,
 	membersFromMessages,
 	nextSeq,
+	shortAuthorRef,
 	sortMessages,
 	toMessage,
 	toPanelMembers,
@@ -187,14 +190,14 @@ describe("groupMessages", () => {
 					ref: "p1",
 					name: "Mira",
 					body: "a",
-					createdAt: "2026-06-20T23:59:00Z",
+					createdAt: new Date(2026, 5, 20, 23, 59, 0).toISOString(),
 					seq: 0,
 				}),
 				message("m2", "c", {
 					ref: "p1",
 					name: "Mira",
 					body: "b",
-					createdAt: "2026-06-21T00:00:30Z",
+					createdAt: new Date(2026, 5, 21, 0, 0, 30).toISOString(),
 					seq: 1,
 				}),
 			],
@@ -204,6 +207,54 @@ describe("groupMessages", () => {
 		expect(groups).toHaveLength(2);
 		expect(groups[0]?.dayKey).toBe("2026-06-20");
 		expect(groups[1]?.dayKey).toBe("2026-06-21");
+	});
+});
+
+describe("day grouping follows the local calendar day", () => {
+	const color = (ref: string) => `color-${ref}`;
+	const savedTz = process.env.TZ;
+	beforeAll(() => {
+		process.env.TZ = "Europe/Berlin";
+	});
+	afterAll(() => {
+		if (savedTz === undefined) Reflect.deleteProperty(process.env, "TZ");
+		else process.env.TZ = savedTz;
+	});
+
+	it("keys a just-after-local-midnight message to the new day", () => {
+		expect(new Date("2026-08-01T22:53:00.000Z").getHours()).toBe(0);
+		expect(dayKey("2026-08-01T20:11:00.000Z")).toBe("2026-08-01");
+		expect(dayKey("2026-08-01T22:53:00.000Z")).toBe("2026-08-02");
+	});
+
+	it("splits a group at local midnight even inside one UTC day", () => {
+		const rows = channelMessages(
+			[
+				message("m1", "c", {
+					ref: "p1",
+					name: "Mira",
+					body: "late",
+					createdAt: "2026-08-01T21:58:00.000Z",
+					seq: 0,
+				}),
+				message("m2", "c", {
+					ref: "p1",
+					name: "Mira",
+					body: "after midnight",
+					createdAt: "2026-08-01T22:01:00.000Z",
+					seq: 1,
+				}),
+			],
+			"c",
+		);
+		expect(groupMessages(rows, color).map((g) => g.dayKey)).toEqual(["2026-08-01", "2026-08-02"]);
+	});
+
+	it("keeps one local day together across a UTC date change", () => {
+		process.env.TZ = "America/Los_Angeles";
+		expect(dayKey("2026-08-01T23:30:00.000Z")).toBe("2026-08-01");
+		expect(dayKey("2026-08-02T00:30:00.000Z")).toBe("2026-08-01");
+		process.env.TZ = "Europe/Berlin";
 	});
 });
 
@@ -316,8 +367,8 @@ describe("initials", () => {
 });
 
 describe("dayKey", () => {
-	it("returns the UTC date portion of an ISO stamp", () => {
-		expect(dayKey("2026-06-20T10:00:00.000Z")).toBe("2026-06-20");
+	it("returns the local calendar date of an ISO stamp", () => {
+		expect(dayKey(new Date(2026, 5, 20, 10, 0, 0).toISOString())).toBe("2026-06-20");
 		expect(dayKey("nope")).toBe("nope");
 	});
 });
@@ -510,5 +561,70 @@ describe("buildChannelProperties", () => {
 			topic: "brand",
 			createdAt: "t",
 		});
+	});
+});
+
+describe('author labels - "You" is the local identity and nobody else', () => {
+	const MIRA = "bWlyYS1zb3ZlcmVpZ24tZWQyNTUxOS1wdWJsaWMta2V5LTAwMDA=";
+	const MARCUS = "bWFyY3VzLXNvdmVyZWlnbi1lZDI1NTE5LXB1YmxpYy1rZXktMDA=";
+	const labelsFor = (selfRef: string, over: Partial<AuthorLabels> = {}): AuthorLabels => ({
+		selfRef,
+		selfName: "",
+		you: "You",
+		unnamed: "Unknown member",
+		...over,
+	});
+	/** The same two synced rows, as each of two unnamed members reads them. */
+	const rows = (storedName: string): EntityLike[] => [
+		message("m1", "c1", { ref: MIRA, name: storedName, body: "hi", createdAt: "t1", seq: 1 }),
+		message("m2", "c1", { ref: MARCUS, name: storedName, body: "yo", createdAt: "t2", seq: 2 }),
+	];
+	const names = (entities: EntityLike[], labels: AuthorLabels): string[] =>
+		channelMessages(entities, "c1", undefined, labels).map((m) => m.authorName);
+
+	it("two members with no display name each read only their OWN message as You", () => {
+		// What a current build writes for an unnamed author: an empty name.
+		expect(names(rows(""), labelsFor(MIRA))).toEqual(["You", shortAuthorRef(MARCUS)]);
+		expect(names(rows(""), labelsFor(MARCUS))).toEqual([shortAuthorRef(MIRA), "You"]);
+	});
+
+	it('a row an older build stamped "You" is not You on another member\'s shell', () => {
+		expect(names(rows("You"), labelsFor(MIRA))).toEqual(["You", shortAuthorRef(MARCUS)]);
+		expect(names(rows("You"), labelsFor(MARCUS))).toEqual([shortAuthorRef(MIRA), "You"]);
+	});
+
+	it("an unnamed member is named by the roster when it knows them", () => {
+		const labels = labelsFor(MARCUS, { nameOf: (ref) => (ref === MIRA ? "Mira" : undefined) });
+		expect(names(rows(""), labels)).toEqual(["Mira", "You"]);
+	});
+
+	it("a named member keeps the name they sent, and self reads as their own name once set", () => {
+		const entities = [
+			message("m1", "c1", { ref: MIRA, name: "Mira", body: "hi", createdAt: "t1", seq: 1 }),
+			message("m2", "c1", { ref: MARCUS, name: "", body: "yo", createdAt: "t2", seq: 2 }),
+		];
+		expect(names(entities, labelsFor(MARCUS, { selfName: "Marcus" }))).toEqual(["Mira", "Marcus"]);
+	});
+
+	it("with no viewer at all (no context) nobody is You", () => {
+		expect(rows("You").map((e) => toMessage(e).authorName)).toEqual([
+			shortAuthorRef(MIRA),
+			shortAuthorRef(MARCUS),
+		]);
+	});
+
+	it("a pre-sharing per-device author key keeps the name it was stored with", () => {
+		const legacy = message("m1", "c1", {
+			ref: "chat-person-abc",
+			name: "You",
+			body: "old",
+			createdAt: "t1",
+			seq: 1,
+		});
+		expect(names([legacy], labelsFor(MIRA))).toEqual(["You"]);
+	});
+
+	it("falls back to the neutral label when there is no key to shorten", () => {
+		expect(authorLabel({ authorRef: "", authorName: "" }, labelsFor(MIRA))).toBe("Unknown member");
 	});
 });

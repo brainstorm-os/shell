@@ -43,21 +43,32 @@ export function isSystemEntityType(entityType: string): boolean {
 /**
  * Parent-scoped child entity types — rows that only carry meaning inside
  * their container: a Message inside its Channel/Conversation, a Comment on
- * the document it annotates. The user authored them deliberately (so they
- * are NOT system types), but as top-level items they are noise: 36
- * "(untitled) · Message" rows burying the vault's real documents (F-318).
+ * the document it annotates, an Email inside its account's folders. They are
+ * real content (so they are NOT system types), but as top-level items they
+ * are noise: 36 "(untitled) · Message" rows burying the vault's real
+ * documents (F-318), and a synced mailbox doing the same with every message
+ * it mirrors.
  *
  * Contract — unlike the presentation-only system set, universal browse
  * surfaces (the Files vault browser, the Database "All vault items" list)
  * EXCLUDE these from their default top-level listings. Scope is default
  * browsing only: search still indexes the content, and the parent apps
- * (Chat, Agent, the comments panel) remain the dedicated readers.
+ * (Chat, Agent, the comments panel, Mailbox) remain the dedicated readers.
  *
  * Membership rule: a type belongs here when every row carries a required
  * reference to its parent and is never opened standalone.
+ *
+ * Mail, classified deliberately: an `Email/v1` requires `accountRef` +
+ * `folderRefs` and is only ever read in Mailbox's reading pane — a child
+ * (drafts are Emails carrying the draft flag; threads are a `threadKey`, not
+ * a type). A `MailFolder/v1` is the CONTAINER (mail's Channel) and a
+ * `MailAccount/v1` a deliberate creation with its own management UX, so
+ * neither is listed here or in the system set. A fetched attachment is an
+ * ordinary `File/v1` and stands on its own.
  */
 export const ChildEntityType = {
 	Comment: "brainstorm/Comment/v1",
+	Email: "brainstorm/Email/v1",
 	Message: "brainstorm/Message/v1",
 } as const;
 
@@ -98,15 +109,24 @@ function pluralize(word: string): string {
 /** The parsed, title-cased name segment of a type id, or null when the id
  *  yields nothing usable. Drops a trailing `vN` version segment only when
  *  one is actually present (so a version-less `brainstorm/Task` keeps
- *  `Task`, not the `brainstorm` namespace) and normalises `_`/`-` to
- *  spaces. Shared by the singular and pluralised display names. */
+ *  `Task`, not the `brainstorm` namespace), normalises `_`/`-` to spaces
+ *  and splits camel case into sentence-cased words (`MailAccount` →
+ *  `Mail account`); an acronym run keeps its capitals (`PDFFile` →
+ *  `PDF file`, `UserID` → `User ID`). Shared by the singular and pluralised
+ *  display names. */
 function typeNameSegment(typeId: string): string | null {
 	const parts = typeId.split("/").filter((p) => p.length > 0);
 	const last = parts[parts.length - 1];
 	const hasVersion = last !== undefined && /^v\d+$/i.test(last);
 	let name = hasVersion ? parts[parts.length - 2] : last;
 	if (!name) return null;
-	name = name.replace(/[_-]+/g, " ").trim();
+	name = name
+		.replace(/[_-]+/g, " ")
+		.replace(/(?<=[a-z0-9])[A-Z]/g, (ch, at: number, all: string) =>
+			/[a-z]/.test(all.charAt(at + 1)) ? ` ${ch.toLowerCase()}` : ` ${ch}`,
+		)
+		.replace(/(?<=[A-Z])[A-Z](?=[a-z])/g, (ch) => ` ${ch.toLowerCase()}`)
+		.trim();
 	if (!name) return null;
 	return name.charAt(0).toUpperCase() + name.slice(1);
 }

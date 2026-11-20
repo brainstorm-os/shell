@@ -577,6 +577,8 @@ body.is-resizing .db-inspector__resize {
 }
 
 .db-tab--add:hover {
+	background: var(--hover);
+	border-radius: var(--radius-sm);
 	color: var(--text);
 }
 
@@ -993,6 +995,10 @@ body.is-resizing .db-inspector__resize {
  * shared `.bs-drag-grip` face; here we only park it in the gutter. */
 .dbv-grid__drag-grip {
 	--bs-drag-grip-inset: var(--space-1);
+	/* The 16px grip overhangs the 12px gutter into the first cell's padding;
+	 * a pinned title cell is opaque at z-index 2 and painted over its right
+	 * dot column, leaving a three-dot sliver. */
+	z-index: 3;
 }
 .dbv-grid__row:hover .dbv-grid__drag-grip {
 	opacity: 1;
@@ -1054,6 +1060,10 @@ body.is-resizing .db-inspector__resize {
 	align-items: baseline;
 	gap: var(--space-2);
 	max-width: 100%;
+	/* The hover face bleeds into the cell padding so the label itself ends on
+	 * the cell's content edge — the edge the header label and the numeric
+	 * values above it share. */
+	margin-inline: calc(-1 * var(--space-1));
 	padding: 0 var(--space-1);
 	border: 0;
 	background: transparent;
@@ -1151,7 +1161,11 @@ body.is-resizing .db-inspector__resize {
  * hover inside the grid; the row hover is the affordance. The editor's own
  * focus ring on click is unaffected. */
 .dbv-grid__cell--editable > .bs-cell-pill:not(:disabled):hover,
-.dbv-grid__cell--editable > .bs-cell-plain:not(:disabled):hover {
+.dbv-grid__cell--editable > .bs-cell-plain:not(:disabled):hover,
+.dbv-grid__cell--editable > .bs-cell-tag-trigger:not(:disabled):not([aria-disabled="true"]):hover,
+.dbv-grid__cell--editable > .bs-cell-date-trigger:not(:disabled):hover,
+.dbv-grid__cell--editable > .bs-cell-link-trigger:not(:disabled):hover,
+.dbv-grid__cell--editable > .bs-cell-progress:not(:disabled):hover {
 	background: transparent;
 }
 
@@ -1168,6 +1182,16 @@ body.is-resizing .db-inspector__resize {
 .dbv-grid__cell--numeric > .bs-cell-plain {
 	justify-content: flex-end;
 	text-align: end;
+}
+
+/* The shared faces bleed 4px past the cell padding and inset their text 2px,
+ * which lands a right-aligned value 2px outside the cell's content edge. Trailing bleed = the face's own inset, so the
+ * numerals end exactly on the edge the header label and footer use. */
+.dbv-grid__cell--numeric > .bs-cell-pill,
+.dbv-grid__cell--numeric > .bs-cell-plain,
+.dbv-grid__cell--numeric .bs-cell-plain-input,
+.dbv-grid__cell--numeric .bs-cell-input {
+	margin-inline-end: calc(-1 * var(--space-0_5));
 }
 
 .dbv-grid__cell--numeric .bs-cell-plain-input,
@@ -1312,7 +1336,7 @@ body.is-resizing .db-inspector__resize {
 	border: 0;
 	border-radius: var(--radius-sm);
 	background: transparent;
-	color: var(--text-dim);
+	color: var(--color-text-secondary);
 	cursor: pointer;
 	opacity: 0;
 	transition:
@@ -1382,7 +1406,9 @@ body.is-resizing .db-inspector__resize {
 	background: var(--bg);
 }
 
-.dbv-grid[data-pinned="true"] .dbv-grid__row:not(.dbv-grid__row--head):hover .dbv-grid__cell[data-col="title"] {
+.dbv-grid[data-pinned="true"]
+	.dbv-grid__row:not(.dbv-grid__row--head):not(.dbv-grid__row--foot):hover
+	.dbv-grid__cell[data-col="title"] {
 	background: linear-gradient(var(--hover), var(--hover)), var(--bg);
 }
 
@@ -1392,6 +1418,12 @@ body.is-resizing .db-inspector__resize {
 
 .dbv-grid[data-pinned="true"] .dbv-grid__row--head .dbv-grid__cell[data-col="title"] {
 	z-index: 3;
+	background: var(--bg-elev);
+}
+
+/* The footer band is `--bg-elev` like the header; left on the pinned cell's
+ * page colour, the title cell read as a grey block set 12px into a white band. */
+.dbv-grid[data-pinned="true"] .dbv-grid__row--foot .dbv-grid__cell[data-col="title"] {
 	background: var(--bg-elev);
 }
 

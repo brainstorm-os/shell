@@ -12,6 +12,7 @@ import { useVaultEntities } from "@brainstorm-os/react-yjs";
 import { openEntity } from "@brainstorm-os/sdk";
 import {
 	AttachmentKind,
+	BUILTIN_AGENT_MENTION_REF,
 	IconKind,
 	type MessageAttachment,
 	type RosterMember,
@@ -61,11 +62,19 @@ import { formatDay, formatTime, navigatorLanguage } from "./format";
 import { plural, t } from "./i18n";
 import { useChatT } from "./i18n-hooks";
 import {
+	agentMentionCandidate,
+	queryMayMatchAgent,
+	resolveAgentMentionTarget,
+} from "./logic/agent-mention";
+import {
+	AgentRowTrust,
+	type AuthorLabels,
 	CHANNEL_TYPE,
 	type ChatChannel,
 	type ChatMessage,
 	MESSAGE_TYPE,
 	type PanelMember,
+	UNVERIFIED_AGENT_REF,
 	authorColor,
 	buildChannelProperties,
 	buildMessageProperties,
@@ -94,8 +103,6 @@ import { SearchPanel } from "./search-panel";
 import { ChatAction, useChatShortcut } from "./shortcuts";
 import { useChatUserState } from "./use-user-state";
 import "./styles.css";
-
-const DEFAULT_NAME = "You";
 
 /** Where the sovereign self (the synced read-state owner key) stands. */
 enum SelfStatus {
@@ -143,6 +150,17 @@ function shareDialogLabels(): ShareDialogLabels {
 	};
 }
 
+/** Agent-13 — the header name for a row that presents as the built-in agent.
+ *  Never the row's own (synced) display name: the vouched agent is named by
+ *  this app, and an unverified one is labelled as exactly that. */
+function agentAuthorLabel(authorRef: string): string | null {
+	if (authorRef === BUILTIN_AGENT_MENTION_REF) return t("agent.name");
+	if (authorRef === UNVERIFIED_AGENT_REF) {
+		return t("agent.unverifiedAuthor", { name: t("agent.name") });
+	}
+	return null;
+}
+
 export function ChatApp(): ReactElement {
 	useChatT();
 	const services = getBrainstorm()?.services ?? null;
@@ -172,6 +190,17 @@ export function ChatApp(): ReactElement {
 			searchCandidates: async (query: string) => {
 				const q = query.trim().toLowerCase();
 				const matches: ContextCandidate[] = [];
+				// Agent-13 — `@agent` leads the list. It is ALWAYS offered when it
+				// matches: unavailable means disabled with the reason as its caption,
+				// never absent (an option that vanishes cannot be discovered).
+				if (activeId && queryMayMatchAgent(query, t)) {
+					const target = await resolveAgentMentionTarget(
+						getBrainstorm()?.capabilities,
+						services?.agentProposals ?? null,
+					);
+					const candidate = agentMentionCandidate(query, target, t);
+					if (candidate) matches.push(candidate);
+				}
 				// People come from the channel roster (Collab-C6) — actual vault
 				// members, keyed on the sovereign pubkey so the mention resolves to a
 				// real identity, not an arbitrary Person/v1 contact. The stored
@@ -183,6 +212,7 @@ export function ChatApp(): ReactElement {
 					// (kind-tagged), so "@Researcher" works exactly like "@Ada":
 					// mentioning an agent invites its loop into the channel.
 					const people = await roster.members(activeId, { includeAgents: true });
+
 					for (const m of people) {
 						const name = m.displayName || m.fingerprint;
 						if (q && !name.toLowerCase().includes(q)) continue;
@@ -201,7 +231,7 @@ export function ChatApp(): ReactElement {
 				return matches;
 			},
 		}),
-		[roster, activeId],
+		[roster, activeId, services],
 	);
 
 	// Documents / objects are pinned through their own search picker (anchored to
@@ -295,7 +325,7 @@ export function ChatApp(): ReactElement {
 	// once storage loads.
 	const [identity, setIdentity] = useState<LocalIdentity>(() => ({
 		personRef: mintPersonRef(seedRef.current ?? ""),
-		displayName: DEFAULT_NAME,
+		displayName: "",
 	}));
 
 	// Resolve the author identity from the vault's self-asserted profile (Collab-C6):
@@ -315,7 +345,7 @@ export function ChatApp(): ReactElement {
 				if (!live) return;
 				setIdentity({
 					personRef: self.pubkey,
-					displayName: self.displayName || DEFAULT_NAME,
+					displayName: self.displayName ?? "",
 					...(self.avatarRef ? { avatarRef: self.avatarRef } : {}),
 				});
 				setSelfStatus(SelfStatus.Resolved);
@@ -432,9 +462,59 @@ export function ChatApp(): ReactElement {
 		void badge.set({ count: unread }).catch(() => undefined);
 	}, [unread, marksReady, services]);
 
+	// The authoritative member roster (the channel's signed access record, resolved
+	// to display profiles). Refetched when the channel changes (membership shifts
+	// with the access record, not with posts). Merged with the message-derived
+	// authors below so a legacy poster still shows as a guest — that merge is the
+	// reactive-to-messages half, via the `members` memo.
+	const [rosterMembers, setRosterMembers] = useState<RosterMember[]>([]);
+	useEffect(() => {
+		if (!roster || !activeId) {
+			setRosterMembers([]);
+			return;
+		}
+		let live = true;
+		roster
+			.members(activeId)
+			.then((m) => {
+				if (live) setRosterMembers(m);
+			})
+			.catch((err) => {
+				console.warn("[chat] roster load failed:", err);
+				if (live) setRosterMembers([]);
+			});
+		return () => {
+			live = false;
+		};
+	}, [roster, activeId]);
+
+	// How each author is named for THIS viewer. "You" belongs to the local
+	// identity alone; the name a message carries was written by its author's
+	// device, so it can never be allowed to say "You" about somebody else.
+	const authorLabels = useMemo<AuthorLabels>(() => {
+		const names = new Map<string, string>();
+		// A roster member with no profile yet is named the way the member panel
+		// names them, so one person is not two different stubs on one screen.
+		for (const m of rosterMembers) {
+			const name = m.displayName || shortFingerprint(m.fingerprint);
+			if (name) names.set(m.pubkey, name);
+		}
+		return {
+			selfRef: identity.personRef,
+			selfName: identity.displayName,
+			you: t("author.you"),
+			unnamed: t("members.unknown"),
+			nameOf: (ref) => names.get(ref),
+		};
+	}, [rosterMembers, identity.personRef, identity.displayName]);
+
+	// Agent-13 — a built-in-agent card is decidable only by its invoker, so the
+	// projection needs this viewer's key; until it resolves every such card is
+	// read-only (fail-closed).
+	const selfPubkey = selfStatus === SelfStatus.Resolved ? identity.personRef : undefined;
 	const persisted = useMemo(
-		() => (activeId ? channelMessages(entities, activeId) : []),
-		[entities, activeId],
+		() => (activeId ? channelMessages(entities, activeId, selfPubkey, authorLabels) : []),
+		[entities, activeId, selfPubkey, authorLabels],
 	);
 
 	// Merge persisted messages with this channel's optimistic echoes, dropping an
@@ -463,32 +543,6 @@ export function ChatApp(): ReactElement {
 	}, [persisted, activeId]);
 
 	const groups = useMemo(() => groupMessages(messages, authorColor), [messages]);
-
-	// The authoritative member roster (the channel's signed access record, resolved
-	// to display profiles). Refetched when the channel changes (membership shifts
-	// with the access record, not with posts). Merged with the message-derived
-	// authors below so a legacy poster still shows as a guest — that merge is the
-	// reactive-to-messages half, via the `members` memo.
-	const [rosterMembers, setRosterMembers] = useState<RosterMember[]>([]);
-	useEffect(() => {
-		if (!roster || !activeId) {
-			setRosterMembers([]);
-			return;
-		}
-		let live = true;
-		roster
-			.members(activeId)
-			.then((m) => {
-				if (live) setRosterMembers(m);
-			})
-			.catch((err) => {
-				console.warn("[chat] roster load failed:", err);
-				if (live) setRosterMembers([]);
-			});
-		return () => {
-			live = false;
-		};
-	}, [roster, activeId]);
 
 	const members = useMemo<PanelMember[]>(
 		() =>
@@ -584,7 +638,7 @@ export function ChatApp(): ReactElement {
 				body: text,
 				...(rich ? { richBody: rich } : {}),
 				authorRef: identity.personRef,
-				authorName: identity.displayName,
+				authorName: identity.displayName || t("author.you"),
 				createdAt: now,
 				seq,
 				attachments: allAtts,
@@ -631,7 +685,7 @@ export function ChatApp(): ReactElement {
 				});
 				setIdentity((prev) => ({
 					personRef: prev.personRef,
-					displayName: saved.displayName || DEFAULT_NAME,
+					displayName: saved.displayName ?? "",
 					...(saved.avatarRef ? { avatarRef: saved.avatarRef } : {}),
 				}));
 				// Refresh the panel so the self row picks up the new name immediately.
@@ -865,7 +919,9 @@ export function ChatApp(): ReactElement {
 						aria-haspopup="menu"
 						onClick={openMore}
 					>
-						<Icon name={IconName.More} size={18} />
+						<span className="bs-object-menu__more-dot" />
+						<span className="bs-object-menu__more-dot" />
+						<span className="bs-object-menu__more-dot" />
 					</button>
 				</div>
 			</header>
@@ -888,6 +944,7 @@ export function ChatApp(): ReactElement {
 					{searchOpen ? (
 						<SearchPanel
 							entities={entities}
+							authorLabels={authorLabels}
 							activeChannelId={activeChannel?.id ?? null}
 							activeChannelName={activeChannel?.name ?? null}
 							query={searchQuery}
@@ -932,8 +989,8 @@ export function ChatApp(): ReactElement {
 						<div className="chat__placeholder" data-testid="no-channel">
 							<EmptyState
 								icon={IconName.Chat}
-								title={t("channel.none.title")}
-								hint={t("channel.none.blurb")}
+								title={t(channels.length === 0 ? "channel.first.title" : "channel.none.title")}
+								hint={t(channels.length === 0 ? "channel.first.blurb" : "channel.none.blurb")}
 								action={
 									<button
 										type="button"
@@ -1238,7 +1295,7 @@ function MessageView({
 							<div className="chat__group-body">
 								<header className="chat__group-head">
 									<span className="chat__author" style={{ color: g.color }}>
-										{g.authorName}
+										{agentAuthorLabel(g.authorRef) ?? g.authorName}
 									</span>
 									<time className="chat__time" dateTime={first?.createdAt}>
 										{formatTime(first?.createdAt ?? "", absoluteTimestamps)}
@@ -1280,8 +1337,20 @@ function MessageView({
 														openMessageMenu({ x: r.right, y: r.bottom + 4 }, m, el);
 													}}
 												>
-													<Icon name={IconName.More} size={14} />
+													<span className="bs-object-menu__more-dot" />
+													<span className="bs-object-menu__more-dot" />
+													<span className="bs-object-menu__more-dot" />
 												</button>
+											) : null}
+											{m.agentTrust === AgentRowTrust.Vouched && !m.proposal ? (
+												<span className="chat__line-invoker" data-testid="agent-asked-by">
+													{t("agent.askedByYou")}
+												</span>
+											) : null}
+											{m.agentTrust === AgentRowTrust.Unverified && !m.proposal ? (
+												<span className="chat__line-invoker" data-testid="agent-unverified">
+													{t("agent.unverified")}
+												</span>
 											) : null}
 											{m.richBody ? (
 												<div className="chat__line chat__line--rich bs-editor bs-editor--readonly">
@@ -1291,7 +1360,13 @@ function MessageView({
 												<p className="chat__line">{m.body}</p>
 											) : null}
 											{m.proposal ? (
-												<ProposalCard messageId={m.id} proposal={m.proposal} host={proposalHost} />
+												<ProposalCard
+													messageId={m.id}
+													proposal={m.proposal}
+													host={proposalHost}
+													{...(m.proposalReadOnly ? { readOnly: true } : {})}
+													{...(m.agentTrust ? { trust: m.agentTrust } : {})}
+												/>
 											) : null}
 											{chips.length > 0 ? (
 												<div className="chat__attachments" data-testid="message-attachments">

@@ -31,6 +31,7 @@
 import { Buffer } from "node:buffer";
 import { type CapabilityLedger, LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import type {
+	EntityExposure,
 	PendingInvite,
 	ShareInviteToken,
 	SharedContact,
@@ -45,7 +46,7 @@ import type { ContactsStore } from "../collab/contacts-store";
 import { cacheRemoteProfile } from "../collab/profile-store";
 import { type ShareInvite, inviteProfile, verifyShareInvite } from "../collab/share-invite";
 import type { CollabAccessView, CollabRelayLike } from "../collab/sharing-engine";
-import { SharingEngine } from "../collab/sharing-engine";
+import { SharingDeniedError, SharingEngine } from "../collab/sharing-engine";
 import type { EntitiesRepository } from "../storage/entities-repo";
 import type { SettingsRepository } from "../storage/settings-repo";
 import type { VaultSession } from "../vault/session";
@@ -88,6 +89,18 @@ function makeError(name: string, message: string): Error {
 	const err = new Error(message);
 	err.name = name;
 	return err;
+}
+
+/** The engine refuses a membership change the local identity has no authority
+ *  to make (only an owner may share or remove; nobody may remove the root
+ *  owner). Surface it as the broker's `Denied`, like a missing capability. */
+async function asDenied<T>(run: () => Promise<T>): Promise<T> {
+	try {
+		return await run();
+	} catch (error) {
+		if (error instanceof SharingDeniedError) throw makeError("Denied", error.message);
+		throw error;
+	}
 }
 
 const ROSTER_TO_ACCESS_ROLE: Readonly<Record<RosterRole, AccessRole>> = {
@@ -294,7 +307,7 @@ export function makeSharingServiceHandler(options: SharingServiceOptions): Servi
 		if (!entityId || !type) throw makeError("Invalid", "sharing.share: entityId + type required");
 		const invite = await resolveInvite(input, options);
 		const role = parseRole(input.role);
-		const view = await engineFor().share({ entityId, type, invite, role });
+		const view = await asDenied(() => engineFor().share({ entityId, type, invite, role }));
 		options.refreshMembership?.(entityId, type);
 		return view.map(toSharedMember);
 	}
@@ -309,7 +322,7 @@ export function makeSharingServiceHandler(options: SharingServiceOptions): Servi
 		}
 		const invite = await resolveInvite(input, options);
 		const role = parseRole(input.role);
-		const view = await engineFor().shareCollection({ entityId, type, invite, role });
+		const view = await asDenied(() => engineFor().shareCollection({ entityId, type, invite, role }));
 		options.refreshMembership?.(entityId, type);
 		return view.map(toSharedMember);
 	}
@@ -324,8 +337,17 @@ export function makeSharingServiceHandler(options: SharingServiceOptions): Servi
 			throw makeError("Invalid", "sharing.revoke: entityId + member required");
 		}
 		const engine = engineFor();
-		await engine.revoke(entityId, member);
+		const result = await asDenied(() => engine.revokeMember(entityId, member));
 		if (type) options.refreshMembership?.(entityId, type);
+		// The member IS removed (and can no longer write anything in it), but
+		// some of what it contains could not be re-keyed away from them. That is
+		// not a success to report quietly: say so, and let the caller retry.
+		if (result.incomplete.length > 0) {
+			throw makeError(
+				"Incomplete",
+				`sharing.revoke: removed, but ${result.incomplete.length} item(s) in it could not be re-keyed and stay readable by the removed member`,
+			);
+		}
 		return (await engine.access(entityId)).map(toSharedMember);
 	}
 
@@ -373,6 +395,37 @@ export function makeSharingServiceHandler(options: SharingServiceOptions): Servi
 		return edit ? { editor: edit.editor, editedAt: edit.editedAt } : null;
 	}
 
+	/** IE-12 — has this object ever involved anyone but this vault's owner?
+	 *  Answered from HOST-side evidence a collaborator cannot rewrite by sync:
+	 *  the tombstones the access record leaves in this device's copy of the doc,
+	 *  and this device's own log of whose edits it has applied. The current
+	 *  member list (`access`) is read from a record any Editor can empty, so it
+	 *  cannot answer this. Gated exactly like `lastEdit`. Any failure to read
+	 *  the evidence answers `everShared: true`. */
+	async function handleExposure(envelope: Envelope): Promise<EntityExposure | null> {
+		await requireCapability(envelope, options, SHARING_READ_CAPABILITY);
+		const entityId = typeof envelope.args[0] === "string" ? envelope.args[0] : "";
+		if (!entityId) throw makeError("Invalid", "sharing.exposure: entityId required");
+		const repo = (await options.getEntitiesRepo?.()) ?? null;
+		if (!repo) return null;
+		const type = repo.get(entityId)?.type;
+		if (!type) return null;
+		try {
+			await requireCapability(envelope, options, `entities.read:${type}`);
+		} catch (error) {
+			if ((error as Error).name === "Denied") return null;
+			throw error;
+		}
+		try {
+			const engine = engineFor();
+			const lastEditor = repo.lastEdits.get(entityId)?.editor ?? null;
+			const editedByAnother = lastEditor !== null && lastEditor !== engine.whoami().userPubB64;
+			return { everShared: editedByAnother || (await engine.shareTrace(entityId)) };
+		} catch {
+			return { everShared: true };
+		}
+	}
+
 	return async (envelope: Envelope): Promise<unknown> => {
 		switch (envelope.method) {
 			case "pendingInvite":
@@ -381,6 +434,8 @@ export function makeSharingServiceHandler(options: SharingServiceOptions): Servi
 				return await handleDefaultRole(envelope);
 			case "lastEdit":
 				return await handleLastEdit(envelope);
+			case "exposure":
+				return await handleExposure(envelope);
 			case "createInvite":
 				return await handleCreateInvite(envelope);
 			case "share":

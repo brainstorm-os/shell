@@ -216,7 +216,12 @@ describe("useToolArgumentPrompt / ToolArgumentPrompt", () => {
 		mount();
 		act(() => {
 			void promptFor(
-				tool([inputDef({ name: "note", required: true, valueType: ValueType.EntityRef })]),
+				// A second input keeps this a real question: a tool the target answers
+				// in full opens no form at all (Tool-10, below).
+				tool([
+					inputDef({ name: "note", required: true, valueType: ValueType.EntityRef }),
+					inputDef({ name: "tone" }),
+				]),
 				{ target: { entityId: "e42", entityType: "brainstorm/Note/v1" } },
 			);
 		});
@@ -242,5 +247,33 @@ describe("useToolArgumentPrompt / ToolArgumentPrompt", () => {
 		});
 		expect(first).toBeNull();
 		expect(container.querySelector("[data-testid='tool-arg-other']")).not.toBeNull();
+	});
+});
+
+describe("useToolArgumentPrompt — nothing to ask (Tool-10)", () => {
+	const NOTE = "io.brainstorm.notes/Note/v1";
+	const source = inputDef({
+		name: "source",
+		required: true,
+		valueType: ValueType.EntityRef,
+		allowedTypes: [NOTE],
+	});
+
+	it("resolves from the target without opening a form", async () => {
+		mount();
+		let pending!: Promise<Readonly<Record<string, unknown>> | null>;
+		act(() => {
+			pending = promptFor(tool([source]), { target: { entityId: "n1", entityType: NOTE } });
+		});
+		await expect(pending).resolves.toEqual({ source: "n1" });
+		expect(container.querySelector("[data-testid^='tool-arg-']")).toBeNull();
+	});
+
+	it("still opens the form when the target cannot fill the input", () => {
+		mount();
+		act(() => {
+			void promptFor(tool([source]), { target: { entityId: "t1", entityType: "x/Task/v1" } });
+		});
+		expect(container.querySelector("[data-testid='tool-arg-source']")).not.toBeNull();
 	});
 });

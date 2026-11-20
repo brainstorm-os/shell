@@ -23,7 +23,7 @@
  */
 
 import type { AppToolRecord } from "@brainstorm-os/sdk-types";
-import { AppToolApprovalState } from "@brainstorm-os/sdk-types";
+import { AppToolApprovalState, sanitizeAppLabel } from "@brainstorm-os/sdk-types";
 import { ulid } from "ulid";
 
 export const TOOL_APPROVAL_PROMPT_CHANNEL = "tools:approval-prompt" as const;
@@ -34,16 +34,39 @@ export const TOOL_APPROVAL_REPLY_CHANNEL = "tools:approval-reply" as const;
  *  this one is deliberately generous. A prompt that expires is NOT approved. */
 export const TOOL_APPROVAL_TIMEOUT_MS = 120_000;
 
+/** How much of a party's NAME the prompt shows. A manifest `name` is free
+ *  text; a long one pushes the app id — the part a lookalike cannot fake — out
+ *  of view. Counted in code points; an over-long name ends in an ellipsis. */
+export const TOOL_APPROVAL_LABEL_MAX = 48;
+
+/** The name the prompt shows for an app: screened like every other
+ *  manifest-authored string (invisible / bidi text refuses the whole name),
+ *  clamped, and falling back to the registry-minted id when unusable. Never
+ *  the only thing shown — the id always rides beside it. */
+export function approvalPartyLabel(raw: string | undefined, appId: string): string {
+	const clean = sanitizeAppLabel(raw);
+	if (clean === null) return appId;
+	const points = Array.from(clean);
+	if (points.length <= TOOL_APPROVAL_LABEL_MAX) return clean;
+	return `${points.slice(0, TOOL_APPROVAL_LABEL_MAX).join("").trimEnd()}…`;
+}
+
 /** What the dashboard renders. Every string here is provider-authored and has
  *  been through Tool-2's screen; the renderer still treats it as data. */
 export type ToolApprovalRequest = {
 	requestId: string;
 	/** Who wants to run it — an app id, or an agent fingerprint. */
 	callerAppId: string;
+	/** The caller's registry name, resolved by the shell from the verified id,
+	 *  screened and clamped (`approvalPartyLabel`). A NAME IS NOT AN IDENTITY —
+	 *  any app may call itself "Notes" — so the prompt always shows it together
+	 *  with `callerAppId`. Equal to the id when there is no usable name. */
+	callerLabel: string;
 	toolId: string;
 	toolTitle: string;
 	toolDescription: string;
 	providerAppId: string;
+	/** As `callerLabel`, for the provider — shown beside `providerAppId`. */
 	providerLabel: string;
 	effect: string;
 	/** Why we are asking: a first approval, a re-approval after the declaration
@@ -88,6 +111,7 @@ export class ToolApprovalHost {
 	 *  no dashboard, a timeout, a dropped renderer, a malformed reply. */
 	async request(input: {
 		callerAppId: string;
+		callerLabel: string;
 		tool: AppToolRecord;
 		providerLabel: string;
 		reason: ToolApprovalReason;
@@ -112,11 +136,12 @@ export class ToolApprovalHost {
 			dashboard.send(TOOL_APPROVAL_PROMPT_CHANNEL, {
 				requestId,
 				callerAppId: input.callerAppId,
+				callerLabel: approvalPartyLabel(input.callerLabel, input.callerAppId),
 				toolId: input.tool.id,
 				toolTitle: input.tool.title,
 				toolDescription: input.tool.description,
 				providerAppId: input.tool.appId,
-				providerLabel: input.providerLabel,
+				providerLabel: approvalPartyLabel(input.providerLabel, input.tool.appId),
 				effect: String(input.tool.effect),
 				reason: input.reason,
 				agentInitiated: input.agentInitiated,

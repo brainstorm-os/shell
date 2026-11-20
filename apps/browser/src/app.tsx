@@ -1329,8 +1329,11 @@ export function BrowserApp(): ReactElement {
 	const blockedTrackers = active?.blockedTrackerCount ?? 0;
 	const readerEnabled = canReader(active?.url);
 	const readerLabel = activeReader ? t("reader.exit") : t("reader.enter");
+	const readerHint = readerEnabled ? readerLabel : t("reader.unavailable");
 	const clipPhase = clipPhaseFor(clipAttempt, active?.id ?? null);
 	const clipEnabled = entities !== null && canClip(active?.url, clipPhase);
+	const clipHint =
+		clipEnabled || clipPhase === ClipPhase.Saving ? clipLabel(clipPhase) : t("clip.unavailable");
 	const activeFindResult = active ? (findResults[active.id] ?? null) : null;
 	const activePermissionAsk = active
 		? (pendingPermissions.find((p) => p.tabId === active.id) ?? null)
@@ -1431,8 +1434,8 @@ export function BrowserApp(): ReactElement {
 					type="button"
 					className={`browser__navbtn browser__reader-toggle${activeReader ? " browser__reader-toggle--on" : ""}`}
 					aria-label={readerLabel}
-					data-bs-tooltip={readerLabel}
-					title={!readerEnabled ? readerLabel : undefined}
+					data-bs-tooltip={readerHint}
+					title={!readerEnabled ? readerHint : undefined}
 					aria-pressed={activeReader !== null}
 					disabled={!readerEnabled}
 					onClick={() => void onToggleReader()}
@@ -1444,8 +1447,8 @@ export function BrowserApp(): ReactElement {
 					type="button"
 					className={`browser__clip browser__clip--${clipPhase}`}
 					aria-label={clipLabel(clipPhase)}
-					data-bs-tooltip={clipLabel(clipPhase)}
-					title={!clipEnabled ? clipLabel(clipPhase) : undefined}
+					data-bs-tooltip={clipHint}
+					title={!clipEnabled ? clipHint : undefined}
 					disabled={!clipEnabled}
 					onClick={() => void onClip()}
 				>
@@ -1468,13 +1471,15 @@ export function BrowserApp(): ReactElement {
 				<button
 					ref={menuButtonRef}
 					type="button"
-					className="browser__navbtn"
+					className="browser__navbtn bs-object-menu__more"
 					aria-label={t("menu.open")}
 					data-bs-tooltip={t("menu.open")}
 					aria-haspopup="menu"
 					onClick={onOpenBrowserMenu}
 				>
-					<Icon name={IconName.More} size={16} />
+					<span className="bs-object-menu__more-dot" />
+					<span className="bs-object-menu__more-dot" />
+					<span className="bs-object-menu__more-dot" />
 				</button>
 			</form>
 			{findOpen && (

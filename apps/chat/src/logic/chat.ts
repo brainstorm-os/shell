@@ -13,6 +13,8 @@
 
 import {
 	AGENT_TYPE,
+	BUILTIN_AGENT_APP_ID,
+	BUILTIN_AGENT_MENTION_REF,
 	MESSAGE_TYPE_URL,
 	type MessageAttachment,
 	type MessageDef,
@@ -23,7 +25,7 @@ import {
 } from "@brainstorm-os/sdk-types";
 import { parseAttachments } from "@brainstorm-os/sdk/composer-context";
 import { readPinned } from "./pins";
-import { type ChannelProposal, readChannelProposal } from "./proposal";
+import { type ChannelProposal, readChannelProposal, readProposalPreview } from "./proposal";
 
 /** The Chat-owned channel type (a channel is NOT an AI `Conversation/v1`, so
  *  it never collides with the Agent app's primary opener). */
@@ -66,7 +68,9 @@ export type ChatMessage = {
 	richBody?: string;
 	/** Stable author key (the participant `personRef`) — drives colour + grouping. */
 	authorRef: string;
-	/** The author's display name at send time (denormalised onto the message). */
+	/** The author's name AS THIS VIEWER SHOULD READ IT ({@link authorLabel}):
+	 *  "You" for the local identity, otherwise the member's name or a neutral
+	 *  fallback. Not the raw denormalised `sender.displayName`. */
 	authorName: string;
 	createdAt: string;
 	seq: number;
@@ -77,6 +81,13 @@ export type ChatMessage = {
 	 *  row carries a well-formed one. Absent for every ordinary message AND for
 	 *  a malformed proposal (fail-closed: it renders as an ordinary message). */
 	proposal?: ChannelProposal;
+	/** Agent-13 — the card is not this viewer's to decide: it was staged by
+	 *  someone else's `@agent` invocation (or is only a synced preview of one).
+	 *  It renders with its actions disabled and a line saying whose it is. */
+	proposalReadOnly?: boolean;
+	/** Agent-13 — set on a row that presents as the built-in agent: whether
+	 *  this device's host vouches for it. Never derived from synced fields. */
+	agentTrust?: AgentRowTrust;
 };
 
 /** One run of consecutive messages from the same author on the same day, within
@@ -129,9 +140,65 @@ export function deriveChannels(entities: readonly EntityLike[]): ChatChannel[] {
 
 // ─────────────────────────────── messages ───────────────────────────────
 
-/** The author key + name for a message: the `participant` sender's `personRef`
- *  / `displayName` when present, falling back to the entity id / "Someone" so a
- *  malformed sender never crashes the render. */
+/** What builds up to 0.15 denormalised onto a message whose author had set no
+ *  display name. It was written into the SYNCED row, so every other member's
+ *  shell rendered that author as "You". Read as "no name" unless the row was
+ *  authored under a per-device key, where it can only ever have meant the
+ *  person looking at it. */
+const LEGACY_UNNAMED_AUTHOR = "You";
+
+/** The author key a single device minted before authorship moved to the
+ *  sovereign pubkey (`mintPersonRef`). Never shared between people. */
+const DEVICE_AUTHOR_PREFIX = "chat-person-";
+
+/** How an author is named for THIS viewer. */
+export type AuthorLabels = {
+	/** This viewer's author key. "You" is only ever said about this key. */
+	selfRef?: string;
+	/** This viewer's own display name; "" when they have not set one. */
+	selfName?: string;
+	/** The localised "You". */
+	you: string;
+	/** The localised label for a member nothing else can name. */
+	unnamed: string;
+	/** A member's live display name by author key (the roster), if known. */
+	nameOf?: (authorRef: string) => string | undefined;
+};
+
+/** A short, human-checkable form of an author key for a member with no name. */
+export function shortAuthorRef(authorRef: string): string {
+	return authorRef.length > 8 ? `${authorRef.slice(0, 6)}…` : authorRef;
+}
+
+/**
+ * The name to show for a message's author. "You" is reserved for the local
+ * identity: another member with no display name gets their roster name, else
+ * a short form of their key, else the neutral "unknown member" - never "You".
+ */
+export function authorLabel(
+	author: { authorRef: string; authorName: string },
+	labels: AuthorLabels,
+): string {
+	if (labels.selfRef && author.authorRef === labels.selfRef) {
+		return labels.selfName?.trim() || labels.you;
+	}
+	const live = labels.nameOf?.(author.authorRef)?.trim();
+	if (live) return live;
+	const stored = author.authorName.trim();
+	const placeholder =
+		stored === LEGACY_UNNAMED_AUTHOR && !author.authorRef.startsWith(DEVICE_AUTHOR_PREFIX);
+	if (stored && !placeholder) return stored;
+	return shortAuthorRef(author.authorRef) || labels.unnamed;
+}
+
+/** With no viewer context, nobody is "You": an unnamed author is their key. */
+const ANONYMOUS_VIEWER: AuthorLabels = { you: "", unnamed: "" };
+
+/** The author key + STORED name for a message: the `participant` sender's
+ *  `personRef` / `displayName` when present, falling back to the entity id /
+ *  "Someone" so a malformed sender never crashes the render. The stored name is
+ *  what the author called themselves at send time and may be empty; it is
+ *  turned into a label by {@link authorLabel}. */
 function readAuthor(
 	properties: Record<string, unknown>,
 	fallbackId: string,
@@ -143,8 +210,7 @@ function readAuthor(
 	if (sender && typeof sender === "object") {
 		const s = sender as Record<string, unknown>;
 		const ref = str(s.personRef);
-		const name = str(s.displayName);
-		if (ref) return { authorRef: ref, authorName: name || ref };
+		if (ref) return { authorRef: ref, authorName: str(s.displayName) };
 	}
 	return { authorRef: `anon:${fallbackId}`, authorName: "Someone" };
 }
@@ -176,7 +242,73 @@ export function trustedAgentAuthors(entities: readonly EntityLike[]): ReadonlySe
 export type ToMessageContext = {
 	/** {@link trustedAgentAuthors} — the vault's own agent members. */
 	trustedAgents?: ReadonlySet<string>;
+	/** Agent-13 — this viewer's sovereign pubkey. A built-in-agent card is
+	 *  decidable only when its invoker is this key; omit it and every such card
+	 *  is read-only (fail-closed, like the trusted set). */
+	selfPubkey?: string;
+	/** How authors are named for this viewer. Omit it and no author is "You"
+	 *  (an unnamed author renders as a short form of their key). */
+	authorLabels?: AuthorLabels;
 };
+
+/** Agent-13 — how far a row that presents as the built-in agent is trusted. */
+export enum AgentRowTrust {
+	/** Written on THIS device by the Agent app (the host-written author says
+	 *  so): the run happened here, for this device's own identity. */
+	Vouched = "vouched",
+	/** Everything about it is another member's synced data. It may well be
+	 *  their agent's honest reply — nothing here can tell — so it is labelled
+	 *  as shown from another device and never attributed to the real agent. */
+	Unverified = "unverified",
+}
+
+/** The author key an UNVERIFIED agent-presenting row is filed under, so it can
+ *  never share a header (or a colour) with the real agent's replies. */
+export const UNVERIFIED_AGENT_REF = `unverified:${BUILTIN_AGENT_MENTION_REF}`;
+
+function presentsAsBuiltinAgent(properties: Record<string, unknown>): boolean {
+	const sender = properties.sender;
+	return (
+		!!sender &&
+		typeof sender === "object" &&
+		(sender as Record<string, unknown>).personRef === BUILTIN_AGENT_MENTION_REF
+	);
+}
+
+/**
+ * Agent-13 — classify a row that presents as the built-in agent, and resolve
+ * its card.
+ *
+ * The ONLY trust signal is the host-written author. `sender`, `agentInvoker`
+ * and the proposal preview are ordinary synced properties: any member of a
+ * shared channel can write all three, so on their own they once painted a
+ * convincing "Agent · asked by <victim> · approved" card. Now:
+ *   · VOUCHED (author is this device's Agent app) — the card comes from the
+ *     reserved `agentProposal` alone, decidable only by the invoker it names;
+ *   · UNVERIFIED (anything else) — the synced preview renders read-only under
+ *     an explicit "from another member's device, not verified" label, with no
+ *     invoker name and no outcome stated as fact.
+ */
+function builtinAgentRow(
+	entity: EntityLike,
+	selfPubkey: string | undefined,
+): { trust: AgentRowTrust; proposal: ChannelProposal | null; readOnly: boolean } | null {
+	if (!presentsAsBuiltinAgent(entity.properties)) return null;
+	if (entity.ownerAppId === BUILTIN_AGENT_APP_ID) {
+		const proposal = readChannelProposal(entity.properties);
+		const card = proposal?.invokedBy ? proposal : null;
+		return {
+			trust: AgentRowTrust.Vouched,
+			proposal: card,
+			readOnly: !!card && (!selfPubkey || card.invokedBy !== selfPubkey),
+		};
+	}
+	return {
+		trust: AgentRowTrust.Unverified,
+		proposal: readProposalPreview(entity.properties),
+		readOnly: true,
+	};
+}
 
 /**
  * Project a message row. A proposal is attached ONLY when the row's
@@ -194,19 +326,24 @@ export function toMessage(entity: EntityLike, context?: ToMessageContext): ChatM
 	const author = readAuthor(entity.properties, entity.id);
 	const richBody = str(entity.properties.richBody);
 	const trusted = context?.trustedAgents;
-	const proposal =
+	const teamProposal =
 		trusted?.has(entity.ownerAppId ?? "") === true ? readChannelProposal(entity.properties) : null;
+	const builtin = teamProposal ? null : builtinAgentRow(entity, context?.selfPubkey);
+	const proposal = teamProposal ?? builtin?.proposal ?? null;
+	const unverified = builtin?.trust === AgentRowTrust.Unverified;
 	return {
 		id: entity.id,
 		channelId: str(entity.properties.conversation),
 		body: str(entity.properties.body),
 		...(richBody ? { richBody } : {}),
-		authorRef: author.authorRef,
-		authorName: author.authorName,
+		authorRef: unverified ? UNVERIFIED_AGENT_REF : author.authorRef,
+		authorName: authorLabel(author, context?.authorLabels ?? ANONYMOUS_VIEWER),
 		createdAt: str(entity.properties.createdAt),
 		seq: num(entity.properties.seq) ?? 0,
 		attachments: parseAttachments(entity.properties.attachments),
 		...(proposal ? { proposal } : {}),
+		...(builtin?.readOnly ? { proposalReadOnly: true } : {}),
+		...(builtin ? { agentTrust: builtin.trust } : {}),
 	};
 }
 
@@ -221,12 +358,23 @@ export function sortMessages(messages: readonly ChatMessage[]): ChatMessage[] {
 /** The ordered messages of one channel from the live snapshot. Resolves the
  *  trusted-agent author set from the same snapshot, so a proposal card only
  *  renders for a local agent's own message (see {@link toMessage}). */
-export function channelMessages(entities: readonly EntityLike[], channelId: string): ChatMessage[] {
+export function channelMessages(
+	entities: readonly EntityLike[],
+	channelId: string,
+	selfPubkey?: string,
+	authorLabels?: AuthorLabels,
+): ChatMessage[] {
 	if (!channelId) return [];
 	const trustedAgents = trustedAgentAuthors(entities);
 	const rows = entities
 		.filter((e) => e.type === MESSAGE_TYPE && str(e.properties.conversation) === channelId)
-		.map((e) => toMessage(e, { trustedAgents }));
+		.map((e) =>
+			toMessage(e, {
+				trustedAgents,
+				...(selfPubkey ? { selfPubkey } : {}),
+				...(authorLabels ? { authorLabels } : {}),
+			}),
+		);
 	return sortMessages(rows);
 }
 
@@ -240,10 +388,16 @@ export function nextSeq(messages: readonly ChatMessage[]): number {
 
 // ─────────────────────────────── grouping ───────────────────────────────
 
-/** `YYYY-MM-DD` (UTC) of an ISO timestamp; "" when unparseable. */
+/** `YYYY-MM-DD` of an ISO timestamp in the viewer's LOCAL calendar — the same
+ *  zone the message time renders in, so a divider can never disagree with the
+ *  stamps beneath it. An unparseable stamp is returned as-is. */
 export function dayKey(iso: string): string {
-	const idx = iso.indexOf("T");
-	return idx > 0 ? iso.slice(0, idx) : iso;
+	const ms = Date.parse(iso);
+	if (!Number.isFinite(ms)) return iso;
+	const d = new Date(ms);
+	const month = String(d.getMonth() + 1).padStart(2, "0");
+	const day = String(d.getDate()).padStart(2, "0");
+	return `${d.getFullYear()}-${month}-${day}`;
 }
 
 /** Messages within this many ms by the same author collapse into one group. */
