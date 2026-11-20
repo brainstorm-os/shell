@@ -22,7 +22,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CapabilityLedger as CapabilityLedgerType } from "@brainstorm-os/capabilities/ledger";
 import { MESSAGE_TYPE_URL } from "@brainstorm-os/sdk-types";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
 import { __ydocCacheResetForTest, handleYDocEnvelope } from "../../workers/ydoc";
 import { AccessRole, activeMembers, getAccessArray, grantAccess } from "../collab/access-record";
@@ -611,12 +611,19 @@ describe("a shared chat channel carries every member's messages to every other m
 		expect(marcus.bodyOf(message)).toBeNull();
 		// Refused on the RECEIVING side, by the container-descent gate: the Viewer's
 		// own shell cannot be trusted to refuse itself.
+		// Waited for, not assumed after `settle`: the refusal is recorded at the end
+		// of a receive chain whose length `settle`'s fixed rounds only bound on a
+		// fast machine (the windows runner recorded none in time).
 		for (const peer of [mira, marcus]) {
-			expect(peer.refusals).toContain(
-				`${message}: ${ShareBootstrapVerdict.DenyContainerGranterNotMember}`,
+			await vi.waitFor(() =>
+				expect(peer.refusals).toContain(
+					`${message}: ${ShareBootstrapVerdict.DenyContainerGranterNotMember}`,
+				),
 			);
 			expect(peer.refusals.every((r) => r.startsWith(`${message}: deny-`))).toBe(true);
 		}
+		expect(mira.bodyOf(message)).toBeNull();
+		expect(marcus.bodyOf(message)).toBeNull();
 		// A Viewer still READS what the others post.
 		const fromOwner = await mira.post(channel, "read-only for you");
 		await settle(peers);

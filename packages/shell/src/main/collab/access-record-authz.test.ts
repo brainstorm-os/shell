@@ -780,7 +780,9 @@ describe("convergence", () => {
  * (b) every active member is reachable from the root by a chain of grants each
  *     signed by an owner — checked against an independent reference model.
  */
-describe("policy properties", () => {
+// Each property signs and verifies hundreds of statements: seconds alone, past
+// the 30s default on a hosted runner sharing its cores with the rest of the suite.
+describe("policy properties", { timeout: 120_000 }, () => {
 	const CAST = 5;
 	type Op =
 		| { kind: "grant"; signer: number; member: number; role: AccessRole }
