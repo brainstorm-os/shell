@@ -224,6 +224,16 @@ img.browser__tab-favicon {
 	height: 30px;
 }
 
+/* The browser menu wears the shared ⋯ glyph. It sits in the toolbar, not the
+ * `.app-header`, so the SDK's quiet-until-hover resting opacity would dim it
+ * against its always-visible neighbours. */
+.browser__navbtn.bs-object-menu__more {
+	display: inline-flex;
+	width: 30px;
+	height: 30px;
+	opacity: 1;
+}
+
 .browser__security {
 	display: inline-flex;
 	align-items: center;

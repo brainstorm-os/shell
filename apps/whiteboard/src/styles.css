@@ -223,9 +223,9 @@ button {
 	background: var(--hover);
 }
 
-/* Locked board — the picker no-ops; mirror the hdr-btn disabled face. */
+/* Locked board — the picker no-ops; mirror the shared header-icon-btn disabled face. */
 .whiteboard__board-icon-btn[aria-disabled="true"] {
-	opacity: 0.4;
+	opacity: 0.5;
 	cursor: default;
 }
 
@@ -255,66 +255,12 @@ button {
 	-webkit-app-region: no-drag;
 }
 
-/* Header content-action icon buttons — one chrome for add / style / arrange /
- * export / layers so the right group reads as a single consistent row of
- * 28×28 borderless icon chips (mirrors the cross-app `.bs-object-menu__more`
- * look), instead of the old mix of bordered chips + bare text buttons. The
- * panel toggle + ⋯ that trail the row keep their own SDK chrome. */
-.whiteboard__hdr-btn {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 28px;
-	height: 28px;
-	padding: 0;
-	background: transparent;
-	border: 0;
-	border-radius: var(--radius-sm);
-	color: var(--text-dim);
-	cursor: pointer;
-	-webkit-app-region: no-drag;
-	transition:
-		background-color var(--motion-duration-fast, 120ms) ease,
-		color var(--motion-duration-fast, 120ms) ease;
-}
-
-.whiteboard__hdr-btn:hover {
-	background: var(--hover);
-	color: var(--text);
-}
-
-/* Disabled trigger (F-200: Style with nothing selected). Stays focusable
- * so the explanatory label reaches keyboard / screen-reader users; the
- * click handler no-ops. */
-.whiteboard__hdr-btn[aria-disabled="true"] {
-	opacity: 0.4;
-	cursor: default;
-}
-
-.whiteboard__hdr-btn[aria-disabled="true"]:hover {
-	background: transparent;
-	color: var(--text-dim);
-}
-
-/* Active panel-toggle state (layers panel open) — the accent treatment the
- * shared `.bs-panel-toggle` uses, so a pressed header button reads the same
- * across apps. */
-.whiteboard__hdr-btn[aria-pressed="true"] {
-	background: var(--accent-soft);
-	color: var(--accent);
-}
-
-.whiteboard__hdr-btn:focus-visible {
-	outline: 2px solid var(--color-focus-ring);
-	outline-offset: -1px;
-}
-
 /* Transient export feedback (no status pill in this header). */
-.whiteboard__hdr-btn.is-success {
+:root .header-icon-btn.whiteboard__hdr-btn--success {
 	color: var(--accent);
 }
 
-.whiteboard__hdr-btn.is-error {
+:root .header-icon-btn.whiteboard__hdr-btn--error {
 	color: var(--danger);
 }
 

@@ -577,6 +577,8 @@ body.is-resizing .db-inspector__resize {
 }
 
 .db-tab--add:hover {
+	background: var(--hover);
+	border-radius: var(--radius-sm);
 	color: var(--text);
 }
 
@@ -993,6 +995,10 @@ body.is-resizing .db-inspector__resize {
  * shared `.bs-drag-grip` face; here we only park it in the gutter. */
 .dbv-grid__drag-grip {
 	--bs-drag-grip-inset: var(--space-1);
+	/* The 16px grip overhangs the 12px gutter into the first cell's padding;
+	 * a pinned title cell is opaque at z-index 2 and painted over its right
+	 * dot column, leaving a three-dot sliver. */
+	z-index: 3;
 }
 .dbv-grid__row:hover .dbv-grid__drag-grip {
 	opacity: 1;
@@ -1155,7 +1161,11 @@ body.is-resizing .db-inspector__resize {
  * hover inside the grid; the row hover is the affordance. The editor's own
  * focus ring on click is unaffected. */
 .dbv-grid__cell--editable > .bs-cell-pill:not(:disabled):hover,
-.dbv-grid__cell--editable > .bs-cell-plain:not(:disabled):hover {
+.dbv-grid__cell--editable > .bs-cell-plain:not(:disabled):hover,
+.dbv-grid__cell--editable > .bs-cell-tag-trigger:not(:disabled):not([aria-disabled="true"]):hover,
+.dbv-grid__cell--editable > .bs-cell-date-trigger:not(:disabled):hover,
+.dbv-grid__cell--editable > .bs-cell-link-trigger:not(:disabled):hover,
+.dbv-grid__cell--editable > .bs-cell-progress:not(:disabled):hover {
 	background: transparent;
 }
 
@@ -1174,9 +1184,8 @@ body.is-resizing .db-inspector__resize {
 	text-align: end;
 }
 
-/* The shared faces bleed 6px (pill) / 4px (plain) past the cell padding and
- * inset their text 2px, which lands a right-aligned value 4px / 2px outside
- * the cell's content edge. Trailing bleed = the face's own inset, so the
+/* The shared faces bleed 4px past the cell padding and inset their text 2px,
+ * which lands a right-aligned value 2px outside the cell's content edge. Trailing bleed = the face's own inset, so the
  * numerals end exactly on the edge the header label and footer use. */
 .dbv-grid__cell--numeric > .bs-cell-pill,
 .dbv-grid__cell--numeric > .bs-cell-plain,
@@ -1327,7 +1336,7 @@ body.is-resizing .db-inspector__resize {
 	border: 0;
 	border-radius: var(--radius-sm);
 	background: transparent;
-	color: var(--text-dim);
+	color: var(--color-text-secondary);
 	cursor: pointer;
 	opacity: 0;
 	transition:
