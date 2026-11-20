@@ -419,7 +419,13 @@ body {
 	cursor: pointer;
 }
 
-.te-tab--active {
+.te-tab:hover {
+	color: var(--color-text-primary);
+	border-bottom-color: var(--color-border-strong);
+}
+
+.te-tab--active,
+.te-tab--active:hover {
 	color: var(--color-text-primary);
 	border-bottom-color: var(--color-accent-default);
 }
@@ -559,9 +565,22 @@ body {
 	height: var(--control-height-sm);
 	padding: 0;
 	border-radius: var(--radius-sm);
-	border: var(--border-width) solid var(--color-border-default);
+	/* The fill is an arbitrary DRAFT value, so the edge is derived from the
+	 * text colour — the one thing guaranteed to contrast with the page. A
+	 * border token sits within a few percent of a near-background swatch
+	 * (#161616 on a #1a1a1a page) and the control vanishes. */
+	border: var(--border-width) solid color-mix(in srgb, var(--color-text-secondary) 45%, transparent);
 	flex-shrink: 0;
 	cursor: pointer;
+	transition: border-color var(--motion-duration-fast, 120ms) ease;
+}
+
+.te-row__swatch:hover {
+	border-color: var(--color-text-primary);
+}
+
+.te-row__reset:hover {
+	text-decoration: underline;
 }
 
 /* The value input takes the WHOLE remaining row width by default; it shrinks
