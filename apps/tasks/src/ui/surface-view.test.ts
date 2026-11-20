@@ -16,8 +16,9 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { TaskSurface } from "../types/surface";
 import { Priority, type Task } from "../types/task";
-import { type SearchViewProps, renderSearchView } from "./surface-view";
+import { type SearchViewProps, renderSearchView, renderSurfaceView } from "./surface-view";
 import type { TaskRowProps } from "./task-row";
 
 function task(overrides: Partial<Task> & { id: string }): Task {
@@ -125,5 +126,28 @@ describe("renderSearchView — KBN-A task list", () => {
 		});
 		expect(rows[0]?.querySelector(".task-row__tag")?.textContent).toBe("Urgent");
 		expect(rows[0]?.querySelector(".task-row__assignee")?.textContent).toBe("Mira Chen");
+	});
+});
+
+describe("renderSurfaceView — header pickers", () => {
+	it("sort and group-by triggers carry a caption and a caret, no leading glyph", () => {
+		const view = renderSurfaceView({
+			surface: { surface: TaskSurface.Upcoming, projectId: null, sections: [], count: 0 },
+			now: 0,
+			project: null,
+			projectsById: new Map(),
+			showCompleted: false,
+			onToggleShowCompleted: () => {},
+			rowProps: rowPropsBuilder({}),
+			onSetSort: () => {},
+			onSetUpcomingGrouping: () => {},
+		});
+		const pickers = view.querySelectorAll<HTMLElement>(".tasks-surface__picker");
+		expect(pickers).toHaveLength(2);
+		for (const picker of pickers) {
+			expect(picker.firstElementChild?.classList.contains("bs-select__value")).toBe(true);
+			expect(picker.querySelectorAll("svg")).toHaveLength(1);
+			expect(picker.querySelector("svg")?.classList.contains("bs-select__caret")).toBe(true);
+		}
 	});
 });

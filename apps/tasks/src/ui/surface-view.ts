@@ -301,7 +301,6 @@ function renderGroupByPicker(
 	button.type = "button";
 	button.className = "bs-select bs-select--sm tasks-surface__picker";
 	button.setAttribute("aria-haspopup", "menu");
-	button.appendChild(createIconElement(GROUP_AXIS_ICON[active], { size: 14 }));
 	const label = document.createElement("span");
 	label.className = "bs-select__value";
 	label.textContent = t("tasks.header.groupBy", { axis: t(GROUP_LABEL_KEY[active]) });
@@ -345,14 +344,15 @@ const SORT_ICON: Record<TaskSort, IconName> = {
 };
 
 /** The "Sort ▾" header control — present on every list surface. Mirrors the
- *  group-by picker: the shared `.bs-select` face (POLISH-DSN-4), a leading
- *  glyph, and the shared anchored menu with the active key marked. */
+ *  group-by picker: the shared `.bs-select` face (POLISH-DSN-4) with no
+ *  leading glyph (the caption names the control; the default order's page
+ *  glyph read as a document, not a sort), and the shared anchored menu with
+ *  the active key marked. */
 function renderSortPicker(active: TaskSort, onSet: (sort: TaskSort) => void): HTMLElement {
 	const button = document.createElement("button");
 	button.type = "button";
 	button.className = "bs-select bs-select--sm tasks-surface__picker";
 	button.setAttribute("aria-haspopup", "menu");
-	button.appendChild(createIconElement(SORT_ICON[active], { size: 14 }));
 	const label = document.createElement("span");
 	label.className = "bs-select__value";
 	label.textContent = t("tasks.header.sortBy", { key: t(SORT_LABEL_KEY[active]) });
