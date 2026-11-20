@@ -4822,6 +4822,12 @@ void app.whenReady().then(async () => {
 			const repo = await getEntitiesRepoForActiveSession();
 			return repo?.get(entityId)?.properties ?? null;
 		},
+		// The creator has to live-sync its own child as well: nothing opens a
+		// message's doc, so without this its later edits never emit and edits by
+		// other members arrive on a channel this device never subscribed.
+		onShared: (entityId, type) => {
+			void getLiveSyncEngine()?.refreshMembership(entityId, type);
+		},
 	});
 
 	// Agent-Teams-5 (doc 69 §O.2) — assignment-driven agent runs. An entity
