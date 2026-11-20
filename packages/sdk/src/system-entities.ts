@@ -43,21 +43,32 @@ export function isSystemEntityType(entityType: string): boolean {
 /**
  * Parent-scoped child entity types — rows that only carry meaning inside
  * their container: a Message inside its Channel/Conversation, a Comment on
- * the document it annotates. The user authored them deliberately (so they
- * are NOT system types), but as top-level items they are noise: 36
- * "(untitled) · Message" rows burying the vault's real documents (F-318).
+ * the document it annotates, an Email inside its account's folders. They are
+ * real content (so they are NOT system types), but as top-level items they
+ * are noise: 36 "(untitled) · Message" rows burying the vault's real
+ * documents (F-318), and a synced mailbox doing the same with every message
+ * it mirrors.
  *
  * Contract — unlike the presentation-only system set, universal browse
  * surfaces (the Files vault browser, the Database "All vault items" list)
  * EXCLUDE these from their default top-level listings. Scope is default
  * browsing only: search still indexes the content, and the parent apps
- * (Chat, Agent, the comments panel) remain the dedicated readers.
+ * (Chat, Agent, the comments panel, Mailbox) remain the dedicated readers.
  *
  * Membership rule: a type belongs here when every row carries a required
  * reference to its parent and is never opened standalone.
+ *
+ * Mail, classified deliberately: an `Email/v1` requires `accountRef` +
+ * `folderRefs` and is only ever read in Mailbox's reading pane — a child
+ * (drafts are Emails carrying the draft flag; threads are a `threadKey`, not
+ * a type). A `MailFolder/v1` is the CONTAINER (mail's Channel) and a
+ * `MailAccount/v1` a deliberate creation with its own management UX, so
+ * neither is listed here or in the system set. A fetched attachment is an
+ * ordinary `File/v1` and stands on its own.
  */
 export const ChildEntityType = {
 	Comment: "brainstorm/Comment/v1",
+	Email: "brainstorm/Email/v1",
 	Message: "brainstorm/Message/v1",
 } as const;
 
