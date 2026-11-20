@@ -55,6 +55,7 @@ import {
 	resolveCurrentMembers,
 	revokeAccess,
 } from "./access-record";
+import { governingContainers } from "./container-rule";
 import { childrenSourceFor, containmentRuleForParent } from "./containment-registry";
 import { inboxChannelFor } from "./inbox-channel";
 import { cacheRemoteProfile, readSelfProfileSnapshot } from "./profile-store";
@@ -89,6 +90,25 @@ export type CollabAccessView = {
 	role: AccessRole;
 	active: boolean;
 	revokedAt: number | null;
+};
+
+/** Why a child was left as it was by a collection revoke. */
+export enum IncompleteRemovalReason {
+	/** Revoking or re-keying it threw. */
+	Failed = "failed",
+	/** This identity is not an owner of the child, so it may not re-key it. */
+	NotOwner = "not-owner",
+	/** This device holds no key for the child. */
+	NoKey = "no-key",
+}
+
+/** What a revoke did. `incomplete` lists the container's children that were
+ *  NOT re-keyed away from the removed member: they can no longer WRITE them
+ *  (the container rule), but later edits to those children stay readable by
+ *  them until this is retried. Empty for a single entity. */
+export type RevokeResult = {
+	revoked: boolean;
+	incomplete: Array<{ entityId: string; reason: IncompleteRemovalReason }>;
 };
 
 /** The local identity is not allowed to make this change to the entity's
@@ -612,12 +632,17 @@ export class SharingEngine {
 	 * anyone removing the root owner).
 	 */
 	async revoke(entityId: string, memberB64: string): Promise<boolean> {
+		return (await this.revokeMember(entityId, memberB64)).revoked;
+	}
+
+	/** {@link revoke}, saying what it could not finish (see {@link RevokeResult}). */
+	async revokeMember(entityId: string, memberB64: string): Promise<RevokeResult> {
 		const type = this.#types.get(entityId) ?? (await this.ensureEntitiesRepo()).get(entityId)?.type;
 		const isContainer = type !== undefined && containmentRuleForParent(type) !== null;
 		// Leaving is the member's own act on the container alone: the container
 		// rule already stops them writing its children on every other device.
 		if (!isContainer || memberB64 === this.#session.identity.publicKeyBase64) {
-			return this.#revokeOne(entityId, memberB64);
+			return { revoked: await this.#revokeOne(entityId, memberB64), incomplete: [] };
 		}
 		return this.revokeFromCollection(entityId, type, memberB64);
 	}
@@ -639,22 +664,30 @@ export class SharingEngine {
 	 * old message is no more readable by the removed member than a new message
 	 * is. What they were already sent stays readable to them - not a goal.
 	 *
-	 * Sequential and not resumable: a child this device does not own, or holds
-	 * no key for, or never reaches because the shell quit mid-walk, keeps its
-	 * old key (its later edits stay readable by the removed member) while the
-	 * writer gate still refuses them.
+	 * The walk carries on past a child it cannot finish and REPORTS it: a child
+	 * this identity does not own, or holds no key for, or that threw, keeps its
+	 * old key. It is sequential and not resumable across a restart.
 	 */
 	async revokeFromCollection(
 		containerId: string,
 		containerType: string,
 		memberB64: string,
-	): Promise<boolean> {
-		if (!(await this.#revokeOne(containerId, memberB64))) return false;
+	): Promise<RevokeResult> {
+		const revoked = await this.#revokeOne(containerId, memberB64);
+		// Not a member now, and not one we ever removed: nothing to walk. A member
+		// removed EARLIER is walked again, so a removal that was left incomplete
+		// can be finished by asking again.
+		const removed = (await this.#currentMembersOf(containerId)).find(
+			(m) => m.member === memberB64 && !m.active,
+		);
+		if (!revoked && !removed) return { revoked: false, incomplete: [] };
+		const memberDevice = removed?.x25519 ?? null;
 		const selfPub = this.#session.identity.publicKeyBase64;
 		const exposed = this.#session.exposeIdentityForPairing();
+		const incomplete: RevokeResult["incomplete"] = [];
 		for (const childId of await this.#childrenOf(containerId, containerType)) {
 			try {
-				const rotate = await this.#mutateRecord(childId, (doc, trustNow) => {
+				const owned = await this.#mutateRecord(childId, (doc, trustNow) => {
 					const trust = trustNow();
 					if (!mayGrant(doc, childId, selfPub, trust)) return false;
 					if (mayRevoke(doc, childId, selfPub, memberB64, trust)) {
@@ -668,17 +701,45 @@ export class SharingEngine {
 					}
 					return true;
 				});
-				if (!rotate) continue;
+				if (!owned) {
+					incomplete.push({ entityId: childId, reason: IncompleteRemovalReason.NotOwner });
+					continue;
+				}
 				const dekStore = await this.ensureDekStore();
 				const held = dekStore.open(childId);
-				if (!held) continue;
+				if (!held) {
+					incomplete.push({ entityId: childId, reason: IncompleteRemovalReason.NoKey });
+					continue;
+				}
 				dekStore.close(held.dek);
+				// Already re-keyed away from them (an earlier, partial walk): leave it.
+				// Once a key has been rotated every holder has a wrap of it, so no
+				// wrap means no key; the ORIGINAL key is different - its author
+				// minted it and never needed one.
+				const rekeyedAway =
+					held.version > 1 &&
+					memberDevice !== null &&
+					!(await this.#holdsCurrentKey(childId, memberDevice, held.version));
+				if (rekeyedAway) continue;
 				await this.#rotateAfterRevoke(childId);
 			} catch (error) {
-				console.warn(`[sharing] revoke cascade skipped ${childId}: ${(error as Error).message}`);
+				incomplete.push({ entityId: childId, reason: IncompleteRemovalReason.Failed });
+				console.warn(
+					`[sharing] revoke cascade could not finish ${childId}: ${(error as Error).message}`,
+				);
 			}
 		}
-		return true;
+		return { revoked, incomplete };
+	}
+
+	/** Does the child's doc carry a wrap of its CURRENT key for `deviceX25519`? */
+	async #holdsCurrentKey(entityId: string, deviceX25519: string, version: number): Promise<boolean> {
+		const { doc } = await this.#session.ydocStore.load(entityId);
+		try {
+			return findWrapForRecipient(doc, base64ToBytes(deviceX25519), version) !== null;
+		} finally {
+			doc.destroy();
+		}
 	}
 
 	/** The children of a container: what the index says points at it now, plus
@@ -963,7 +1024,13 @@ export class SharingEngine {
 		try {
 			const trust = store.trustFor(doc, entityId);
 			members = resolveCurrentMembers(doc, entityId, trust);
-			containers = store.containersOf(doc, entityId, trust);
+			const repo = await this.ensureEntitiesRepo();
+			containers = await governingContainers(
+				{ session: this.#session, accessTrust: store, rowOf: (id) => repo.get(id) },
+				doc,
+				entityId,
+				trust,
+			);
 		} finally {
 			doc.destroy();
 		}

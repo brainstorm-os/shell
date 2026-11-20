@@ -337,8 +337,17 @@ export function makeSharingServiceHandler(options: SharingServiceOptions): Servi
 			throw makeError("Invalid", "sharing.revoke: entityId + member required");
 		}
 		const engine = engineFor();
-		await asDenied(() => engine.revoke(entityId, member));
+		const result = await asDenied(() => engine.revokeMember(entityId, member));
 		if (type) options.refreshMembership?.(entityId, type);
+		// The member IS removed (and can no longer write anything in it), but
+		// some of what it contains could not be re-keyed away from them. That is
+		// not a success to report quietly: say so, and let the caller retry.
+		if (result.incomplete.length > 0) {
+			throw makeError(
+				"Incomplete",
+				`sharing.revoke: removed, but ${result.incomplete.length} item(s) in it could not be re-keyed and stay readable by the removed member`,
+			);
+		}
 		return (await engine.access(entityId)).map(toSharedMember);
 	}
 

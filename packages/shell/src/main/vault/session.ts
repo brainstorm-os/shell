@@ -48,6 +48,7 @@ import { BillingService } from "../billing/billing-service";
 import { CreditLedgerRepository } from "../billing/credit-ledger-repo";
 import { EntitlementRepository } from "../billing/entitlement-repo";
 import { AccessTrustStore } from "../collab/access-trust";
+import { deriveInviteSecret, verifyInviteAnchor } from "../collab/invite-anchor";
 import {
 	clearAppLockPin,
 	hasAppLockPin,
@@ -437,6 +438,19 @@ export class VaultSession {
 		this.cachedAccessTrust ??= new AccessTrustStore(
 			new AccessTrustRepository(db),
 			this.identity.publicKeyBase64,
+			{
+				// "Did the party we handed an invite to make this grant?" - answered
+				// from our own key, so it holds on every device of this identity.
+				verifyAnchor: (entityId, grant) =>
+					verifyInviteAnchor({
+						anchor: grant.anchor,
+						entityId,
+						memberPubB64: this.identity.publicKeyBase64,
+						ownerPubB64: grant.addedBy,
+						deriveSecret: (nonce, expiresAt) =>
+							deriveInviteSecret((bytes) => this.signPayload(bytes), nonce, expiresAt),
+					}),
+			},
 		);
 		return this.cachedAccessTrust;
 	}

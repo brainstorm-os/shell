@@ -29,10 +29,16 @@ import {
 	type AccessTrust,
 	type GrantStatement,
 	type RevokeStatement,
+	accessRecordTampered,
 	deriveAccessRoot,
 	effectiveStatements,
+	firstSightRoot,
 	isAccessRole,
 } from "./access-record";
+
+/** Does the invite anchor on `grant` (a grant naming this identity) verify
+ *  under this identity's own invite secret? */
+export type AnchorVerifier = (entityId: string, grant: GrantStatement) => boolean;
 
 /** What the store needs from storage — `AccessTrustRepository` in production,
  *  an in-memory map in tests. */
@@ -40,7 +46,13 @@ export type AccessTrustPersistence = {
 	getRoot(entityId: string): string | null;
 	pinRoot(entityId: string, rootPub: string, now: number): string;
 	listStatements(entityId: string): AccessStatementRecord[];
-	remember(entityId: string, records: readonly AccessStatementRecord[], now: number): void;
+	/** Returns how many of `records` could not be kept. */
+	remember(
+		entityId: string,
+		records: readonly AccessStatementRecord[],
+		now: number,
+		rootPub: string,
+	): number;
 	getContainer(entityId: string): string | null;
 	pinContainer(entityId: string, containerId: string, now: number): string;
 	listContained(containerId: string): string[];
@@ -89,15 +101,62 @@ export class AccessTrustStore {
 	readonly #persistence: AccessTrustPersistence;
 	readonly #selfPubB64: string;
 	readonly #now: () => number;
+	readonly #warnedFull = new Set<string>();
+
+	readonly #verifyAnchor: AnchorVerifier;
 
 	constructor(
 		persistence: AccessTrustPersistence,
 		selfPubB64: string,
-		now: () => number = Date.now,
+		options: { now?: () => number; verifyAnchor?: AnchorVerifier } = {},
 	) {
 		this.#persistence = persistence;
 		this.#selfPubB64 = selfPubB64;
-		this.#now = now;
+		this.#now = options.now ?? Date.now;
+		this.#verifyAnchor = options.verifyAnchor ?? (() => false);
+	}
+
+	/**
+	 * The root of a doc this device HOLDS but has no pin for - an entity that
+	 * was here before 0.16, or one whose pin was lost.
+	 *
+	 *   1. Us, if we signed its genesis grant.
+	 *   2. The root named by whoever INVITED us: a grant naming us whose invite
+	 *      anchor verifies under our own invite secret is one only the party we
+	 *      invited could have made, so it is believed over anything else in the
+	 *      record - a second "root" someone added, or a lone impostor's.
+	 *   3. With no such grant (we are the creator's other device, or the entity
+	 *      came by a cascade), the ONE candidate that makes us a member - but
+	 *      only if nothing was ever deleted from the record. A record with
+	 *      deletions is not believed on its own say-so: it resolves nobody until
+	 *      the genuine statements return (`recoverRoot`).
+	 */
+	#deriveRoot(doc: Y.Doc, entityId: string, memory: AccessMemory, fallback: boolean): string | null {
+		const invited = firstSightRoot(
+			doc,
+			entityId,
+			this.#selfPubB64,
+			(grant) =>
+				grant.addedBy === this.#selfPubB64 ||
+				(grant.anchor !== null && this.#verifyAnchor(entityId, grant)),
+		);
+		if (invited !== null) return invited;
+		if (!fallback || accessRecordTampered(doc)) return null;
+		return deriveAccessRoot(doc, entityId, { self: this.#selfPubB64, memory });
+	}
+
+	/**
+	 * Try to establish the root of an UNPINNED entity from `doc` using only
+	 * evidence a collaborator cannot fabricate (rules 1-2 of the lazy pin), and
+	 * pin it. This is the way back for a device left resolving nobody: the
+	 * moment the true owner's statements reach it again - her device re-asserts
+	 * them whenever tampering reaches her - the root is hers.
+	 */
+	recoverRoot(doc: Y.Doc, entityId: string): string | null {
+		const pinned = this.#persistence.getRoot(entityId);
+		if (pinned !== null) return pinned;
+		const root = this.#deriveRoot(doc, entityId, this.memoryOf(entityId), false);
+		return root === null ? null : this.pinRoot(entityId, root);
 	}
 
 	/** Pin the container `entityId` was first seen in (a cascade child). The
@@ -125,14 +184,24 @@ export class AccessTrustStore {
 	 * so moving a message does not move who may write it. Empty for an entity
 	 * that is not a cascade child.
 	 */
-	containersOf(doc: Y.Doc, entityId: string, trust: AccessTrust): string[] {
+	containersOf(
+		doc: Y.Doc,
+		entityId: string,
+		trust: AccessTrust,
+		/** The container this device's own row for the entity points at, when
+		 *  that container is a shared one here (`container-rule.ts`). The last
+		 *  resort for a child that predates `via` and pins - never exempt it. */
+		structural: string | null = null,
+	): string[] {
 		const pinned = this.#persistence.getContainer(entityId);
 		if (pinned !== null) return [pinned];
-		if (trust.root === null) return [];
 		const named = new Set<string>();
-		for (const grant of effectiveStatements(doc, entityId, trust).grants) {
-			if (grant.via !== null) named.add(grant.via);
+		if (trust.root !== null) {
+			for (const grant of effectiveStatements(doc, entityId, trust).grants) {
+				if (grant.via !== null) named.add(grant.via);
+			}
 		}
+		if (named.size === 0 && structural !== null) named.add(structural);
 		const containers = [...named].sort();
 		const [only] = containers;
 		if (containers.length === 1 && only !== undefined) this.pinContainer(entityId, only);
@@ -182,7 +251,7 @@ export class AccessTrustStore {
 		const memory = this.memoryOf(entityId);
 		let root = this.#persistence.getRoot(entityId);
 		if (root === null) {
-			const derived = deriveAccessRoot(doc, entityId, { self: this.#selfPubB64, memory });
+			const derived = this.#deriveRoot(doc, entityId, memory, true);
 			if (derived !== null) root = this.pinRoot(entityId, derived);
 		}
 		const trust: AccessTrust = { root, memory };
@@ -194,13 +263,37 @@ export class AccessTrustStore {
 		const fresh: AccessStatementRecord[] = [];
 		for (const g of counted.grants) {
 			if (known.has(`${AccessStatementKind.Grant}:${g.grantSig}`)) continue;
-			fresh.push({ kind: AccessStatementKind.Grant, sig: g.grantSig, body: JSON.stringify(g) });
+			fresh.push({
+				kind: AccessStatementKind.Grant,
+				sig: g.grantSig,
+				body: JSON.stringify(g),
+				signer: g.addedBy,
+			});
 		}
 		for (const r of counted.revokes) {
 			if (known.has(`${AccessStatementKind.Revoke}:${r.revokeSig}`)) continue;
-			fresh.push({ kind: AccessStatementKind.Revoke, sig: r.revokeSig, body: JSON.stringify(r) });
+			fresh.push({
+				kind: AccessStatementKind.Revoke,
+				sig: r.revokeSig,
+				body: JSON.stringify(r),
+				signer: r.revokedBy,
+			});
 		}
-		if (fresh.length > 0) this.#persistence.remember(entityId, fresh, this.#now());
+		if (fresh.length > 0) {
+			// Revokes first: if anything is going to be refused for want of room,
+			// it must not be the statement that removes someone.
+			fresh.sort(
+				(a, b) =>
+					Number(b.kind === AccessStatementKind.Revoke) - Number(a.kind === AccessStatementKind.Revoke),
+			);
+			const dropped = this.#persistence.remember(entityId, fresh, this.#now(), root);
+			if (dropped > 0 && !this.#warnedFull.has(entityId)) {
+				this.#warnedFull.add(entityId);
+				console.warn(
+					`[sharing] ${entityId}: statement memory is full for a signer; ${dropped} statement(s) not remembered`,
+				);
+			}
+		}
 		// Everything fresh came out of `doc`, so `trust` already resolves it.
 		return trust;
 	}
@@ -237,6 +330,7 @@ export function inMemoryAccessTrust(): AccessTrustPersistence {
 				if (!forEntity.has(key)) forEntity.set(key, record);
 			}
 			statements.set(entityId, forEntity);
+			return 0;
 		},
 	};
 }

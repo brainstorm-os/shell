@@ -27,27 +27,39 @@
  *           she attests beside the grant — never from whoever relayed the
  *           record ({@link firstSightRoot}).
  *
- *   Owners. `owners` is the least fixed point of: the root; plus the member of
- *           any Owner grant signed by a current owner and not revoked by the
- *           root or by that member.
+ *   Tenure. Ownership is held for a TENURE: from the date on the Owner grant
+ *           that gave it (signed by an owner whose own tenure covers that date)
+ *           until the date on the root's removal of it, or until the granting
+ *           owner's tenure ends. The root's tenure is all of time. A tenure is
+ *           CURRENT while nothing has ended it anywhere up the chain. The
+ *           dates are the signed timestamps of the statements - stamped by the
+ *           granting owner and by the root, never by the member concerned.
  *
- *   Grants. A grant has effect only while its signer is a current owner. So
- *           an Editor or a Viewer cannot add anyone, and a grant signed by a
- *           co-owner stops counting when that co-owner is removed.
+ *   Grants. A grant has effect only when dated within a CURRENT tenure of its
+ *           signer. So an Editor or a Viewer cannot add anyone; a grant signed
+ *           by a co-owner stops counting when she is removed; and it does not
+ *           come back if she is made an owner again - that is a new tenure,
+ *           and covers only what she signs from then on.
  *
  *   Revokes. A revoke of an Owner grant has effect only when signed by the root
  *           or by the member themselves. A revoke of an Editor/Viewer grant has
- *           effect when signed by the member themselves (leaving) or by anyone
- *           who has EVER held ownership through an unbroken chain from the root.
- *           The asymmetry is deliberate and fail-closed: removing a co-owner
- *           must never resurrect the people they removed.
+ *           effect when signed by the member themselves (leaving) or when
+ *           dated within ANY tenure of its signer, ended or not. The asymmetry
+ *           is deliberate and fail-closed: removing a co-owner must never
+ *           resurrect the people she removed. What she signs dated after her
+ *           removal has no effect, and an Owner grant she hands out then
+ *           confers nothing. (She chooses the dates on what she signs, so a
+ *           removed co-owner who BACK-dates a revoke into her old tenure, and
+ *           gets a current writer to relay it, can still remove a member. A
+ *           co-owner who left of her own accord keeps this revoke power.)
  *
  *   Everything else is ignored. An entry that fails the policy may stay in the
  *   CRDT; it has no effect on any reader.
  *
- * Why order-free: array position, Yjs clocks and the self-declared `addedAt`
- * are all attacker-influenced, and existing records carry no causal link to
- * bind them. The rules above are a pure function of the SET of signed
+ * Why order-free: array position and Yjs clocks are attacker-influenced, and
+ * existing records carry no causal link to bind them. The only ordering used
+ * is between a statement's own signed date and its signer's tenure. The rules
+ * above are a pure function of the SET of signed
  * statements plus the root, so two replicas holding the same statements resolve
  * identically whatever order they arrived or sit in.
  *
@@ -411,36 +423,97 @@ function collectStatements(doc: Y.Doc, entityId: string, memory?: AccessMemory):
 	};
 }
 
-/** Least fixed point of "the seed, plus the member of every Owner grant signed
- *  by someone already in the set (and passing `admit`)". */
-function ownerClosure(
-	root: string,
-	grants: readonly GrantStatement[],
-	admit: (grant: GrantStatement) => boolean,
-): Set<string> {
-	const owners = new Set<string>([root]);
-	for (let grew = true; grew; ) {
-		grew = false;
-		for (const g of grants) {
-			if (g.role !== AccessRole.Owner || owners.has(g.member)) continue;
-			if (!owners.has(g.addedBy) || !admit(g)) continue;
-			owners.add(g.member);
-			grew = true;
+/** A stretch of time during which a member held ownership: from the Owner
+ *  grant that gave it (`start`, the grant's `addedAt`) until the root removed
+ *  them or the tenure of whoever granted it ended (`end`, exclusive).
+ *  `current` ⇔ it is still running: nothing has ended it, all the way up the
+ *  chain to the root. Times are the SIGNED timestamps of the statements - the
+ *  granting owner's for `start`, the root's for a removal - so the member whose
+ *  tenure it is chooses neither. */
+type Tenure = { start: number; end: number; current: boolean };
+
+const ROOT_TENURE: Tenure = {
+	start: Number.NEGATIVE_INFINITY,
+	end: Number.POSITIVE_INFINITY,
+	current: true,
+};
+
+function covering(tenures: Iterable<Tenure> | undefined, at: number): Tenure | null {
+	let best: Tenure | null = null;
+	for (const t of tenures ?? []) {
+		if (t.start > at || at >= t.end) continue;
+		if (
+			best === null ||
+			(t.current && !best.current) ||
+			(t.current === best.current && t.end > best.end)
+		) {
+			best = t;
 		}
 	}
-	return owners;
+	return best;
+}
+
+/** Every member's tenures as an owner — the least fixed point of "the root,
+ *  always; and the member of an Owner grant signed by someone who held
+ *  ownership at the moment the grant is dated". */
+function ownerTenures(
+	root: string,
+	grants: readonly GrantStatement[],
+	ownerRevoke: (grant: GrantStatement) => RevokeStatement | null,
+): Map<string, Map<string, Tenure>> {
+	const held = new Map<string, Map<string, Tenure>>([[root, new Map([["", ROOT_TENURE]])]]);
+	for (let changed = true; changed; ) {
+		changed = false;
+		for (const g of grants) {
+			if (g.role !== AccessRole.Owner || g.member === root) continue;
+			const backing = covering(held.get(g.addedBy)?.values(), g.addedAt);
+			if (!backing) continue;
+			const revoke = ownerRevoke(g);
+			// The root's removal ends the tenure at the time the ROOT signed. A
+			// member's own leave ends its being current, but not the stretch in
+			// which her earlier acts are honoured: she picks that timestamp, and a
+			// back-dated leave must not be a way to undo the revokes she made.
+			const end =
+				revoke !== null && revoke.revokedBy === root
+					? Math.min(backing.end, revoke.revokedAt)
+					: backing.end;
+			const current = backing.current && revoke === null;
+			if (end <= g.addedAt) continue;
+			const key = grantKey(g);
+			const mine = held.get(g.member) ?? new Map<string, Tenure>();
+			const prev = mine.get(key);
+			if (prev && prev.end >= end && (prev.current || !current)) continue;
+			mine.set(key, {
+				start: g.addedAt,
+				end: Math.max(prev?.end ?? end, end),
+				current: (prev?.current ?? false) || current,
+			});
+			held.set(g.member, mine);
+			changed = true;
+		}
+	}
+	return held;
 }
 
 type Evaluation = {
 	/** One row per distinct signature-valid grant. */
 	rows: ResolvedMember[];
-	/** Current owners — who may grant. */
-	owners: ReadonlySet<string>;
+	/** Current owners — who may grant — and since when (their earliest running
+	 *  tenure's start; `-Infinity` for the root). */
+	owners: ReadonlyMap<string, number>;
 	/** The statements that had effect — what a device remembers. */
 	counted: AccessMemory;
+	/** The latest signed timestamp among the statements `member` signed that
+	 *  have (or had) effect, or null. */
+	lastActOf: (member: string) => number | null;
 };
 
-const NOBODY: Evaluation = { rows: [], owners: new Set(), counted: { grants: [], revokes: [] } };
+const NOBODY: Evaluation = {
+	rows: [],
+	owners: new Map(),
+	counted: { grants: [], revokes: [] },
+	lastActOf: () => null,
+};
 
 /** THE POLICY. See the module header; this is the only place it is decided. */
 function evaluate(doc: Y.Doc, entityId: string, trust: AccessTrust): Evaluation {
@@ -454,17 +527,15 @@ function evaluate(doc: Y.Doc, entityId: string, trust: AccessTrust): Evaluation 
 		if (list) list.push(r);
 		else revokesByTarget.set(key, [r]);
 	}
-	const everOwners = ownerClosure(root, grants, () => true);
-	const effectiveRevoke = (g: GrantStatement): RevokeStatement | null => {
-		if (g.member === root) return null;
+	// Several effective revokes of one grant: the earliest, with a total order
+	// behind it so every replica picks the same one.
+	const earliest = (
+		g: GrantStatement,
+		counts: (r: RevokeStatement) => boolean,
+	): RevokeStatement | null => {
 		let chosen: RevokeStatement | null = null;
 		for (const r of revokesByTarget.get(targetKey(g.member, g.addedAt)) ?? []) {
-			const counts =
-				r.revokedBy === g.member ||
-				(g.role === AccessRole.Owner ? r.revokedBy === root : everOwners.has(r.revokedBy));
-			if (!counts) continue;
-			// Several effective revokes of one grant: report the earliest, with a
-			// total order behind it so every replica reports the same one.
+			if (!counts(r)) continue;
 			if (
 				chosen === null ||
 				r.revokedAt < chosen.revokedAt ||
@@ -475,18 +546,55 @@ function evaluate(doc: Y.Doc, entityId: string, trust: AccessTrust): Evaluation 
 		}
 		return chosen;
 	};
-	const owners = ownerClosure(root, grants, (g) => effectiveRevoke(g) === null);
+	// An Owner grant ends only by the root's hand or the member's own. The
+	// root's wins when both exist: it is the one that bounds her tenure.
+	const ownerRevoke = (g: GrantStatement): RevokeStatement | null =>
+		g.member === root
+			? null
+			: (earliest(g, (r) => r.revokedBy === root) ?? earliest(g, (r) => r.revokedBy === g.member));
+	const tenures = ownerTenures(root, grants, ownerRevoke);
+	const heldAt = (member: string, at: number): Tenure | null =>
+		covering(tenures.get(member)?.values(), at);
+	const effectiveRevoke = (g: GrantStatement): RevokeStatement | null => {
+		if (g.member === root) return null;
+		if (g.role === AccessRole.Owner) return ownerRevoke(g);
+		// Anyone else's grant: the member leaving, or someone who held ownership
+		// at the moment the revoke is dated.
+		return earliest(g, (r) => r.revokedBy === g.member || heldAt(r.revokedBy, r.revokedAt) !== null);
+	};
+	const owners = new Map<string, number>();
+	for (const [member, mine] of tenures) {
+		for (const t of mine.values()) {
+			if (t.current) owners.set(member, Math.min(owners.get(member) ?? t.start, t.start));
+		}
+	}
 
 	const rows: ResolvedMember[] = [];
 	const countedGrants: GrantStatement[] = [];
 	const countedRevokes = new Map<string, RevokeStatement>();
 	let rootIsOwner = false;
+	const lastAct = new Map<string, number>();
+	const acted = (member: string, at: number): void => {
+		lastAct.set(member, Math.max(lastAct.get(member) ?? at, at));
+	};
 	for (const g of grants) {
-		const authorized = owners.has(g.addedBy);
-		const revoke = authorized ? effectiveRevoke(g) : null;
+		// In force NOW: signed by someone whose ownership is still running and
+		// had begun when the grant is dated. A grant from before a co-owner's
+		// removal does not come back when she is made an owner again.
+		const backing = heldAt(g.addedBy, g.addedAt);
+		const authorized = backing?.current === true;
+		const revoke = backing ? effectiveRevoke(g) : null;
 		const active = authorized && revoke === null;
-		if (authorized) countedGrants.push(g);
-		if (revoke) countedRevokes.set(revokeKey(revoke), revoke);
+		// Remembered whenever it EVER had effect: a tenure that has ended still
+		// has to be reconstructible, or the revokes made during it would lapse.
+		if (backing) {
+			countedGrants.push(g);
+			acted(g.addedBy, g.addedAt);
+		}
+		if (revoke) {
+			countedRevokes.set(revokeKey(revoke), revoke);
+			acted(revoke.revokedBy, revoke.revokedAt);
+		}
 		if (active && g.member === root && g.role === AccessRole.Owner) rootIsOwner = true;
 		rows.push({
 			member: g.member,
@@ -527,6 +635,7 @@ function evaluate(doc: Y.Doc, entityId: string, trust: AccessTrust): Evaluation 
 		rows,
 		owners,
 		counted: { grants: countedGrants, revokes: [...countedRevokes.values()] },
+		lastActOf: (member) => lastAct.get(member) ?? null,
 	};
 }
 
@@ -596,7 +705,15 @@ export function deriveAccessRoot(
  * from a pre-0.16 co-owner carries no attestation and establishes nothing —
  * the entity's root owner has to share it, or the co-owner upgrade.
  */
-export function firstSightRoot(doc: Y.Doc, entityId: string, selfB64: string): string | null {
+export function firstSightRoot(
+	doc: Y.Doc,
+	entityId: string,
+	selfB64: string,
+	/** Which of the grants naming us may be believed. The bootstrap gate
+	 *  authenticates the granter itself afterwards and passes nothing; a device
+	 *  working out the root of a doc it already HOLDS passes its anchor check. */
+	accept: (grant: GrantStatement) => boolean = () => true,
+): string | null {
 	const genesis = new Set<string>();
 	const naming: Array<{ grant: GrantStatement; attested: string | null }> = [];
 	for (const entry of readAccessArray(doc)?.toArray() ?? []) {
@@ -604,7 +721,7 @@ export function firstSightRoot(doc: Y.Doc, entityId: string, selfB64: string): s
 		const grant = grantOf(entry as Y.Map<unknown>);
 		if (!grant || !grantSignatureValid(entityId, grant)) continue;
 		if (grant.role === AccessRole.Owner && grant.member === grant.addedBy) genesis.add(grant.member);
-		if (grant.member !== selfB64) continue;
+		if (grant.member !== selfB64 || !accept(grant)) continue;
 		const root = readString(entry as Y.Map<unknown>, "root");
 		const rootSig = readString(entry as Y.Map<unknown>, "rootSig");
 		const attested =
@@ -638,6 +755,26 @@ export function firstSightRoot(doc: Y.Doc, entityId: string, selfB64: string): s
 		if (counts) return root;
 	}
 	return null;
+}
+
+/** Has anything ever been DELETED from the record's array, or the array itself
+ *  been replaced? No version of this code deletes an entry (a revoke is written
+ *  onto its entry; a repair appends), so a tombstone here is a member having
+ *  removed statements - evidence that what remains may not be the whole story.
+ *  Reads Yjs's item lists, the only place a deletion stays visible. */
+export function accessRecordTampered(doc: Y.Doc): boolean {
+	type Items = { _start: Y.Item | null; _map: Map<string, Y.Item> };
+	const meta = getEntityMetaMap(doc) as unknown as Items;
+	const latest = meta._map.get(ENTITY_ACCESS_KEY);
+	if (!latest) return false;
+	for (let item: Y.Item | null = latest; item; item = item.left) {
+		if (item.deleted) return true;
+	}
+	const array = readAccessArray(doc) as unknown as Items | null;
+	for (let item = array?._start ?? null; item; item = item.right) {
+		if (item.deleted) return true;
+	}
+	return false;
 }
 
 /** Does any correctly-signed grant in the doc name `memberB64`? Structural —
@@ -696,9 +833,14 @@ export function grantAccess(
 ): void {
 	const addedBy = signerPubOf(opts.signerSecret);
 	const trust = opts.trust ?? docTrust(doc, opts.entityId, { self: addedBy });
-	if (evaluate(doc, opts.entityId, trust).rows.some((m) => m.active && m.member === opts.member)) {
-		return;
-	}
+	const standing = evaluate(doc, opts.entityId, trust);
+	if (standing.rows.some((m) => m.active && m.member === opts.member)) return;
+	// A grant only counts when dated within its signer's tenure, and that
+	// tenure starts at a time some OTHER owner's clock stamped. Never date one
+	// before it because this device's clock runs behind theirs.
+	const since = standing.owners.get(addedBy);
+	const addedAt =
+		since !== undefined && Number.isFinite(since) ? Math.max(opts.now, since) : opts.now;
 	const arr = getAccessArray(doc);
 	const x25519 = opts.x25519 ?? null;
 	// Every field concatenated into the signed payload must be pipe-free, or the
@@ -718,7 +860,7 @@ export function grantAccess(
 	const via = opts.via ?? null;
 	const sig = signPayload(
 		opts.signerSecret,
-		grantPayload(opts.entityId, opts.member, opts.role, addedBy, opts.now, x25519, anchor, via),
+		grantPayload(opts.entityId, opts.member, opts.role, addedBy, addedAt, x25519, anchor, via),
 	);
 	// A granter who is not the root tells the new member who is. The member has
 	// no other way to learn it that a relaying collaborator could not forge: the
@@ -735,7 +877,7 @@ export function grantAccess(
 				via,
 				role: opts.role,
 				addedBy,
-				addedAt: opts.now,
+				addedAt,
 				grantSig: bytesToBase64(sig),
 			},
 			null,
@@ -747,7 +889,7 @@ export function grantAccess(
 				bytesToBase64(
 					signPayload(
 						opts.signerSecret,
-						rootAttestationPayload(opts.entityId, opts.member, addedBy, opts.now, root),
+						rootAttestationPayload(opts.entityId, opts.member, addedBy, addedAt, root),
 					),
 				),
 			);
@@ -802,11 +944,25 @@ export function revokeAccess(
 ): boolean {
 	const revokedBy = signerPubOf(opts.signerSecret);
 	const trust = opts.trust ?? docTrust(doc, opts.entityId, { self: revokedBy });
+	const standing = evaluate(doc, opts.entityId, trust);
 	const live = new Set<string>();
-	for (const m of evaluate(doc, opts.entityId, trust).rows) {
+	for (const m of standing.rows) {
 		if (m.active && m.member === opts.member) live.add(targetKey(m.member, m.addedAt));
 	}
 	if (live.size === 0) return false;
+	// The date on a removal is where the removed member's tenure ENDS: what she
+	// signed before it stays honoured (the people she removed stay removed),
+	// what she signs after it is nothing. So it must not fall before acts of
+	// hers this device has already seen merely because her clock ran ahead of
+	// ours - but only within a bounded skew, or a member could post-date one
+	// statement and keep her authority alive past any removal.
+	const since = standing.owners.get(revokedBy);
+	const lastAct = standing.lastActOf(opts.member);
+	const revokedAt = Math.max(
+		opts.now,
+		since !== undefined && Number.isFinite(since) ? since : opts.now,
+		lastAct === null ? opts.now : Math.min(lastAct + 1, opts.now + MAX_CLOCK_SKEW_MS),
+	);
 	const array = readAccessArray(doc);
 	if (!array) return false;
 	let revoked = false;
@@ -817,12 +973,12 @@ export function revokeAccess(
 			if (!grant || !live.has(targetKey(grant.member, grant.addedAt))) continue;
 			const sig = signPayload(
 				opts.signerSecret,
-				revokePayload(opts.entityId, grant.member, grant.addedAt, opts.now, revokedBy),
+				revokePayload(opts.entityId, grant.member, grant.addedAt, revokedAt, revokedBy),
 			);
 			writeRevoke(entry as Y.Map<unknown>, {
 				member: grant.member,
 				addedAt: grant.addedAt,
-				revokedAt: opts.now,
+				revokedAt,
 				revokedBy,
 				revokeSig: bytesToBase64(sig),
 			});
@@ -988,6 +1144,10 @@ export function isAuthorizedWriter(
 	}
 	return false;
 }
+
+/** How far ahead of this device's clock another member's signed timestamp may
+ *  run and still be accommodated when dating a removal (see `revokeAccess`). */
+export const MAX_CLOCK_SKEW_MS = 10 * 60 * 1000;
 
 /** Ceiling on the state a share BOOTSTRAP may carry (see below). Deliberately
  *  generous against a real opening snapshot and still far under anything that

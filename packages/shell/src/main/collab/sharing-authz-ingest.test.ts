@@ -20,14 +20,18 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MESSAGE_TYPE_URL } from "@brainstorm-os/sdk-types";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
 import { base64ToBytes, generateSymmetricKey } from "../credentials/crypto";
-import { verifySignature } from "../credentials/identity";
+import { generateIdentity, publicKeyToBase64, verifySignature } from "../credentials/identity";
 import { listWraps, wrapDekForRecipient, wrapDekVersionOf } from "../credentials/member-wraps";
 import type { EntityDekStore } from "../entities/entity-dek-store";
+import { writeEntityProps } from "../entities/entity-doc-codec";
 import { installEntityDek } from "../entities/install-wrap";
-import type { EntitiesRepository } from "../storage/entities-repo";
+import {
+	ACCESS_STATEMENTS_PER_SIGNER_MAX,
+	type EntitiesRepository,
+} from "../storage/entities-repo";
 import { decodeFrame } from "../sync/envelope-codec";
 import {
 	type PipelineContext,
@@ -42,7 +46,12 @@ import { VaultSession } from "../vault/session";
 import { AccessRole, getAccessArray, grantAccess, revokeAccess } from "./access-record";
 import { inboxChannelFor } from "./inbox-channel";
 import type { ShareInvite } from "./share-invite";
-import { type CollabRelayLike, SharingDeniedError, SharingEngine } from "./sharing-engine";
+import {
+	type CollabRelayLike,
+	IncompleteRemovalReason,
+	SharingDeniedError,
+	SharingEngine,
+} from "./sharing-engine";
 import { type SyncAuthz, createSyncAuthz } from "./sync-authz";
 
 const CHANNEL = "ent_authz_channel";
@@ -95,6 +104,7 @@ class Shell {
 			accessTrust: await session.accessTrust(),
 			shareInvites: await engine.ensureShareInvitesRepo(),
 			typeOf: (id) => repo.get(id)?.type ?? null,
+			propertiesOf: (id) => repo.get(id)?.properties ?? null,
 		});
 		return new Shell(session, engine, repo, dekStore, authz, port, dir);
 	}
@@ -629,3 +639,319 @@ describe("first sight: a relaying member cannot choose the root an invitee pins"
 function toUrl(b64: string): string {
 	return Buffer.from(b64, "base64").toString("base64url");
 }
+
+/**
+ * Design-review regressions (0.16.0). Each case states an invariant of the
+ * policy in a situation the first cut did not cover.
+ */
+describe("design review: the policy's invariants in the awkward corners", () => {
+	let alice: Shell;
+	let eve: Shell;
+	let sam: Shell;
+
+	beforeEach(async () => {
+		const [p0, p1, p2] = LoopbackRelayPort.pair(3);
+		if (!p0 || !p1 || !p2) throw new Error("expected three loopback ports");
+		alice = await Shell.open("alice", p0);
+		eve = await Shell.open("eve", p1);
+		sam = await Shell.open("sam", p2);
+		await alice.engine.provisionEntity(CHANNEL, CHANNEL_TYPE, { name: "general" });
+	});
+
+	afterEach(async () => {
+		vi.restoreAllMocks();
+		await Promise.all([alice.close(), eve.close(), sam.close()]);
+	});
+
+	async function share(owner: Shell, to: Shell, role: AccessRole): Promise<void> {
+		const invite = await to.engine.createInvite(to.pub);
+		await owner.engine.share({ entityId: CHANNEL, type: CHANNEL_TYPE, invite, role });
+		for (const shell of [alice, eve, sam]) await shell.drain();
+	}
+
+	const drainAll = async (): Promise<void> => {
+		for (const shell of [alice, eve, sam]) await shell.drain();
+	};
+
+	/** Forget every pin and remembered statement, as on the first launch after
+	 *  the upgrade: the tables exist and are empty. */
+	async function asIfJustUpgraded(shell: Shell): Promise<void> {
+		const db = await shell.session.dataStores.open("entities");
+		db.exec(
+			"DELETE FROM access_roots; DELETE FROM access_statements; DELETE FROM entity_containers;",
+		);
+	}
+
+	// 5 — re-granting ownership does not revive what a co-owner signed before
+	// she was removed.
+	it("a re-instated co-owner gets fresh authority only: the grants she signed before her removal stay void", async () => {
+		await share(alice, eve, AccessRole.Owner);
+		await share(eve, sam, AccessRole.Viewer);
+		expect(await alice.active(CHANNEL)).toEqual([alice.pub, eve.pub, sam.pub].sort());
+
+		expect(await alice.engine.revoke(CHANNEL, eve.pub)).toBe(true);
+		await drainAll();
+		expect(await alice.active(CHANNEL)).toEqual([alice.pub]);
+
+		await share(alice, eve, AccessRole.Owner);
+		expect(await alice.active(CHANNEL)).toEqual([alice.pub, eve.pub].sort());
+		expect(await eve.active(CHANNEL)).toEqual([alice.pub, eve.pub].sort());
+
+		// What she grants NOW counts.
+		await share(eve, sam, AccessRole.Viewer);
+		expect(await alice.active(CHANNEL)).toEqual([alice.pub, eve.pub, sam.pub].sort());
+	});
+
+	// 7 — what a removed co-owner signs after her removal confers nothing.
+	it("after her removal a co-owner's new revokes, and the Owner grants she hands out, do nothing", async () => {
+		await share(alice, eve, AccessRole.Owner);
+		await share(alice, sam, AccessRole.Editor);
+		const evePair = eve.session.exposeIdentityForPairing();
+		const eveSecret = new Uint8Array(evePair.secretKey);
+		expect(await alice.engine.revoke(CHANNEL, eve.pub)).toBe(true);
+		await drainAll();
+
+		// A current writer relays what she signs from outside: an Owner grant to
+		// a fresh key, that key's revoke of a member, and her own revoke of him.
+		const zed = generateIdentity();
+		const zedPub = publicKeyToBase64(zed.publicKey);
+		await sam.engine.mutateAndEmit(CHANNEL, (doc) => {
+			const rooted = { root: alice.pub };
+			grantAccess(doc, {
+				entityId: CHANNEL,
+				member: zedPub,
+				role: AccessRole.Owner,
+				signerSecret: eveSecret,
+				now: Date.now(),
+				trust: { root: null },
+			});
+			revokeAccess(doc, {
+				entityId: CHANNEL,
+				member: sam.pub,
+				signerSecret: zed.secretKey,
+				now: Date.now() + 1,
+				trust: rooted,
+			});
+		});
+		await alice.drain();
+		expect(await alice.active(CHANNEL)).toEqual([alice.pub, sam.pub].sort());
+		await sam.engine.mutateAndEmit(CHANNEL, (doc) => {
+			revokeAccess(doc, {
+				entityId: CHANNEL,
+				member: sam.pub,
+				signerSecret: eveSecret,
+				now: Date.now() + 2,
+				trust: { root: alice.pub },
+			});
+		});
+		await alice.drain();
+		expect(await alice.active(CHANNEL)).toEqual([alice.pub, sam.pub].sort());
+	});
+
+	it("…while the people she removed when she WAS an owner stay removed", async () => {
+		await share(alice, eve, AccessRole.Owner);
+		await share(alice, sam, AccessRole.Editor);
+		expect(await eve.engine.revoke(CHANNEL, sam.pub)).toBe(true);
+		await drainAll();
+		expect(await alice.active(CHANNEL)).toEqual([alice.pub, eve.pub].sort());
+		expect(await alice.engine.revoke(CHANNEL, eve.pub)).toBe(true);
+		expect(await alice.active(CHANNEL)).toEqual([alice.pub]);
+	});
+
+	// 4 — one member cannot fill the statement memory, and a root revoke is
+	// remembered whatever else is in it.
+	it("a co-owner's flood of grants is bounded in memory, and the root's revoke is still remembered after it", async () => {
+		await share(alice, eve, AccessRole.Owner);
+		await share(alice, sam, AccessRole.Editor);
+		const eveSecret = eve.session.exposeIdentityForPairing().secretKey;
+		await eve.engine.mutateAndEmit(CHANNEL, (doc) => {
+			for (let i = 0; i < ACCESS_STATEMENTS_PER_SIGNER_MAX + 40; i++) {
+				grantAccess(doc, {
+					entityId: CHANNEL,
+					member: publicKeyToBase64(generateIdentity().publicKey),
+					role: AccessRole.Viewer,
+					signerSecret: eveSecret,
+					now: Date.now() + i,
+					trust: { root: null },
+				});
+			}
+		});
+		await alice.drain();
+		const store = await alice.session.accessTrust();
+		await alice.active(CHANNEL);
+		const fromEve = store.memoryOf(CHANNEL).grants.filter((g) => g.addedBy === eve.pub);
+		expect(fromEve.length).toBeLessThanOrEqual(ACCESS_STATEMENTS_PER_SIGNER_MAX);
+
+		expect(await alice.engine.revoke(CHANNEL, sam.pub)).toBe(true);
+		expect(store.memoryOf(CHANNEL).revokes.some((r) => r.member === sam.pub)).toBe(true);
+		// So deleting it from the doc changes nothing here.
+		await eve.engine.mutateAndEmit(CHANNEL, (doc) => {
+			const access = getAccessArray(doc);
+			access.delete(0, access.length);
+		});
+		await alice.drain();
+		expect(await alice.active(CHANNEL)).not.toContain(sam.pub);
+	});
+
+	// 6 — an incomplete removal says so.
+	it("a collection revoke reports the children it could not revoke or re-key", async () => {
+		await share(alice, eve, AccessRole.Editor);
+		for (const id of ["msg_ok", "msg_broken"]) {
+			await alice.engine.provisionEntity(id, MESSAGE_TYPE_URL, { conversation: CHANNEL });
+			expect(await alice.engine.autoShareNewChild(id, MESSAGE_TYPE_URL, CHANNEL)).toBe(1);
+		}
+		const load = alice.session.ydocStore.load.bind(alice.session.ydocStore);
+		vi.spyOn(alice.session.ydocStore, "load").mockImplementation(async (id) => {
+			if (id === "msg_broken") throw new Error("disk says no");
+			return load(id);
+		});
+
+		const result = await alice.engine.revokeFromCollection(CHANNEL, CHANNEL_TYPE, eve.pub);
+		expect(result.revoked).toBe(true);
+		expect(result.incomplete.map((c) => c.entityId)).toEqual(["msg_broken"]);
+		expect(result.incomplete[0]?.reason).toBe(IncompleteRemovalReason.Failed);
+		expect(alice.dekVersion("msg_ok")).toBe(2);
+		expect(await alice.active(CHANNEL)).toEqual([alice.pub]);
+	});
+
+	// 2 — a child with no pin and no `via` is still a child.
+	it("a pre-0.16 message (no pin, no via in its grants) is still governed by its channel", async () => {
+		await share(alice, eve, AccessRole.Editor);
+		const OLD = "msg_pre_016";
+		// Eve's message, written the old way: her genesis grant and a plain grant
+		// to the channel's owner, with nothing naming the channel but the row.
+		const eveSecret = eve.session.exposeIdentityForPairing().secretKey;
+		const doc = new Y.Doc();
+		grantAccess(doc, {
+			entityId: OLD,
+			member: eve.pub,
+			role: AccessRole.Owner,
+			signerSecret: eveSecret,
+			now: 1,
+			x25519: eve.session.deviceX25519.publicKeyBase64,
+		});
+		grantAccess(doc, {
+			entityId: OLD,
+			member: alice.pub,
+			role: AccessRole.Owner,
+			signerSecret: eveSecret,
+			now: 2,
+			x25519: alice.session.deviceX25519.publicKeyBase64,
+		});
+		writeEntityProps(doc, { conversation: CHANNEL, body: "old" });
+		const state = Y.encodeStateAsUpdate(doc);
+		const dek = generateSymmetricKey();
+		for (const shell of [eve, alice]) {
+			shell.repo.create({
+				id: OLD,
+				type: MESSAGE_TYPE_URL,
+				properties: { conversation: CHANNEL, body: "old" },
+				createdBy: "io.brainstorm.chat",
+				now: Date.now(),
+				dekId: null,
+			});
+			installEntityDek(OLD, dek, 1, shell.dekStore, shell.repo);
+			await shell.session.ydocStore.appendUpdate(OLD, state);
+		}
+		// Still a member: her edit lands.
+		await eve.engine.mutateAndEmit(OLD, (d) => d.getText(BODY).insert(0, "ok "));
+		await alice.drain();
+		expect(await alice.text(OLD)).toBe("ok ");
+
+		// Removed from the channel (the revoke alone - no re-key, so her frames
+		// still decrypt and only the gate stands in the way).
+		const aliceSecret = alice.session.exposeIdentityForPairing().secretKey;
+		const aliceTrust = await alice.session.accessTrust();
+		await alice.engine.mutateAndEmit(CHANNEL, (d) => {
+			revokeAccess(d, {
+				entityId: CHANNEL,
+				member: eve.pub,
+				signerSecret: aliceSecret,
+				now: Date.now(),
+				trust: aliceTrust.trustFor(d, CHANNEL),
+			});
+		});
+		await eve.engine.mutateAndEmit(OLD, (d) => d.getText(BODY).insert(0, "rewritten "));
+		await alice.drain();
+		expect(alice.unauthorized()).toHaveLength(1);
+		expect(await alice.text(OLD)).toBe("ok ");
+	});
+
+	// 3 — the lazy pin of an entity that was here before the upgrade.
+	it("after upgrade, a doc with TWO candidate roots resolves to the one who actually invited us", async () => {
+		await share(alice, eve, AccessRole.Editor);
+		await share(alice, sam, AccessRole.Editor);
+		const samSecret = sam.session.exposeIdentityForPairing().secretKey;
+		// Before the upgrade Sam forged a second root that also "explains" Eve.
+		await sam.engine.mutateAndEmit(CHANNEL, (doc) => {
+			for (const [member, role] of [
+				[sam.pub, AccessRole.Owner],
+				[alice.pub, AccessRole.Owner],
+			] as const) {
+				grantAccess(doc, {
+					entityId: CHANNEL,
+					member,
+					role,
+					signerSecret: samSecret,
+					now: 0,
+					trust: { root: null },
+				});
+			}
+		});
+		await eve.drain();
+		await asIfJustUpgraded(eve);
+
+		expect(await eve.active(CHANNEL)).toEqual([alice.pub, eve.pub, sam.pub].sort());
+		expect((await eve.session.accessTrust()).rootOf(CHANNEL)).toBe(alice.pub);
+	});
+
+	it("after upgrade, a doc whose real record was DELETED and replaced does not pin the impostor, and the owner's re-assert recovers it", async () => {
+		await share(alice, eve, AccessRole.Editor);
+		await share(alice, sam, AccessRole.Editor);
+		const samSecret = sam.session.exposeIdentityForPairing().secretKey;
+		// Before the upgrade Sam wiped the record and wrote one of his own.
+		const forge = (doc: Y.Doc): void => {
+			const access = getAccessArray(doc);
+			access.delete(0, access.length);
+			grantAccess(doc, {
+				entityId: CHANNEL,
+				member: sam.pub,
+				role: AccessRole.Owner,
+				signerSecret: samSecret,
+				now: 0,
+				trust: { root: null },
+			});
+			grantAccess(doc, {
+				entityId: CHANNEL,
+				member: eve.pub,
+				role: AccessRole.Editor,
+				signerSecret: samSecret,
+				now: 1,
+				trust: { root: null },
+			});
+		};
+		const { doc: evesCopy } = await eve.session.ydocStore.load(CHANNEL);
+		const before = Y.encodeStateVector(evesCopy);
+		forge(evesCopy);
+		await eve.session.ydocStore.appendUpdate(CHANNEL, Y.encodeStateAsUpdate(evesCopy, before));
+		evesCopy.destroy();
+		await asIfJustUpgraded(eve);
+
+		const trust = await eve.session.accessTrust();
+		await eve.active(CHANNEL);
+		expect(trust.rootOf(CHANNEL)).not.toBe(sam.pub);
+		expect(await eve.authz.authorizeWriter(toUrl(sam.pub), CHANNEL, new Uint8Array())).toBe(false);
+
+		// The real owner's record comes back (her device re-asserts what it
+		// remembers the moment tampering reaches it; any later frame of hers
+		// carries it too) and Eve's device recovers by itself.
+		await alice.engine.mutateAndEmit(CHANNEL, (doc) => {
+			const access = getAccessArray(doc);
+			access.delete(0, access.length);
+		});
+		await alice.engine.reassertRecord(CHANNEL);
+		await eve.drain();
+		expect(trust.rootOf(CHANNEL)).toBe(alice.pub);
+		expect(await eve.active(CHANNEL)).toEqual([alice.pub, eve.pub, sam.pub].sort());
+	});
+});

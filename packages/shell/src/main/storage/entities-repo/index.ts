@@ -38,6 +38,7 @@ export { AssetRefsRepository } from "./asset-refs-repo";
 export type { AssetRefRecord, CreateAssetRefInput } from "./asset-refs-repo";
 export {
 	ACCESS_STATEMENTS_PER_ENTITY_MAX,
+	ACCESS_STATEMENTS_PER_SIGNER_MAX,
 	AccessStatementKind,
 	AccessTrustRepository,
 } from "./access-trust-repo";

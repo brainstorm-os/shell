@@ -465,6 +465,81 @@ describe("co-owners and former owners", () => {
 		expect(ownerDevice.active(ownerDoc)).toEqual([owner.pub]);
 	});
 
+	it("a co-owner whose clock runs behind still dates her grants inside her tenure", () => {
+		const { owner, ownerDoc, ownerDevice } = sharedPair();
+		const coOwner = person();
+		grantAccess(ownerDoc, {
+			entityId: ENT,
+			member: coOwner.pub,
+			role: AccessRole.Owner,
+			signerSecret: owner.secret,
+			now: 1_000,
+			trust: ownerDevice.trust(ownerDoc),
+		});
+		const invitee = person();
+		grantAccess(ownerDoc, {
+			entityId: ENT,
+			member: invitee.pub,
+			role: AccessRole.Viewer,
+			signerSecret: coOwner.secret,
+			now: 400, // her device thinks it is earlier than the root's stamp
+			trust: { root: owner.pub },
+		});
+		expect(ownerDevice.active(ownerDoc)).toContain(invitee.pub);
+	});
+
+	it("a removal is dated after what the removed co-owner already signed, so her clock running ahead resurrects nobody", () => {
+		const { owner, editor, coOwner, ownerDoc, ownerDevice } = withCoOwner();
+		revokeAccess(ownerDoc, {
+			entityId: ENT,
+			member: editor.pub,
+			signerSecret: coOwner.secret,
+			now: 500, // ahead of the root's clock below
+			trust: ownerDevice.trust(ownerDoc),
+		});
+		revokeAccess(ownerDoc, {
+			entityId: ENT,
+			member: coOwner.pub,
+			signerSecret: owner.secret,
+			now: 10,
+			trust: ownerDevice.trust(ownerDoc),
+		});
+		expect(ownerDevice.active(ownerDoc)).toEqual([owner.pub]);
+	});
+
+	it("RESIDUE, pinned: a removed co-owner who BACK-dates a revoke into her old tenure still removes a member", () => {
+		const { owner, editor, coOwner, ownerDoc, ownerDevice } = withCoOwner();
+		revokeAccess(ownerDoc, {
+			entityId: ENT,
+			member: coOwner.pub,
+			signerSecret: owner.secret,
+			now: 10,
+			trust: ownerDevice.trust(ownerDoc),
+		});
+		// Dated after her removal: nothing.
+		const honest = replica(ownerDoc);
+		revokeAccess(honest, {
+			entityId: ENT,
+			member: editor.pub,
+			signerSecret: coOwner.secret,
+			now: 11,
+			trust: { root: owner.pub },
+		});
+		expect(activeMembers(honest, ENT, { root: owner.pub }).map((m) => m.member)).toContain(
+			editor.pub,
+		);
+		// Dated inside the tenure she no longer holds (3 ≤ t < 10): it counts. She
+		// chooses that date; nothing in a record without causal links can refute it.
+		revokeAccess(ownerDoc, {
+			entityId: ENT,
+			member: editor.pub,
+			signerSecret: coOwner.secret,
+			now: 5,
+			trust: { root: owner.pub },
+		});
+		expect(ownerDevice.active(ownerDoc)).toEqual([owner.pub]);
+	});
+
 	it("a co-owner cannot remove the root or another co-owner", () => {
 		const { owner, coOwner, ownerDoc, ownerDevice } = withCoOwner();
 		const second = person();

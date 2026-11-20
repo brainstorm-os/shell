@@ -30,12 +30,18 @@ export type AccessStatementRecord = {
 	sig: string;
 	/** The signed fields, JSON. */
 	body: string;
+	/** base64 key of whoever signed it — whose quota it counts against. */
+	signer: string;
 };
 
-/** Per-entity ceiling on remembered statements. Only statements that had
- *  effect are remembered, so reaching this takes an owner, not an outsider —
- *  the cap is there so even that cannot grow the table without bound. */
+/** Ceiling on the GRANTS remembered per entity from the root, and — as one
+ *  pool — from everyone else. Only statements that had effect are remembered,
+ *  so reaching either takes an owner, not an outsider. */
 export const ACCESS_STATEMENTS_PER_ENTITY_MAX = 4096;
+
+/** Ceiling on the statements remembered per entity from any ONE signer other
+ *  than the root, so a single co-owner cannot fill the memory. */
+export const ACCESS_STATEMENTS_PER_SIGNER_MAX = 256;
 
 export class AccessTrustRepository {
 	private readonly statements = new Map<string, SqliteStatement>();
@@ -69,8 +75,8 @@ export class AccessTrustRepository {
 
 	listStatements(entityId: string): AccessStatementRecord[] {
 		const rows = this.stmt(
-			"SELECT kind, sig, body FROM access_statements WHERE entity_id = ? ORDER BY seen_at, sig",
-		).all(entityId) as Array<{ kind: string; sig: string; body: string }>;
+			"SELECT kind, sig, body, signer FROM access_statements WHERE entity_id = ? ORDER BY seen_at, sig",
+		).all(entityId) as Array<{ kind: string; sig: string; body: string; signer: string }>;
 		return rows.map((row) => ({
 			kind:
 				row.kind === AccessStatementKind.Revoke
@@ -78,25 +84,77 @@ export class AccessTrustRepository {
 					: AccessStatementKind.Grant,
 			sig: row.sig,
 			body: row.body,
+			signer: row.signer,
 		}));
 	}
 
-	/** Remember statements. Already-known ones are left alone; past the
-	 *  per-entity ceiling nothing more is taken. */
-	remember(entityId: string, records: readonly AccessStatementRecord[], now: number): void {
-		if (records.length === 0) return;
-		const count = this.stmt("SELECT COUNT(*) AS n FROM access_statements WHERE entity_id = ?").get(
-			entityId,
-		) as { n: number };
-		let room = ACCESS_STATEMENTS_PER_ENTITY_MAX - Number(count.n);
+	/**
+	 * Remember statements. Already-known ones are left alone. Returns how many
+	 * could NOT be kept, so the caller can say so — nothing is dropped silently.
+	 *
+	 * What is kept is decided by what losing it would cost:
+	 *   - a REVOKE signed by `rootPub` is always kept, with no ceiling: it is the
+	 *     owner removing someone, and forgetting it is how a removal comes undone;
+	 *   - a revoke from anyone else is kept within that signer's quota, evicting
+	 *     that signer's own oldest remembered GRANT to make room if need be;
+	 *   - a grant is kept within its signer's quota and its pool's ceiling (the
+	 *     root has a pool to itself). Forgetting a grant only ever removes access.
+	 */
+	remember(
+		entityId: string,
+		records: readonly AccessStatementRecord[],
+		now: number,
+		rootPub: string,
+	): number {
+		let dropped = 0;
 		for (const record of records) {
-			if (room <= 0) return;
-			const result = this.stmt(
-				"INSERT INTO access_statements (entity_id, kind, sig, body, seen_at) VALUES (?, ?, ?, ?, ?) " +
+			const known = this.stmt(
+				"SELECT 1 FROM access_statements WHERE entity_id = ? AND kind = ? AND sig = ?",
+			).get(entityId, record.kind, record.sig);
+			if (known !== undefined) continue;
+			if (!this.makeRoom(entityId, record, rootPub)) {
+				dropped++;
+				continue;
+			}
+			this.stmt(
+				"INSERT INTO access_statements (entity_id, kind, sig, body, seen_at, signer) VALUES (?, ?, ?, ?, ?, ?) " +
 					"ON CONFLICT(entity_id, kind, sig) DO NOTHING",
-			).run(entityId, record.kind, record.sig, record.body, now);
-			if (Number(result.changes) > 0) room--;
+			).run(entityId, record.kind, record.sig, record.body, now, record.signer);
 		}
+		return dropped;
+	}
+
+	private count(entityId: string, where: string, ...args: string[]): number {
+		const row = this.stmt(
+			`SELECT COUNT(*) AS n FROM access_statements WHERE entity_id = ? AND ${where}`,
+		).get(entityId, ...args) as { n: number };
+		return Number(row.n);
+	}
+
+	private makeRoom(entityId: string, record: AccessStatementRecord, rootPub: string): boolean {
+		const fromRoot = record.signer === rootPub;
+		const isRevoke = record.kind === AccessStatementKind.Revoke;
+		if (fromRoot) {
+			if (isRevoke) return true;
+			return (
+				this.count(entityId, "kind = ? AND signer = ?", AccessStatementKind.Grant, rootPub) <
+				ACCESS_STATEMENTS_PER_ENTITY_MAX
+			);
+		}
+		const mine = this.count(entityId, "signer = ?", record.signer);
+		if (mine >= ACCESS_STATEMENTS_PER_SIGNER_MAX) {
+			if (!isRevoke) return false;
+			const evicted = this.stmt(
+				"DELETE FROM access_statements WHERE rowid = (SELECT rowid FROM access_statements " +
+					"WHERE entity_id = ? AND signer = ? AND kind = ? ORDER BY seen_at, sig LIMIT 1)",
+			).run(entityId, record.signer, AccessStatementKind.Grant);
+			return Number(evicted.changes) > 0;
+		}
+		if (isRevoke) return true;
+		return (
+			this.count(entityId, "kind = ? AND signer <> ?", AccessStatementKind.Grant, rootPub) <
+			ACCESS_STATEMENTS_PER_ENTITY_MAX
+		);
 	}
 
 	getContainer(entityId: string): string | null {

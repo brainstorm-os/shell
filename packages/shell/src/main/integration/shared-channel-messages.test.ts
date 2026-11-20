@@ -23,8 +23,9 @@ import { join } from "node:path";
 import type { CapabilityLedger as CapabilityLedgerType } from "@brainstorm-os/capabilities/ledger";
 import { MESSAGE_TYPE_URL } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import * as Y from "yjs";
 import { __ydocCacheResetForTest, handleYDocEnvelope } from "../../workers/ydoc";
-import { AccessRole, activeMembers, getAccessArray } from "../collab/access-record";
+import { AccessRole, activeMembers, getAccessArray, grantAccess } from "../collab/access-record";
 import { createAutoShareReactor } from "../collab/auto-share-reactor";
 import { inboxChannelFor } from "../collab/inbox-channel";
 import { ShareBootstrapVerdict } from "../collab/share-bootstrap-authz";
@@ -35,11 +36,12 @@ import { ED25519_PUBLIC_BYTES, verifySignature } from "../credentials/identity";
 import { listWraps, wrapDekForRecipient, wrapDekVersionOf } from "../credentials/member-wraps";
 import { type ApplyRemoteDocFn, makeEntitiesServiceHandler } from "../entities/entities-service";
 import { EntityChangeEmitter } from "../entities/entity-change-emitter";
+import { writeEntityProps } from "../entities/entity-doc-codec";
 import { installEntityDek } from "../entities/install-wrap";
 import { base64UrlToBytes } from "../pairing/pairing-channel";
 import { EntitiesRepository, ShareInvitesRepository } from "../storage/entities-repo";
 import { decodeFrame } from "../sync/envelope-codec";
-import { emitWrapBootstrap } from "../sync/envelope-pipeline";
+import { emitWrapBootstrap, encryptAndEmit } from "../sync/envelope-pipeline";
 import { LiveSyncEngine } from "../sync/live-sync-engine";
 import type { RelayPort, RelaySurface } from "../sync/relay-port";
 import { makeRemoteDocApplier } from "../sync/remote-doc-applier";
@@ -173,6 +175,7 @@ async function makePeer(name: string, relay: ChannelRelay) {
 		accessTrust,
 		shareInvites,
 		typeOf: (id) => repo.get(id)?.type ?? null,
+		propertiesOf: (id) => repo.get(id)?.properties ?? null,
 		onBootstrapRefused: (entityId, verdict) => refusals.push(`${entityId}: ${verdict}`),
 	});
 
@@ -346,6 +349,58 @@ async function makePeer(name: string, relay: ChannelRelay) {
 				sharing.makeCtx(surface.currentPort()),
 				inboxChannelFor(victim.pub),
 			);
+		},
+		rootOf: async (entityId: string): Promise<string | null> => accessTrust.rootOf(entityId),
+		/** Compose a record for an EXISTING child id as if this peer had authored
+		 *  it, and hand it (key + state) to `victim`. */
+		forgeChild: async (
+			childId: string,
+			containerId: string,
+			victim: { session: VaultSession; pub: string },
+			body: string,
+		): Promise<void> => {
+			const handle = dekStore.open(childId);
+			if (!handle) throw new Error("forger holds no key for the child");
+			const secret = session.exposeIdentityForPairing().secretKey;
+			const forged = new Y.Doc();
+			try {
+				grantAccess(forged, {
+					entityId: childId,
+					member: session.identity.publicKeyBase64,
+					role: AccessRole.Owner,
+					signerSecret: secret,
+					now: 1,
+					x25519: session.deviceX25519.publicKeyBase64,
+				});
+				grantAccess(forged, {
+					entityId: childId,
+					member: victim.pub,
+					role: AccessRole.Editor,
+					signerSecret: secret,
+					now: 2,
+					x25519: victim.session.deviceX25519.publicKeyBase64,
+					via: containerId,
+				});
+				writeEntityProps(forged, { conversation: containerId, body });
+				const ctx = sharing.makeCtx(surface.currentPort());
+				const inbox = inboxChannelFor(victim.pub);
+				await emitWrapBootstrap(
+					childId,
+					wrapDekForRecipient(
+						handle.dek,
+						victim.session.deviceX25519.publicKey,
+						childId,
+						MESSAGE_TYPE_URL,
+						handle.version,
+					),
+					ctx,
+					inbox,
+				);
+				await encryptAndEmit(childId, Y.encodeStateAsUpdate(forged), ctx, inbox);
+			} finally {
+				dekStore.close(handle.dek);
+				forged.destroy();
+			}
 		},
 		dispose: async (): Promise<void> => {
 			offReactor();
@@ -679,26 +734,100 @@ describe("a shared chat channel carries every member's messages to every other m
 		expect(mira.bodyOf(his)).toBe("his, before");
 	});
 
-	it("moving a message does not move who may write it: the container it was first seen in still decides", async () => {
+	it("a message cannot be moved into a channel its mover does not stand in, and moving never moves who may write it", async () => {
 		const [mira, marcus] = (await boot("mira", "marcus")) as [Peer, Peer];
 		const channel = await sharedChannel(mira, [{ peer: marcus, role: AccessRole.Editor }], peers);
 		const his = await marcus.post(channel, "his, before");
 		await settle(peers);
 
-		// While still a member he re-points it at a channel only he is in. The
-		// property changes (it is content, and he may write content)…
+		// While still a member he re-points it at a channel only he is in. A
+		// re-parent has to be authorized on BOTH ends, and on Mira's device he
+		// does not stand in the destination, so the whole update is refused.
 		const elsewhere = await marcus.create(CHANNEL_TYPE, { name: "mine" });
-		await marcus.edit(his, { conversation: elsewhere });
+		await marcus.edit(his, { conversation: elsewhere, body: "moved" });
 		await settle(peers);
-		expect(mira.repo.get(his)?.properties.conversation).toBe(elsewhere);
+		expect(mira.repo.get(his)?.properties.conversation).toBe(channel);
+		expect(mira.bodyOf(his)).toBe("his, before");
 
-		// …and it buys him nothing once he is removed from the original.
+		// And once he is removed from the original, nothing he does to it lands.
 		await mira.sharing.revoke(channel, marcus.pub);
 		await settle(peers);
 		await marcus.edit(his, { body: "rewritten from the other channel" });
 		await settle(peers);
 		expect(mira.bodyOf(his)).toBe("his, before");
 	});
+
+	it("removed from one channel but still in another: he cannot move a message from the one he is in into the one he was removed from", async () => {
+		const [mira, marcus] = (await boot("mira", "marcus")) as [Peer, Peer];
+		const kept = await sharedChannel(mira, [{ peer: marcus, role: AccessRole.Editor }], peers);
+		const lost = await sharedChannel(mira, [{ peer: marcus, role: AccessRole.Editor }], peers);
+		await mira.sharing.revoke(lost, marcus.pub);
+		await settle(peers);
+
+		// A message that legitimately lives in the channel he is still in…
+		const message = await marcus.post(kept, "posted where he may");
+		await settle(peers);
+		expect(mira.bodyOf(message)).toBe("posted where he may");
+		// …re-pointed at the one he was removed from. Authority would stay with
+		// `kept`, so without a check the message would simply APPEAR in `lost`.
+		await marcus.edit(message, { conversation: lost, body: "smuggled in" });
+		await settle(peers);
+		expect(mira.repo.get(message)?.properties.conversation).toBe(kept);
+		expect(mira.bodyOf(message)).toBe("posted where he may");
+
+		// The owner, who stands in both, may move it - and then it answers to
+		// both channels: he is in the first but not the second, so he can no
+		// longer write it.
+		await mira.edit(message, { conversation: lost });
+		await settle(peers);
+		expect(marcus.repo.get(message)?.properties.conversation).toBe(lost);
+		await marcus.edit(message, { body: "written into the channel he was removed from" });
+		await settle(peers);
+		expect(mira.bodyOf(message)).toBe("posted where he may");
+	});
+
+	// OPEN. On a device that has never seen a message, nothing distinguishes its
+	// author's record from one a different channel member composed under the
+	// same id: both are a self-signed genesis grant plus a grant naming us, from
+	// a current Editor of a channel we are in. The first to arrive is pinned as
+	// the message's root and the other is refused. Closing it needs an entity id
+	// that binds its creator (so a genesis grant can be checked against the id),
+	// which is a change to id minting across the product, not to this policy.
+	it.fails(
+		"a message first learned from a member who did not write it is not rooted in that member",
+		async () => {
+			const [mira, marcus, priya, dora] = (await boot("mira", "marcus", "priya", "dora")) as [
+				Peer,
+				Peer,
+				Peer,
+				Peer,
+			];
+			const channel = await sharedChannel(
+				mira,
+				[
+					{ peer: marcus, role: AccessRole.Editor },
+					{ peer: priya, role: AccessRole.Editor },
+					{ peer: dora, role: AccessRole.Editor },
+				],
+				peers,
+			);
+			relay.setOffline("dora", true);
+			const his = await marcus.post(channel, "marcus wrote this");
+			await settle(peers);
+			relay.setOffline("dora", false);
+
+			// Priya holds the message and its key, and reaches Dora first with a
+			// record of her own under the same id.
+			await priya.forgeChild(his, channel, dora, "priya wrote this instead");
+			await settle(peers);
+			// Then the author's own device hands Dora the real one.
+			await marcus.sharing.recascadeCollection(channel, CHANNEL_TYPE);
+			await settle(peers);
+
+			expect(await dora.rootOf(his)).toBe(marcus.pub);
+			expect(dora.bodyOf(his)).toBe("marcus wrote this");
+		},
+	);
 
 	it("a member who LEAVES can no longer write the channel's messages either", async () => {
 		const [mira, marcus] = (await boot("mira", "marcus")) as [Peer, Peer];
