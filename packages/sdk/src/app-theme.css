@@ -511,6 +511,12 @@ select {
 		border-color var(--motion-duration-normal) var(--motion-easing-standard),
 		color var(--motion-duration-normal) var(--motion-easing-standard);
 }
+/* A `.bs-btn` with no variant had no hover at all, so in five apps a real
+ * button read as a bold label. `:where` keeps this at the base rule's
+ * specificity: every variant's own hover, declared later, still wins. */
+:root .bs-btn:where(:hover:not(:disabled)) {
+	background: var(--hover);
+}
 :root .bs-btn:disabled {
 	cursor: not-allowed;
 	opacity: 0.55;

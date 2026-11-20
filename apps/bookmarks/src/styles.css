@@ -41,8 +41,8 @@ button {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 28px;
-	height: 28px;
+	width: var(--control-height-sm, 24px);
+	height: var(--control-height-sm, 24px);
 	border: 0;
 	border-radius: var(--radius-sm);
 	background: transparent;

@@ -235,7 +235,7 @@ export function PersonSidebar({
 				<AxisPicker
 					axes={CONTACTS_GROUPINGS}
 					active={grouping}
-					leadingIcon={IconName.View}
+					leadingIcon={IconName.KindMultiSelect}
 					labelKeyOf={(axis) => GROUP_LABEL_KEY[axis]}
 					captionKey="list.groupBy"
 					menuLabelKey="list.groupBy.menuLabel"
