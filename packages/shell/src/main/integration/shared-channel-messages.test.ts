@@ -594,6 +594,28 @@ describe("a shared chat channel carries every member's messages to every other m
 		expect(await mira.activeMembersOf(fromOwner)).toEqual([mira.pub, priya.pub].sort());
 	});
 
+	// OPEN (design 71 flow 3, `revokeFromCollection`, is not implemented): a
+	// revoke is recorded on the CHANNEL only, so every message that predates it
+	// still lists the revoked member as an Editor and their rewrite of it is
+	// accepted - their own messages and everyone else's. `it.fails` pins the hole:
+	// it turns red the day the revoke cascades onto the children, and the marker
+	// is then removed.
+	it.fails("a revoked member cannot rewrite messages that predate the revoke", async () => {
+		const [mira, marcus] = (await boot("mira", "marcus")) as [Peer, Peer];
+		const channel = await sharedChannel(mira, [{ peer: marcus, role: AccessRole.Editor }], peers);
+		const his = await marcus.post(channel, "his, before");
+		const hers = await mira.post(channel, "hers, before");
+		await settle(peers);
+		await mira.sharing.revoke(channel, marcus.pub);
+		await settle(peers);
+
+		await marcus.edit(his, { body: "his, rewritten after the revoke" });
+		await marcus.edit(hers, { body: "hers, rewritten after the revoke" });
+		await settle(peers);
+
+		expect([mira.bodyOf(his), mira.bodyOf(hers)]).toEqual(["his, before", "hers, before"]);
+	});
+
 	it("a message posted while a member is offline is NOT delivered later; the next one is", async () => {
 		const [mira, marcus] = (await boot("mira", "marcus")) as [Peer, Peer];
 		const channel = await sharedChannel(mira, [{ peer: marcus, role: AccessRole.Editor }], peers);
