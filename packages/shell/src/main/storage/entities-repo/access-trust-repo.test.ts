@@ -16,7 +16,9 @@ import {
 	AccessTrustRepository,
 } from "./access-trust-repo";
 
-describe("AccessTrustRepository", () => {
+// Signature-heavy: seconds alone, and 20-30x that on a hosted runner sharing
+// its cores with the rest of the suite — past the 30s default.
+describe("AccessTrustRepository", { timeout: 120_000 }, () => {
 	let vaultDir = "";
 	let stores: DataStores;
 	let repo: AccessTrustRepository;
