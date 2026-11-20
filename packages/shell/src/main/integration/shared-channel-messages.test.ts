@@ -7,7 +7,7 @@
  * joins it - a real `VaultSession`, the real `entities` service over the real
  * ydoc worker handler, the real change emitter + `createAutoShareReactor`, a
  * real `SharingEngine`, and a real `LiveSyncEngine` whose receive gates are the
- * production predicates (`authorizeShareBootstrap`, `authorizesWrapInstall`).
+ * production ones (`createSyncAuthz`, the same closures `main/index.ts` uses).
  * The peers meet over a CHANNEL-ROUTED, forward-only relay (frames fan by
  * `route ?? entityId` to current subscribers and are never stored), which is
  * the routing model of the shell's relay server and the reason the inbox path
@@ -24,18 +24,11 @@ import type { CapabilityLedger as CapabilityLedgerType } from "@brainstorm-os/ca
 import { MESSAGE_TYPE_URL } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { __ydocCacheResetForTest, handleYDocEnvelope } from "../../workers/ydoc";
-import {
-	AccessRole,
-	isAuthorizedWriter,
-	keyBytesEqual,
-	resolveCurrentMembers,
-	resolveMembers,
-} from "../collab/access-record";
+import { AccessRole, activeMembers } from "../collab/access-record";
 import { createAutoShareReactor } from "../collab/auto-share-reactor";
-import { deriveInviteSecret } from "../collab/invite-anchor";
-import { ShareBootstrapVerdict, authorizeShareBootstrap } from "../collab/share-bootstrap-authz";
+import { ShareBootstrapVerdict } from "../collab/share-bootstrap-authz";
 import { SharingEngine } from "../collab/sharing-engine";
-import { authorizesWrapInstall } from "../collab/wrap-install-authz";
+import { createSyncAuthz } from "../collab/sync-authz";
 import { base64ToBytes, bytesToBase64 } from "../credentials/crypto";
 import { ED25519_PUBLIC_BYTES, verifySignature } from "../credentials/identity";
 import { wrapDekVersionOf } from "../credentials/member-wraps";
@@ -170,6 +163,17 @@ async function makePeer(name: string, relay: ChannelRelay) {
 		},
 	});
 
+	// The production gates, as `main/index.ts` builds them.
+	const accessTrust = await session.accessTrust();
+	const syncAuthz = createSyncAuthz({
+		session,
+		dekStore,
+		accessTrust,
+		shareInvites,
+		typeOf: (id) => repo.get(id)?.type ?? null,
+		onBootstrapRefused: (entityId, verdict) => refusals.push(`${entityId}: ${verdict}`),
+	});
+
 	live = new LiveSyncEngine({
 		getRelay: () => surface,
 		dekStore,
@@ -177,67 +181,14 @@ async function makePeer(name: string, relay: ChannelRelay) {
 		deviceSign: (bytes) => session.signPayload(bytes),
 		deviceVerify: (sig, bytes, senderPub) => verifySignature(senderPub, bytes, sig),
 		resolveEntityType: () => null,
-		isShared: async (entityId) => {
-			const { doc } = await session.ydocStore.load(entityId);
-			try {
-				return resolveMembers(doc, entityId).filter((m) => m.active).length > 1;
-			} finally {
-				doc.destroy();
-			}
-		},
-		authorizeWriter: async (senderPubB64, entityId, plaintext) => {
-			const senderKey = base64UrlToBytes(senderPubB64);
-			if (senderKey.length !== ED25519_PUBLIC_BYTES) return false;
-			if (keyBytesEqual(senderKey, session.identity.publicKey)) return true;
-			const { doc } = await session.ydocStore.load(entityId);
-			try {
-				if (isAuthorizedWriter(doc, entityId, senderKey)) return true;
-				const verdict = await authorizeShareBootstrap({
-					localDoc: doc,
-					entityId,
-					senderKey,
-					selfPubB64: session.identity.publicKeyBase64,
-					incomingState: plaintext,
-					now: Date.now(),
-					invites: shareInvites,
-					deriveInviteSecret: (nonce, expiresAt) =>
-						deriveInviteSecret((bytes) => session.signPayload(bytes), nonce, expiresAt),
-					loadDoc: async (id) => (await session.ydocStore.load(id)).doc,
-					typeOf: (id) => repo.get(id)?.type ?? null,
-				});
-				if (verdict !== ShareBootstrapVerdict.Allow) refusals.push(`${entityId}: ${verdict}`);
-				return verdict === ShareBootstrapVerdict.Allow;
-			} catch {
-				return false;
-			} finally {
-				doc.destroy();
-			}
-		},
+		isShared: syncAuthz.isShared,
+		authorizeWriter: syncAuthz.authorizeWriter,
 		applyRemoteUpdate: makeRemoteDocApplier({
 			apply: () => applyRemoteDoc,
 			onApplied: (entityId) => repaints.push(entityId),
 		}),
 		installWrap: async (wrap, entityId, senderPubB64) => {
-			const senderKey = base64UrlToBytes(senderPubB64);
-			if (senderKey.length !== ED25519_PUBLIC_BYTES) return null;
-			const existing = dekStore.open(entityId);
-			if (existing) {
-				dekStore.close(existing.dek);
-				const { doc } = await session.ydocStore.load(entityId);
-				try {
-					const allowed = authorizesWrapInstall({
-						entityId,
-						senderKey,
-						selfPub: session.identity.publicKey,
-						holdsDek: true,
-						localDoc: doc,
-						decodeMemberKey: base64ToBytes,
-					});
-					if (!allowed) return null;
-				} finally {
-					doc.destroy();
-				}
-			}
+			if (!(await syncAuthz.authorizeWrapInstall(entityId, senderPubB64))) return null;
 			if (wrap.recipientPubB64 !== bytesToBase64(session.deviceX25519.publicKey)) return null;
 			const { dek, type } = session.unwrapMemberWrapWithType(wrap, entityId);
 			try {
@@ -335,8 +286,7 @@ async function makePeer(name: string, relay: ChannelRelay) {
 		activeMembersOf: async (entityId: string): Promise<string[]> => {
 			const { doc } = await session.ydocStore.load(entityId);
 			try {
-				return resolveCurrentMembers(doc, entityId)
-					.filter((m) => m.active)
+				return activeMembers(doc, entityId, accessTrust.trustFor(doc, entityId))
 					.map((m) => m.member)
 					.sort();
 			} finally {

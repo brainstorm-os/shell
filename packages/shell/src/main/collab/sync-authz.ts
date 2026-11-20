@@ -40,6 +40,9 @@ export type SyncAuthzDeps = {
 	shareInvites: ShareInviteStoreLike;
 	/** The locally materialized type of an entity, or null. */
 	typeOf: (entityId: string) => string | null;
+	/** Told when the bootstrap gate refuses a first-share frame. Defaults to a
+	 *  console warning naming the entity and the verdict. */
+	onBootstrapRefused?: (entityId: string, verdict: ShareBootstrapVerdict) => void;
 };
 
 export type SyncAuthz = {
@@ -62,6 +65,11 @@ function senderKeyOf(senderPubB64Url: string): Uint8Array | null {
 
 export function createSyncAuthz(deps: SyncAuthzDeps): SyncAuthz {
 	const { session, dekStore, accessTrust } = deps;
+	const onBootstrapRefused =
+		deps.onBootstrapRefused ??
+		((entityId, verdict) => {
+			console.warn(`[collab] share bootstrap refused for ${entityId}: ${verdict}`);
+		});
 	return {
 		// Shared ⇔ the record lists >1 ACTIVE member under the policy. Read off
 		// the persisted doc (the worker persists synchronously before `loadDoc`
@@ -120,9 +128,7 @@ export function createSyncAuthz(deps: SyncAuthzDeps): SyncAuthz {
 						typeOf: deps.typeOf,
 						accessTrust,
 					});
-					if (verdict !== ShareBootstrapVerdict.Allow) {
-						console.warn(`[collab] share bootstrap refused for ${entityId}: ${verdict}`);
-					}
+					if (verdict !== ShareBootstrapVerdict.Allow) onBootstrapRefused(entityId, verdict);
 					return verdict === ShareBootstrapVerdict.Allow;
 				} finally {
 					doc.destroy();

@@ -217,12 +217,7 @@ export class SharingEngine {
 			// grant: an Owner grant without one made every provisioned channel
 			// one-way - the owner's messages reached members and no member's
 			// message ever reached the owner, with nothing logged on either side.
-			this.#writeGenesisGrant(
-				doc,
-				entityId,
-				trustNow(),
-				this.#session.deviceX25519.publicKeyBase64,
-			);
+			this.#writeGenesisGrant(doc, entityId, trustNow(), this.#session.deviceX25519.publicKeyBase64);
 		});
 	}
 

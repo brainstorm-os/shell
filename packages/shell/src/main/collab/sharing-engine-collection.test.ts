@@ -254,7 +254,7 @@ describe("SharingEngine.shareCollection — cascade onto a channel's messages", 
 		await engine.provisionEntity(CHANNEL, CHANNEL_TYPE, { name: "general" });
 		const { doc } = await owner.ydocStore.load(CHANNEL);
 		try {
-			const self = resolveCurrentMembers(doc, CHANNEL).find(
+			const self = resolveCurrentMembers(doc, CHANNEL, docTrust(doc, CHANNEL)).find(
 				(m) => m.member === owner.identity.publicKeyBase64,
 			);
 			expect(self?.role).toBe(AccessRole.Owner);
