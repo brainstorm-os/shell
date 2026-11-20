@@ -321,13 +321,6 @@ button {
  * `place-items: center` + the surface's own `width/min-height: 100%` keep the
  * card centered in the full stage. */
 
-/* When there's nothing to preview, soften the toolbar chrome — keep the
- * inspector toggle (it still controls the panel), but hide the counter
- * (always "0 of 0") + dim the disabled nav buttons. */
-.preview--empty .preview__counter {
-	visibility: hidden;
-}
-
 /* ── Inspector ──────────────────────────────────────────────────────── */
 
 /* Glass overlay (`.glass--strong` on the element supplies the translucent

@@ -184,3 +184,41 @@ describe("new-file affordances (F-205)", () => {
 		expect(document.querySelector(".editor__refs")).toBeNull();
 	});
 });
+
+describe("header identity glyph", () => {
+	it("paints the type fallback for an icon-less file, is not a dead button, and the new-file controls carry a hover-bearing face", async () => {
+		const { runtime, create } = makeFakeRuntime();
+		window.brainstorm = runtime;
+		act(() => {
+			root = createRoot(container);
+			root.render(<CodeEditorApp />);
+		});
+		await vi.waitFor(() => {
+			expect(document.querySelector(".editor__empty .editor__empty-new")).not.toBeNull();
+		});
+		act(() =>
+			document.querySelector<HTMLButtonElement>(".editor__empty .editor__empty-new")?.click(),
+		);
+		await vi.waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+
+		await vi.waitFor(
+			() => {
+				expect(
+					document.querySelector(".app-header__left .editor__header-identity .editor__file-icon svg"),
+				).not.toBeNull();
+			},
+			{ timeout: 2000 },
+		);
+		expect(document.querySelector(".app-header__left button.bs-icon-pick")).toBeNull();
+
+		expect(
+			document
+				.querySelector(".app-header__right .editor__header-new")
+				?.classList.contains("header-icon-btn"),
+		).toBe(true);
+		for (const button of document.querySelectorAll(".editor__files-actions .bs-btn")) {
+			expect(button.classList.contains("bs-btn--ghost")).toBe(true);
+		}
+		expect(document.querySelectorAll(".editor__files-actions .bs-btn").length).toBe(2);
+	});
+});

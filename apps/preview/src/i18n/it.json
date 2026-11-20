@@ -14,7 +14,6 @@
   "menu.saveCopy": "Salva una copia…",
   "menu.saveDialogTitle": "Salva una copia",
   "counter.position": "{index} di {total}",
-  "counter.empty": "0 di 0",
   "stage.noFileSelected": "Niente da visualizzare in anteprima",
   "stage.noFileSelectedHint": "Apri un file o un'immagine da File, o premi Spazio su un oggetto per vederlo qui con Quick Look.",
   "stage.noPreviewFor": "Nessuna anteprima per {mime}",

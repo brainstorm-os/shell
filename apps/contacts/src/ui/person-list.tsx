@@ -302,6 +302,7 @@ export function PersonSidebar({
 									<ObjectMenuTrigger
 										key={`b:${person.id}`}
 										variant="row"
+										className="contacts-row-host"
 										moreActionsLabel={t("detail.menu.more")}
 										context={() => menuContextFor(person)}
 									>
@@ -327,6 +328,7 @@ export function PersonSidebar({
 									<ObjectMenuTrigger
 										key={person.id}
 										variant="row"
+										className="contacts-row-host"
 										moreActionsLabel={t("detail.menu.more")}
 										context={() => menuContextFor(person)}
 									>

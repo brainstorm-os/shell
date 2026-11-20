@@ -60,7 +60,6 @@
   "syntaxTheme.auto": "Segui l'aspetto",
   "syntaxTheme.light": "GitHub Light",
   "syntaxTheme.dark": "GitHub Dark",
-  "fileIconSelect": "Seleziona {name}",
   "navToggle.show": "Mostra i file",
   "navToggle.hide": "Nascondi i file",
   "header.lock": "Blocca il file (sola lettura)",

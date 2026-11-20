@@ -8,6 +8,7 @@
   "header.inspector.show": "Eigenschaften einblenden",
   "header.inspector.hide": "Eigenschaften ausblenden",
   "header.inspector.disabledHint": "Öffnen Sie ein Lesezeichen, um seine Eigenschaften zu sehen",
+  "header.more.disabledHint": "Öffnen Sie ein Lesezeichen oder eine Sammlung, um die Aktionen zu sehen",
   "nav.surfaces": "Bereiche",
   "sidebar.tags": "Tags",
   "sidebar.resize": "Größe der Seitenleiste ändern",

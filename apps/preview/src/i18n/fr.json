@@ -14,7 +14,6 @@
   "menu.saveCopy": "Enregistrer une copie…",
   "menu.saveDialogTitle": "Enregistrer une copie",
   "counter.position": "{index} sur {total}",
-  "counter.empty": "0 sur 0",
   "stage.noFileSelected": "Rien à prévisualiser",
   "stage.noFileSelectedHint": "Ouvrez un fichier ou une image depuis Fichiers, ou appuyez sur Espace sur un objet pour l'aperçu rapide ici.",
   "stage.noPreviewFor": "Aucun aperçu pour {mime}",

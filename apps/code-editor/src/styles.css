@@ -1014,8 +1014,8 @@ body.is-resizing .editor__files-resize {
 
 /* ── FILES head actions (9.7.5, 9.7.12) ──────────────────────────────
    The "New" affordances are the SHARED button faces (`.bs-btn--sm`,
-   `.bs-btn--sm.bs-btn--icon`) — height, padding, radius, hover and focus
-   ring all come from `@brainstorm-os/sdk/app-theme.css`. The app supplies
+   `.bs-btn--sm.bs-btn--icon`) — height, padding, radius and focus ring all
+   come from `@brainstorm-os/sdk/app-theme.css`. The app supplies
    only the layout delta. */
 
 .editor__files-actions {
@@ -1025,9 +1025,25 @@ body.is-resizing .editor__files-resize {
 	flex: 0 0 auto;
 }
 
-/* The panel's own heading + the header "+" carry no deltas beyond what the
-   shared faces give them; the rules that used to re-declare their box are
-   deliberately gone. */
+/* A bare `.bs-btn` is faceless AND hoverless — the hover lives on the variant
+   — so the panel actions carry `.bs-btn--ghost` and the header "+" is the
+   shared `.header-icon-btn`. Neither needs a delta here. */
+
+/* The header identity (file glyph + name) rides inside the object-menu host,
+   which is a plain block: without its own flex line the glyph and the title
+   are adjacent inline boxes with no gap between them. */
+:root .editor__header-identity {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2);
+	min-width: 0;
+}
+
+.editor__header-identity .editor__file-icon {
+	flex-basis: 18px;
+	width: 18px;
+	height: 18px;
+}
 
 /* ── Diagnostics problem list (9.7.6) ────────────────────────────── */
 

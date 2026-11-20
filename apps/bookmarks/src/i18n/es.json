@@ -8,6 +8,7 @@
   "header.inspector.show": "Mostrar propiedades",
   "header.inspector.hide": "Ocultar propiedades",
   "header.inspector.disabledHint": "Abra un marcador para ver sus propiedades",
+  "header.more.disabledHint": "Abra un marcador o una colección para ver sus acciones",
   "nav.surfaces": "Secciones",
   "sidebar.tags": "Etiquetas",
   "sidebar.resize": "Redimensionar barra lateral",

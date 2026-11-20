@@ -97,6 +97,18 @@ describe("PreviewApp", () => {
 		await unmount();
 	});
 
+	it("renders no pager with nothing to page, and brings it back with a gallery", async () => {
+		const { container, unmount } = await renderInto(<PreviewApp />);
+		await flush();
+		expect(container.querySelector(".app-header .preview__nav")).toBeNull();
+		expect(container.querySelector(".app-header")?.textContent).not.toContain("0 of 0");
+		await applyGallery();
+		expect(container.querySelector(".app-header .preview__counter")?.textContent).toBe(
+			`1 of ${SIBLINGS.length}`,
+		);
+		await unmount();
+	});
+
 	it("opens the overflow ⋯ through the fancy-menus anchored menu", async () => {
 		withFilesService();
 		const { container, unmount } = await renderInto(<PreviewApp />);
