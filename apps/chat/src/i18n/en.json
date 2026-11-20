@@ -33,6 +33,7 @@
   "members.agent": "AI agent",
   "members.guest": "guest",
   "members.unknown": "Unknown member",
+  "author.you": "You",
   "members.one": "{count} member",
   "members.other": "{count} members",
   "newChannel.title": "New channel",

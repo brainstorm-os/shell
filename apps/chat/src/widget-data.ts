@@ -12,7 +12,13 @@
  */
 
 import type { VaultEntitiesListQuery } from "@brainstorm-os/sdk-types";
-import { CHANNEL_TYPE, MESSAGE_TYPE, sortMessages, toMessage } from "./logic/chat";
+import {
+	type AuthorLabels,
+	CHANNEL_TYPE,
+	MESSAGE_TYPE,
+	sortMessages,
+	toMessage,
+} from "./logic/chat";
 
 /** Manifest widget id — must match `registrations.widgets[].id` in manifest.json. */
 export const CHAT_WIDGET_RECENT = "recent-messages";
@@ -63,6 +69,7 @@ export function messageSnippet(body: string): string {
 export function shapeRecentMessages(
 	entities: readonly WidgetChatEntity[],
 	limit = RECENT_LIMIT,
+	authorLabels?: AuthorLabels,
 ): { rows: WidgetMessageRow[]; channelCount: number } {
 	const channelNames = new Map<string, string>();
 	for (const e of entities) {
@@ -76,7 +83,7 @@ export function shapeRecentMessages(
 		.filter((e) => e.type === MESSAGE_TYPE && e.deletedAt === null)
 		// No trusted-agent context: the widget shows message snippets, never an
 		// approvable card, so it takes `toMessage`'s fail-closed default.
-		.map((e) => toMessage(e))
+		.map((e) => toMessage(e, authorLabels ? { authorLabels } : {}))
 		.filter((m) => channelNames.has(m.channelId));
 
 	const rows = sortMessages(messages)

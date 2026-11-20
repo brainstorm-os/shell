@@ -33,6 +33,7 @@
   "members.agent": "KI-Agent",
   "members.guest": "Gast",
   "members.unknown": "Unbekanntes Mitglied",
+  "author.you": "Du",
   "members.one": "{count} Mitglied",
   "members.other": "{count} Mitglieder",
   "newChannel.title": "Neuer Kanal",

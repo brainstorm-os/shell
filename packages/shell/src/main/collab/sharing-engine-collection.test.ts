@@ -240,6 +240,20 @@ describe("SharingEngine.shareCollection — cascade onto a channel's messages", 
 		}
 	});
 
+	it("a provisioned entity's Owner grant carries the owner's wrapping key", async () => {
+		await engine.provisionEntity(CHANNEL, CHANNEL_TYPE, { name: "general" });
+		const { doc } = await owner.ydocStore.load(CHANNEL);
+		try {
+			const self = resolveCurrentMembers(doc, CHANNEL).find(
+				(m) => m.member === owner.identity.publicKeyBase64,
+			);
+			expect(self?.role).toBe(AccessRole.Owner);
+			expect(self?.x25519).toBe(owner.deviceX25519.publicKeyBase64);
+		} finally {
+			doc.destroy();
+		}
+	});
+
 	it("auto-share is a no-op on a solo (unshared) container", async () => {
 		await engine.provisionEntity(CHANNEL, CHANNEL_TYPE, { name: "solo" });
 		await engine.provisionEntity("msg_solo", MESSAGE_TYPE_URL, { conversation: CHANNEL });

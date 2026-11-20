@@ -68,7 +68,9 @@ export type ChatMessage = {
 	richBody?: string;
 	/** Stable author key (the participant `personRef`) — drives colour + grouping. */
 	authorRef: string;
-	/** The author's display name at send time (denormalised onto the message). */
+	/** The author's name AS THIS VIEWER SHOULD READ IT ({@link authorLabel}):
+	 *  "You" for the local identity, otherwise the member's name or a neutral
+	 *  fallback. Not the raw denormalised `sender.displayName`. */
 	authorName: string;
 	createdAt: string;
 	seq: number;
@@ -138,9 +140,65 @@ export function deriveChannels(entities: readonly EntityLike[]): ChatChannel[] {
 
 // ─────────────────────────────── messages ───────────────────────────────
 
-/** The author key + name for a message: the `participant` sender's `personRef`
- *  / `displayName` when present, falling back to the entity id / "Someone" so a
- *  malformed sender never crashes the render. */
+/** What builds up to 0.15 denormalised onto a message whose author had set no
+ *  display name. It was written into the SYNCED row, so every other member's
+ *  shell rendered that author as "You". Read as "no name" unless the row was
+ *  authored under a per-device key, where it can only ever have meant the
+ *  person looking at it. */
+const LEGACY_UNNAMED_AUTHOR = "You";
+
+/** The author key a single device minted before authorship moved to the
+ *  sovereign pubkey (`mintPersonRef`). Never shared between people. */
+const DEVICE_AUTHOR_PREFIX = "chat-person-";
+
+/** How an author is named for THIS viewer. */
+export type AuthorLabels = {
+	/** This viewer's author key. "You" is only ever said about this key. */
+	selfRef?: string;
+	/** This viewer's own display name; "" when they have not set one. */
+	selfName?: string;
+	/** The localised "You". */
+	you: string;
+	/** The localised label for a member nothing else can name. */
+	unnamed: string;
+	/** A member's live display name by author key (the roster), if known. */
+	nameOf?: (authorRef: string) => string | undefined;
+};
+
+/** A short, human-checkable form of an author key for a member with no name. */
+export function shortAuthorRef(authorRef: string): string {
+	return authorRef.length > 8 ? `${authorRef.slice(0, 6)}…` : authorRef;
+}
+
+/**
+ * The name to show for a message's author. "You" is reserved for the local
+ * identity: another member with no display name gets their roster name, else
+ * a short form of their key, else the neutral "unknown member" - never "You".
+ */
+export function authorLabel(
+	author: { authorRef: string; authorName: string },
+	labels: AuthorLabels,
+): string {
+	if (labels.selfRef && author.authorRef === labels.selfRef) {
+		return labels.selfName?.trim() || labels.you;
+	}
+	const live = labels.nameOf?.(author.authorRef)?.trim();
+	if (live) return live;
+	const stored = author.authorName.trim();
+	const placeholder =
+		stored === LEGACY_UNNAMED_AUTHOR && !author.authorRef.startsWith(DEVICE_AUTHOR_PREFIX);
+	if (stored && !placeholder) return stored;
+	return shortAuthorRef(author.authorRef) || labels.unnamed;
+}
+
+/** With no viewer context, nobody is "You": an unnamed author is their key. */
+const ANONYMOUS_VIEWER: AuthorLabels = { you: "", unnamed: "" };
+
+/** The author key + STORED name for a message: the `participant` sender's
+ *  `personRef` / `displayName` when present, falling back to the entity id /
+ *  "Someone" so a malformed sender never crashes the render. The stored name is
+ *  what the author called themselves at send time and may be empty; it is
+ *  turned into a label by {@link authorLabel}. */
 function readAuthor(
 	properties: Record<string, unknown>,
 	fallbackId: string,
@@ -152,8 +210,7 @@ function readAuthor(
 	if (sender && typeof sender === "object") {
 		const s = sender as Record<string, unknown>;
 		const ref = str(s.personRef);
-		const name = str(s.displayName);
-		if (ref) return { authorRef: ref, authorName: name || ref };
+		if (ref) return { authorRef: ref, authorName: str(s.displayName) };
 	}
 	return { authorRef: `anon:${fallbackId}`, authorName: "Someone" };
 }
@@ -189,6 +246,9 @@ export type ToMessageContext = {
 	 *  decidable only when its invoker is this key; omit it and every such card
 	 *  is read-only (fail-closed, like the trusted set). */
 	selfPubkey?: string;
+	/** How authors are named for this viewer. Omit it and no author is "You"
+	 *  (an unnamed author renders as a short form of their key). */
+	authorLabels?: AuthorLabels;
 };
 
 /** Agent-13 — how far a row that presents as the built-in agent is trusted. */
@@ -277,7 +337,7 @@ export function toMessage(entity: EntityLike, context?: ToMessageContext): ChatM
 		body: str(entity.properties.body),
 		...(richBody ? { richBody } : {}),
 		authorRef: unverified ? UNVERIFIED_AGENT_REF : author.authorRef,
-		authorName: author.authorName,
+		authorName: authorLabel(author, context?.authorLabels ?? ANONYMOUS_VIEWER),
 		createdAt: str(entity.properties.createdAt),
 		seq: num(entity.properties.seq) ?? 0,
 		attachments: parseAttachments(entity.properties.attachments),
@@ -302,12 +362,19 @@ export function channelMessages(
 	entities: readonly EntityLike[],
 	channelId: string,
 	selfPubkey?: string,
+	authorLabels?: AuthorLabels,
 ): ChatMessage[] {
 	if (!channelId) return [];
 	const trustedAgents = trustedAgentAuthors(entities);
 	const rows = entities
 		.filter((e) => e.type === MESSAGE_TYPE && str(e.properties.conversation) === channelId)
-		.map((e) => toMessage(e, { trustedAgents, ...(selfPubkey ? { selfPubkey } : {}) }));
+		.map((e) =>
+			toMessage(e, {
+				trustedAgents,
+				...(selfPubkey ? { selfPubkey } : {}),
+				...(authorLabels ? { authorLabels } : {}),
+			}),
+		);
 	return sortMessages(rows);
 }
 

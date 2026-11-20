@@ -47,6 +47,24 @@ describe("reactToEntityCreate", () => {
 		expect(autoShareNewChild).toHaveBeenCalledWith("msg_1", MESSAGE_TYPE_URL, "chan_1");
 	});
 
+	it("reports a child that was shared, and stays quiet about one that was not", async () => {
+		const onShared = vi.fn();
+		const shared = spyEngine(async () => 2);
+		await reactToEntityCreate(
+			{ verb: EntityEventVerb.Create, entityId: "msg_1", type: MESSAGE_TYPE_URL },
+			deps({ getEngine: () => shared.engine, onShared }),
+		);
+		expect(onShared).toHaveBeenCalledWith("msg_1", MESSAGE_TYPE_URL);
+
+		onShared.mockClear();
+		const solo = spyEngine(async () => 0);
+		await reactToEntityCreate(
+			{ verb: EntityEventVerb.Create, entityId: "msg_2", type: MESSAGE_TYPE_URL },
+			deps({ getEngine: () => solo.engine, onShared }),
+		);
+		expect(onShared).not.toHaveBeenCalled();
+	});
+
 	it("ignores a type with no containment rule", async () => {
 		const { engine, autoShareNewChild } = spyEngine();
 		await reactToEntityCreate(

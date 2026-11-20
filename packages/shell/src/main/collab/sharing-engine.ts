@@ -201,6 +201,14 @@ export class SharingEngine {
 				role: AccessRole.Owner,
 				signerSecret: exposed.secretKey,
 				now: Date.now(),
+				// The same keyed self-grant `#shareOne` writes. `grantAccess` no-ops
+				// on a live grant, so a key-less one written here is the one that
+				// STAYS after a share - and a member's child cascade can only wrap to
+				// a wrapping key it reads out of a signed grant. An Owner grant
+				// without one made every provisioned channel one-way: the owner's
+				// messages reached members and no member's message ever reached the
+				// owner, with nothing logged on either side.
+				x25519: this.#session.deviceX25519.publicKeyBase64,
 			});
 		});
 	}
@@ -325,7 +333,15 @@ export class SharingEngine {
 	async autoShareNewChild(childId: string, childType: string, containerId: string): Promise<number> {
 		const members = await this.#activeMembersWithKeys(containerId);
 		const selfPub = this.#session.identity.publicKeyBase64;
-		const recipients = members.filter((m) => m.member !== selfPub && m.x25519 !== null);
+		const others = members.filter((m) => m.member !== selfPub);
+		const recipients = others.filter((m) => m.x25519 !== null);
+		// A member we cannot wrap to is a member who silently never receives this
+		// child, so say so. Identifiers only: the count, never a key.
+		if (recipients.length < others.length) {
+			console.warn(
+				`[sharing] ${childId}: ${others.length - recipients.length} of ${others.length} member(s) of ${containerId} have no wrapping key in their grant and will not receive it`,
+			);
+		}
 		// Solo container (only self) ⇒ nothing to fan out, exactly like LiveSync's
 		// solo-quiet rule. (A container shared only with members we can't yet wrap
 		// to also lands here; the deferred re-cascade picks them up later.)

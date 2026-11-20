@@ -33,6 +33,7 @@
   "members.agent": "Agent IA",
   "members.guest": "invité",
   "members.unknown": "Membre inconnu",
+  "author.you": "Vous",
   "members.one": "{count} membre",
   "members.other": "{count} membres",
   "newChannel.title": "Nouveau canal",

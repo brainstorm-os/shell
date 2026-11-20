@@ -31,6 +31,11 @@ export type AutoShareReactorDeps = {
 	 *  passed its gate. */
 	readonly readEntityProperties: (entityId: string) => Promise<Record<string, unknown> | null>;
 	readonly onError?: (error: unknown) => void;
+	/** The child was cascaded to at least one member, so it is now a shared
+	 *  entity on THIS device too. The wiring uses it to start live-syncing the
+	 *  child (subscribe its channel, emit later edits); without it the creator is
+	 *  the one member not listening to their own message. */
+	readonly onShared?: (entityId: string, type: string) => void;
 };
 
 /**
@@ -50,7 +55,8 @@ export async function reactToEntityCreate(
 	if (typeof parentId !== "string" || parentId === "") return;
 	const engine = deps.getEngine();
 	if (!engine) return;
-	await engine.autoShareNewChild(change.entityId, change.type, parentId);
+	const shared = await engine.autoShareNewChild(change.entityId, change.type, parentId);
+	if (shared > 0) deps.onShared?.(change.entityId, change.type);
 }
 
 /**

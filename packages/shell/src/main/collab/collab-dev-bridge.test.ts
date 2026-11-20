@@ -138,7 +138,19 @@ describe("Collab-C4-live — persisted relay-driven share + co-edit + revoke", (
 
 		// Mira revokes Marcus — append-only audit; the revoke propagates as an update.
 		expect(await bridgeMira.revoke(ENTITY_ID, marcusB64)).toBe(true);
-		await awaitConverged(bridgeMira, bridgeMarcus, ENTITY_ID);
+		// The revoke itself is sealed under the key Marcus still holds, so he sees
+		// it. Full convergence is NOT expected after that, and must not be: the
+		// revoke rotates the DEK and appends the survivors' wraps (the owner's
+		// included, now that a provisioned Owner grant carries a wrapping key, as
+		// a shared entity's always has) under DEK', which a revoked member cannot
+		// open. Waiting for equal state vectors here only ever passed because the
+		// provisioned owner had no key and so was not a survivor.
+		const revokedView = async () =>
+			(await bridgeMarcus.access(ENTITY_ID)).find((m) => m.member === marcusB64);
+		const deadline = Date.now() + 3000;
+		while ((await revokedView())?.active !== false && Date.now() < deadline) {
+			await new Promise((r) => setTimeout(r, 25));
+		}
 		const afterRevoke = await bridgeMarcus.access(ENTITY_ID);
 		const revokedEntry = afterRevoke.find((m) => m.member === marcusB64);
 		expect(revokedEntry?.active).toBe(false);
