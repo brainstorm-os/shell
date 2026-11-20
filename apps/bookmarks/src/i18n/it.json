@@ -8,6 +8,7 @@
   "header.inspector.show": "Mostra proprietà",
   "header.inspector.hide": "Nascondi proprietà",
   "header.inspector.disabledHint": "Apra un segnalibro per vederne le proprietà",
+  "header.more.disabledHint": "Apra un segnalibro o una raccolta per vederne le azioni",
   "nav.surfaces": "Sezioni",
   "sidebar.tags": "Tag",
   "sidebar.resize": "Ridimensiona barra laterale",
