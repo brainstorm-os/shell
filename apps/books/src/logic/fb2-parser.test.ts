@@ -65,15 +65,19 @@ describe("parseFb2Markup", () => {
 		expect(content.author).toBe("Стивен Кинг, translator42");
 	});
 
-	it("maps sections to chapters, folding a title-only part into its first chapter", () => {
+	it("lists every section title in document order, nested ones included", () => {
 		expect(content.spine.map((s) => s.title)).toEqual([
 			"Библиотечная полиция",
 			"Часть первая",
+			"Глава 1",
 			"Глава 2",
 			"Примечания",
 		]);
-		expect(content.spine[1]?.blocks).toEqual([
-			{ kind: BlockKind.Heading, text: "Часть первая" },
+	});
+
+	it("gives a title-only part its own title page, and each chapter its own text", () => {
+		expect(content.spine[1]?.blocks).toEqual([{ kind: BlockKind.Heading, text: "Часть первая" }]);
+		expect(content.spine[2]?.blocks).toEqual([
 			{ kind: BlockKind.Heading, text: "Глава 1" },
 			{ kind: BlockKind.Paragraph, text: "Первый абзац со сноской[1]." },
 			{ kind: BlockKind.Heading, text: "* * *" },
@@ -81,7 +85,7 @@ describe("parseFb2Markup", () => {
 		]);
 	});
 
-	it("keeps the body's own title and epigraph as the opening chapter", () => {
+	it("keeps the body's own title and epigraph as the opening page", () => {
 		expect(content.spine[0]?.blocks.map((b) => b.text)).toEqual([
 			"Библиотечная полиция",
 			"Эпиграф книги.",
@@ -90,7 +94,7 @@ describe("parseFb2Markup", () => {
 	});
 
 	it("reads poems, citations and tables as paragraphs", () => {
-		expect(content.spine[2]?.blocks.map((b) => b.text)).toEqual([
+		expect(content.spine[3]?.blocks.map((b) => b.text)).toEqual([
 			"Глава 2",
 			"Строка раз,",
 			"строка два.",
@@ -102,7 +106,7 @@ describe("parseFb2Markup", () => {
 	});
 
 	it("collapses the notes body into ONE chapter, each note led by its number", () => {
-		expect(content.spine[3]?.blocks).toEqual([
+		expect(content.spine[4]?.blocks).toEqual([
 			{ kind: BlockKind.Heading, text: "Примечания" },
 			{ kind: BlockKind.Paragraph, text: "1 Текст сноски." },
 			{ kind: BlockKind.Paragraph, text: "2 Вторая сноска." },
@@ -116,6 +120,65 @@ describe("parseFb2Markup", () => {
 
 	it("is deterministic, so a stored reading position stays valid", () => {
 		expect(parseFb2Markup(BOOK).content).toEqual(content);
+	});
+});
+
+describe("FB2 contents — the body title is the book, not a chapter", () => {
+	const chapters = (markup: string): string[] =>
+		parseFb2Markup(markup).content.spine.map((item) => item.title);
+
+	// The shape found in the real shell: the first chapter's title vanished
+	// from the contents because the body's title was folded into it.
+	const REPORTED =
+		"<FictionBook><description><title-info><book-title>Библиотечная полиция</book-title></title-info></description><body><title><p>Библиотечная полиция</p></title><section><title><p>Глава первая</p></title><p>Первый абзац.</p></section><section><title><p>Глава вторая</p></title><p>Второй абзац.</p></section></body></FictionBook>";
+
+	it("lists both chapters and no entry for the body title", () => {
+		expect(chapters(REPORTED)).toEqual(["Глава первая", "Глава вторая"]);
+	});
+
+	it("opens the first chapter on its own heading, not the book's", () => {
+		const { content } = parseFb2Markup(REPORTED);
+		expect(content.title).toBe("Библиотечная полиция");
+		expect(content.spine[0]?.blocks.map((b) => b.text)).toEqual(["Глава первая", "Первый абзац."]);
+	});
+
+	it("lists nested sections flat, in document order, parts included", () => {
+		const nested = `<FictionBook><body><title><p>Книга</p></title>
+			<section><title><p>Часть I</p></title>
+				<section><title><p>Глава 1</p></title><p>a</p></section>
+				<section><title><p>Глава 2</p></title><p>b</p>
+					<section><title><p>Глава 2.1</p></title><p>c</p></section>
+				</section>
+			</section>
+			<section><title><p>Часть II</p></title><p>Вступление части.</p>
+				<section><title><p>Глава 3</p></title><p>d</p></section>
+			</section>
+		</body></FictionBook>`;
+		expect(chapters(nested)).toEqual([
+			"Часть I",
+			"Глава 1",
+			"Глава 2",
+			"Глава 2.1",
+			"Часть II",
+			"Глава 3",
+		]);
+	});
+
+	it("numbers an untitled section by its place and never borrows a neighbour's title", () => {
+		const untitled =
+			"<FictionBook><body><title><p>Книга</p></title><section><p>a</p></section><section><title><p>Вторая</p></title><p>b</p></section></body></FictionBook>";
+		expect(chapters(untitled)).toEqual(["Chapter 1", "Вторая"]);
+	});
+
+	it("keeps text that follows a nested section as its own untitled entry", () => {
+		const trailing =
+			"<FictionBook><body><section><title><p>Глава</p></title><p>до</p><section><title><p>Вложенная</p></title><p>в</p></section><p>после</p></section></body></FictionBook>";
+		const { content } = parseFb2Markup(trailing);
+		expect(content.spine.map((s) => s.blocks.map((b) => b.text))).toEqual([
+			["Глава", "до"],
+			["Вложенная", "в"],
+			["после"],
+		]);
 	});
 });
 

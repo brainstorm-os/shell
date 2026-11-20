@@ -73,7 +73,12 @@ import {
 	staleFileMimePatch,
 } from "./logic/book-open";
 import { sniffBookBytes } from "./logic/book-sniff";
-import { makePositionPersister, removeBookEntity, writeBookPatch } from "./logic/book-writes";
+import {
+	makePositionPersister,
+	removeBookEntity,
+	writeBookPatch,
+	writerForOpenBook,
+} from "./logic/book-writes";
 import { parseEpub } from "./logic/epub-parser";
 import { type LiveProgress, booksFromEntities, withLiveProgress } from "./logic/library";
 import { type PdfInfo, pdfEnrichmentPatch } from "./logic/pdf-metadata";
@@ -537,6 +542,8 @@ export function BooksApp(): ReactElement {
 			return undefined;
 		}
 
+		// Every write this open makes goes to THIS book or nowhere.
+		const writeOpened = writerForOpenBook(writeBook, () => seq === openSeqRef.current);
 		const reportProgress = (progress: number): void => {
 			if (seq === openSeqRef.current) setLiveProgress({ bookId: selectedId, progress });
 		};
@@ -613,7 +620,7 @@ export function BooksApp(): ReactElement {
 					});
 				}
 				if (book.format !== format) {
-					writeBook({ format });
+					writeOpened({ format });
 					book = { ...book, format };
 				}
 				const openedBook = book;
@@ -624,7 +631,7 @@ export function BooksApp(): ReactElement {
 					const loaded = await withTimeout(loadReflowBook(bytes, kind, { parseEpub }), OPEN_TIMEOUT_MS);
 					if (seq !== openSeqRef.current) return;
 					const { content } = loaded;
-					const persist = makePositionPersister(writeBook, openedBook, content.spine.length);
+					const persist = makePositionPersister(writeOpened, openedBook, content.spine.length);
 					const handle = mountReader(stage, controls, content, {
 						bookId: openedBook.id,
 						initialPosition: openedBook.reading.position,
@@ -639,7 +646,7 @@ export function BooksApp(): ReactElement {
 						book: openedBook,
 						fileName,
 						rawProperties: rawProperties ?? null,
-						write: entitiesSvc ? writeBook : null,
+						write: entitiesSvc ? writeOpened : null,
 						covers: coversSvc,
 						stillCurrent: () => seq === openSeqRef.current,
 					});
@@ -656,7 +663,7 @@ export function BooksApp(): ReactElement {
 					return;
 				}
 				const port = enginePagePort(doc);
-				const persist = makePositionPersister(writeBook, openedBook, doc.numPages);
+				const persist = makePositionPersister(writeOpened, openedBook, doc.numPages);
 				const title = openedBook.name.length > 0 ? openedBook.name : t("app.title");
 				const handle = mountPdfReader(stage, controls, title, port, {
 					initialPosition: openedBook.reading.position,
@@ -681,7 +688,7 @@ export function BooksApp(): ReactElement {
 					port,
 					book: openedBook,
 					rawProperties: rawProperties ?? null,
-					write: entitiesSvc ? writeBook : null,
+					write: entitiesSvc ? writeOpened : null,
 					covers: coversSvc,
 					stillCurrent: () => seq === openSeqRef.current,
 				});

@@ -103,3 +103,19 @@ export function makePositionPersister(
 		write(patch);
 	};
 }
+
+/**
+ * Scope a write path to the book whose reader produced the write. The app's
+ * gated write targets "the open book", so a callback that outlives its reader
+ * — a debounced re-pagination, a late metadata backfill — would otherwise
+ * park ITS position on whichever book is open by then. Once the book it was
+ * made for is no longer the open one, the write is dropped.
+ */
+export function writerForOpenBook(
+	write: (patch: Record<string, unknown>) => void,
+	isStillOpen: () => boolean,
+): (patch: Record<string, unknown>) => void {
+	return (patch) => {
+		if (isStillOpen()) write(patch);
+	};
+}
