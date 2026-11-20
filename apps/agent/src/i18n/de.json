@@ -103,6 +103,7 @@
   "error.quotaExhausted": "Die Agent-App hat ihr 30-Tage-KI-Budget aufgebraucht. Erhöhe oder lösche das Budget unter Einstellungen → KI, um weiter zu chatten.",
   "error.generic": "Beim Generieren einer Antwort ist etwas schiefgelaufen.",
   "provenance.via": "über {model}",
+  "reply.noAnswer": "Darauf hatte ich keine Antwort. Versuche es mit einer anderen Formulierung.",
   "widget.label": "Agent",
   "widget.count.one": "{count} Unterhaltung",
   "widget.count.other": "{count} Unterhaltungen",

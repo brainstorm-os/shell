@@ -42,8 +42,8 @@ export function sortMessages<T extends TranscriptMessage>(messages: readonly T[]
 /**
  * Build the `ai.generate` transcript: the system prompt, then each
  * user/assistant turn in order. Tool / system messages in the store are
- * skipped (the agent loop that produces them is a later rung); a row with an
- * unknown role is coerced to `user` so a malformed entity can't drop context.
+ * skipped (the agent loop that produces them is a later rung), as is an
+ * assistant turn with an empty body; a row with an unknown role is coerced to `user` so a malformed entity can't drop context.
  */
 export function buildAiMessages(
 	messages: readonly TranscriptMessage[],
@@ -53,6 +53,8 @@ export function buildAiMessages(
 	for (const m of sortMessages(messages)) {
 		const role = isMessageRole(m.role) ? m.role : MessageRole.User;
 		if (role !== MessageRole.User && role !== MessageRole.Assistant) continue;
+		// A turn the agent had no answer for carries nothing to replay.
+		if (role === MessageRole.Assistant && m.body.trim().length === 0) continue;
 		out.push({ role, content: m.body });
 	}
 	return out;
