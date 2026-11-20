@@ -181,7 +181,7 @@ export function FileTree(props: FileTreeProps): ReactElement {
 					<div className="editor__files-actions">
 						<button
 							type="button"
-							className="bs-btn bs-btn--sm bs-btn--icon"
+							className="bs-btn bs-btn--ghost bs-btn--sm bs-btn--icon"
 							data-bs-tooltip={t("newFolderHint")}
 							aria-label={t("newFolderHint")}
 							onClick={() => onCreateFolder(focusFolder)}
@@ -190,7 +190,7 @@ export function FileTree(props: FileTreeProps): ReactElement {
 						</button>
 						<button
 							type="button"
-							className="bs-btn bs-btn--sm editor__file-new"
+							className="bs-btn bs-btn--ghost bs-btn--sm editor__file-new"
 							data-bs-tooltip={t("newFileHint")}
 							onClick={() => void onCreateFile(focusFolder)}
 						>

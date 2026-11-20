@@ -110,6 +110,7 @@ const pluralMsg = (
 // ── Panel + editor preferences (device-local; same localStorage path as
 // every other first-party app). The right-hand refs panel is the exception:
 // window-scoped via `@brainstorm-os/sdk/panel-state`. ──────────────────────
+const HEADER_ICON_PX = 18;
 const NAV_OPEN_KEY = "code-editor:nav-open";
 const FILES_WIDTH_KEY = "code-editor:files-width";
 const FILES_WIDTH_DEFAULT = 248;
@@ -1277,15 +1278,9 @@ export function CodeEditorApp(): ReactElement {
 							context={headerMenuContext}
 							moreActionsLabel={t("menuMoreActions", { name: fileName(selectedRow.path) })}
 							noMoreButton
+							className="editor__header-identity"
 						>
-							<button
-								type="button"
-								className="bs-icon-pick editor__header-icon"
-								aria-label={t("fileIconSelect", { name: fileName(selectedRow.path) })}
-								onClick={() => selectFile(selectedRow.id)}
-							>
-								<EntityIcon icon={selectedRow.icon} size={18} />
-							</button>
+							<EntityIcon icon={selectedRow.icon} size={HEADER_ICON_PX} fallback={IconName.View} />
 							<span className="app-header__title" title={selectedRow.path}>
 								{fileName(selectedRow.path)}
 							</span>
@@ -1313,7 +1308,7 @@ export function CodeEditorApp(): ReactElement {
 					{canCreateFile ? (
 						<button
 							type="button"
-							className="bs-btn bs-btn--sm bs-btn--icon editor__header-new"
+							className="header-icon-btn editor__header-new"
 							data-bs-tooltip={t("newFileHint")}
 							aria-label={t("newFileHint")}
 							onClick={() => void createNewFile()}

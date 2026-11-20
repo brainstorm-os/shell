@@ -19,9 +19,9 @@ export function EntityIcon({
 }: {
 	icon: EntityIconValue | null;
 	size: number;
-	/** Glyph to paint when the object carries no icon of its own. Opt-in: the
-	 *  header's icon-picker chip stays EMPTY without one (an empty chip is the
-	 *  invitation to pick), while the tree rows always want a filled column. */
+	/** Glyph to paint when the object carries no icon of its own. Both hosts
+	 *  pass one: this app has no icon picker, so an empty box invites nothing
+	 *  and reads as a broken control. */
 	fallback?: IconName;
 }): ReactElement {
 	const ref = useRef<HTMLSpanElement>(null);
