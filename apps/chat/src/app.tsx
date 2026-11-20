@@ -68,6 +68,7 @@ import {
 } from "./logic/agent-mention";
 import {
 	AgentRowTrust,
+	type AuthorLabels,
 	CHANNEL_TYPE,
 	type ChatChannel,
 	type ChatMessage,
@@ -102,8 +103,6 @@ import { SearchPanel } from "./search-panel";
 import { ChatAction, useChatShortcut } from "./shortcuts";
 import { useChatUserState } from "./use-user-state";
 import "./styles.css";
-
-const DEFAULT_NAME = "You";
 
 /** Where the sovereign self (the synced read-state owner key) stands. */
 enum SelfStatus {
@@ -326,7 +325,7 @@ export function ChatApp(): ReactElement {
 	// once storage loads.
 	const [identity, setIdentity] = useState<LocalIdentity>(() => ({
 		personRef: mintPersonRef(seedRef.current ?? ""),
-		displayName: DEFAULT_NAME,
+		displayName: "",
 	}));
 
 	// Resolve the author identity from the vault's self-asserted profile (Collab-C6):
@@ -346,7 +345,7 @@ export function ChatApp(): ReactElement {
 				if (!live) return;
 				setIdentity({
 					personRef: self.pubkey,
-					displayName: self.displayName || DEFAULT_NAME,
+					displayName: self.displayName ?? "",
 					...(self.avatarRef ? { avatarRef: self.avatarRef } : {}),
 				});
 				setSelfStatus(SelfStatus.Resolved);
@@ -463,13 +462,54 @@ export function ChatApp(): ReactElement {
 		void badge.set({ count: unread }).catch(() => undefined);
 	}, [unread, marksReady, services]);
 
+	// The authoritative member roster (the channel's signed access record, resolved
+	// to display profiles). Refetched when the channel changes (membership shifts
+	// with the access record, not with posts). Merged with the message-derived
+	// authors below so a legacy poster still shows as a guest — that merge is the
+	// reactive-to-messages half, via the `members` memo.
+	const [rosterMembers, setRosterMembers] = useState<RosterMember[]>([]);
+	useEffect(() => {
+		if (!roster || !activeId) {
+			setRosterMembers([]);
+			return;
+		}
+		let live = true;
+		roster
+			.members(activeId)
+			.then((m) => {
+				if (live) setRosterMembers(m);
+			})
+			.catch((err) => {
+				console.warn("[chat] roster load failed:", err);
+				if (live) setRosterMembers([]);
+			});
+		return () => {
+			live = false;
+		};
+	}, [roster, activeId]);
+
+	// How each author is named for THIS viewer. "You" belongs to the local
+	// identity alone; the name a message carries was written by its author's
+	// device, so it can never be allowed to say "You" about somebody else.
+	const authorLabels = useMemo<AuthorLabels>(() => {
+		const names = new Map<string, string>();
+		for (const m of rosterMembers) if (m.displayName) names.set(m.pubkey, m.displayName);
+		return {
+			selfRef: identity.personRef,
+			selfName: identity.displayName,
+			you: t("author.you"),
+			unnamed: t("members.unknown"),
+			nameOf: (ref) => names.get(ref),
+		};
+	}, [rosterMembers, identity.personRef, identity.displayName]);
+
 	// Agent-13 — a built-in-agent card is decidable only by its invoker, so the
 	// projection needs this viewer's key; until it resolves every such card is
 	// read-only (fail-closed).
 	const selfPubkey = selfStatus === SelfStatus.Resolved ? identity.personRef : undefined;
 	const persisted = useMemo(
-		() => (activeId ? channelMessages(entities, activeId, selfPubkey) : []),
-		[entities, activeId, selfPubkey],
+		() => (activeId ? channelMessages(entities, activeId, selfPubkey, authorLabels) : []),
+		[entities, activeId, selfPubkey, authorLabels],
 	);
 
 	// Merge persisted messages with this channel's optimistic echoes, dropping an
@@ -498,32 +538,6 @@ export function ChatApp(): ReactElement {
 	}, [persisted, activeId]);
 
 	const groups = useMemo(() => groupMessages(messages, authorColor), [messages]);
-
-	// The authoritative member roster (the channel's signed access record, resolved
-	// to display profiles). Refetched when the channel changes (membership shifts
-	// with the access record, not with posts). Merged with the message-derived
-	// authors below so a legacy poster still shows as a guest — that merge is the
-	// reactive-to-messages half, via the `members` memo.
-	const [rosterMembers, setRosterMembers] = useState<RosterMember[]>([]);
-	useEffect(() => {
-		if (!roster || !activeId) {
-			setRosterMembers([]);
-			return;
-		}
-		let live = true;
-		roster
-			.members(activeId)
-			.then((m) => {
-				if (live) setRosterMembers(m);
-			})
-			.catch((err) => {
-				console.warn("[chat] roster load failed:", err);
-				if (live) setRosterMembers([]);
-			});
-		return () => {
-			live = false;
-		};
-	}, [roster, activeId]);
 
 	const members = useMemo<PanelMember[]>(
 		() =>
@@ -619,7 +633,7 @@ export function ChatApp(): ReactElement {
 				body: text,
 				...(rich ? { richBody: rich } : {}),
 				authorRef: identity.personRef,
-				authorName: identity.displayName,
+				authorName: identity.displayName || t("author.you"),
 				createdAt: now,
 				seq,
 				attachments: allAtts,
@@ -666,7 +680,7 @@ export function ChatApp(): ReactElement {
 				});
 				setIdentity((prev) => ({
 					personRef: prev.personRef,
-					displayName: saved.displayName || DEFAULT_NAME,
+					displayName: saved.displayName ?? "",
 					...(saved.avatarRef ? { avatarRef: saved.avatarRef } : {}),
 				}));
 				// Refresh the panel so the self row picks up the new name immediately.
@@ -925,6 +939,7 @@ export function ChatApp(): ReactElement {
 					{searchOpen ? (
 						<SearchPanel
 							entities={entities}
+							authorLabels={authorLabels}
 							activeChannelId={activeChannel?.id ?? null}
 							activeChannelName={activeChannel?.name ?? null}
 							query={searchQuery}

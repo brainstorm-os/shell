@@ -11,7 +11,7 @@ import { Searchbar } from "@brainstorm-os/sdk/searchbar";
 import { type ReactElement, useMemo, useRef } from "react";
 import { formatStamp } from "./format";
 import { plural, t } from "./i18n";
-import type { EntityLike } from "./logic/chat";
+import type { AuthorLabels, EntityLike } from "./logic/chat";
 import {
 	SEARCH_MIN_QUERY,
 	SEARCH_RESULT_LIMIT,
@@ -31,7 +31,9 @@ export function SearchPanel({
 	onScopeChange,
 	onSelect,
 	onClose,
+	authorLabels,
 }: {
+	authorLabels: AuthorLabels;
 	entities: readonly EntityLike[];
 	activeChannelId: string | null;
 	activeChannelName: string | null;
@@ -46,8 +48,8 @@ export function SearchPanel({
 	useChatShortcut(ChatAction.CloseSearch, onClose, { scope: rootRef });
 
 	const hits = useMemo(
-		() => searchMessages(entities, query, { scope, channelId: activeChannelId }),
-		[entities, query, scope, activeChannelId],
+		() => searchMessages(entities, query, { scope, channelId: activeChannelId, authorLabels }),
+		[entities, query, scope, activeChannelId, authorLabels],
 	);
 	const tooShort = query.trim().length < SEARCH_MIN_QUERY;
 
