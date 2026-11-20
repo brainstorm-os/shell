@@ -25,6 +25,7 @@ import {
 	activeMembers,
 	deriveAccessRoot,
 	docTrust,
+	firstSightRoot,
 	getAccessArray,
 	grantAccess,
 	isAuthorizedWriter,
@@ -551,6 +552,70 @@ describe("the root of authority", () => {
 		expect(deriveAccessRoot(ownerDoc, ENT, { self: editor.pub })).toBeNull();
 		const fresh = device(editor);
 		expect(fresh.active(ownerDoc)).toEqual([]);
+	});
+
+	it("first sight: the root is the GRANTER's (her genesis grant, or the root she attests) — never a relayer's", () => {
+		const { owner, editor, ownerDoc } = sharedPair();
+		// Granted by the root herself: her genesis grant in the record is enough.
+		expect(firstSightRoot(ownerDoc, ENT, editor.pub)).toBe(owner.pub);
+
+		const coOwner = person();
+		const invitee = person();
+		const pinned: AccessTrust = { root: owner.pub };
+		grantAccess(ownerDoc, {
+			entityId: ENT,
+			member: coOwner.pub,
+			role: AccessRole.Owner,
+			signerSecret: owner.secret,
+			now: 3,
+			trust: pinned,
+		});
+		grantAccess(ownerDoc, {
+			entityId: ENT,
+			member: invitee.pub,
+			role: AccessRole.Viewer,
+			signerSecret: coOwner.secret,
+			now: 4,
+			trust: pinned,
+		});
+		const entryFor = (doc: Y.Doc, member: string) =>
+			getAccessArray(doc)
+				.toArray()
+				.find((entry) => entry.get("member") === member) as Y.Map<unknown>;
+		// Granted by a co-owner: her grant says who the root is.
+		expect(entryFor(ownerDoc, invitee.pub).get("root")).toBe(owner.pub);
+		expect(firstSightRoot(ownerDoc, ENT, invitee.pub)).toBe(owner.pub);
+
+		// A relayer adds a root of her own and makes the co-owner an Owner under
+		// it, so the invitee's grant would "count" under her too. It changes
+		// nothing: the co-owner attested the real root.
+		const relayed = replica(ownerDoc);
+		grantAccess(relayed, {
+			entityId: ENT,
+			member: editor.pub,
+			role: AccessRole.Owner,
+			signerSecret: editor.secret,
+			now: 0,
+			trust: { root: null },
+		});
+		grantAccess(relayed, {
+			entityId: ENT,
+			member: coOwner.pub,
+			role: AccessRole.Owner,
+			signerSecret: editor.secret,
+			now: 0,
+			trust: { root: null },
+		});
+		expect(firstSightRoot(relayed, ENT, invitee.pub)).toBe(owner.pub);
+
+		// Re-pointing the attestation at herself breaks its signature, and with
+		// no attestation a co-owner's grant establishes no root at all.
+		const repointed = replica(relayed);
+		entryFor(repointed, invitee.pub).set("root", editor.pub);
+		expect(firstSightRoot(repointed, ENT, invitee.pub)).toBeNull();
+		const stripped = replica(relayed);
+		entryFor(stripped, invitee.pub).set("root", null);
+		expect(firstSightRoot(stripped, ENT, invitee.pub)).toBeNull();
 	});
 
 	it("with no root, nobody is a member", () => {

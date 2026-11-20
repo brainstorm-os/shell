@@ -21,7 +21,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MESSAGE_TYPE_URL } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type * as Y from "yjs";
+import * as Y from "yjs";
 import { base64ToBytes, generateSymmetricKey } from "../credentials/crypto";
 import { verifySignature } from "../credentials/identity";
 import { listWraps, wrapDekForRecipient, wrapDekVersionOf } from "../credentials/member-wraps";
@@ -32,6 +32,7 @@ import { decodeFrame } from "../sync/envelope-codec";
 import {
 	type PipelineContext,
 	emitWrapBootstrap,
+	encryptAndEmit,
 	receiveAndApply,
 	receiveWrapBootstrap,
 } from "../sync/envelope-pipeline";
@@ -40,6 +41,7 @@ import { WireKind } from "../sync/routing-header";
 import { VaultSession } from "../vault/session";
 import { AccessRole, getAccessArray, grantAccess, revokeAccess } from "./access-record";
 import { inboxChannelFor } from "./inbox-channel";
+import type { ShareInvite } from "./share-invite";
 import { type CollabRelayLike, SharingDeniedError, SharingEngine } from "./sharing-engine";
 import { type SyncAuthz, createSyncAuthz } from "./sync-authz";
 
@@ -160,6 +162,11 @@ class Shell {
 				this.refused.push((error as Error).message);
 			}
 		}
+	}
+
+	/** Drop everything received so far, unread — this shell was offline. */
+	discard(): void {
+		this.#inbox.splice(0);
 	}
 
 	unauthorized(): string[] {
@@ -465,3 +472,160 @@ describe("an Editor's sync updates cannot change who holds an entity — real in
 		expect(eve.dekVersion(CHANNEL)).toBe(alice.dekVersion(CHANNEL));
 	});
 });
+
+/**
+ * The root of authority on a device that sees an entity for the FIRST time.
+ * Sam is invited by Alice but is offline when her share goes out, so the relay
+ * (forward-only) drops it. Eve, an Editor who holds the DEK and sees Sam's
+ * grant in the record, gets to Sam first with a record of her own composition.
+ */
+describe("first sight: a relaying member cannot choose the root an invitee pins", () => {
+	let alice: Shell;
+	let eve: Shell;
+	let sam: Shell;
+
+	beforeEach(async () => {
+		const [p0, p1, p2] = LoopbackRelayPort.pair(3);
+		if (!p0 || !p1 || !p2) throw new Error("expected three loopback ports");
+		alice = await Shell.open("alice", p0);
+		eve = await Shell.open("eve", p1);
+		sam = await Shell.open("sam", p2);
+		await alice.engine.provisionEntity(CHANNEL, CHANNEL_TYPE, { name: "general" });
+	});
+
+	afterEach(async () => {
+		await Promise.all([alice.close(), eve.close(), sam.close()]);
+	});
+
+	async function shareWith(shell: Shell, role: AccessRole): Promise<ShareInvite> {
+		const invite = await shell.engine.createInvite(shell.pub);
+		await alice.engine.share({ entityId: CHANNEL, type: CHANNEL_TYPE, invite, role });
+		return invite;
+	}
+
+	/** Eve hands Sam the DEK and a full state she composed: her own genesis
+	 *  grant, her Owner grant to Alice (so Alice's grant to Sam still "counts"
+	 *  under Eve), and Alice's genuine, anchored grant to Sam — with or without
+	 *  the rest of the genuine record (Alice's genesis grant, Eve's real one). */
+	async function eveBootstrapsSam(keepGenuineRecord: boolean): Promise<void> {
+		const eveSecret = eve.session.exposeIdentityForPairing().secretKey;
+		const entries = await eve.read(CHANNEL, (doc) =>
+			getAccessArray(doc)
+				.toArray()
+				.map((entry) => Object.fromEntries(entry.entries())),
+		);
+		const forged = new Y.Doc();
+		grantAccess(forged, {
+			entityId: CHANNEL,
+			member: eve.pub,
+			role: AccessRole.Owner,
+			signerSecret: eveSecret,
+			now: 1,
+			x25519: eve.session.deviceX25519.publicKeyBase64,
+		});
+		grantAccess(forged, {
+			entityId: CHANNEL,
+			member: alice.pub,
+			role: AccessRole.Owner,
+			signerSecret: eveSecret,
+			now: 2,
+			trust: { root: null },
+		});
+		const access = getAccessArray(forged);
+		for (const fields of entries) {
+			if (!keepGenuineRecord && fields.member !== sam.pub) continue;
+			const copy = new Y.Map<unknown>();
+			for (const [k, v] of Object.entries(fields)) copy.set(k, v);
+			access.push([copy]);
+		}
+		forged.getText(BODY).insert(0, "eve's version");
+		const handle = eve.dekStore.open(CHANNEL);
+		if (!handle) throw new Error("eve has no DEK");
+		try {
+			const wrap = wrapDekForRecipient(
+				handle.dek,
+				base64ToBytes(sam.session.deviceX25519.publicKeyBase64),
+				CHANNEL,
+				CHANNEL_TYPE,
+				handle.version,
+			);
+			await emitWrapBootstrap(CHANNEL, wrap, eve.ctx(), inboxChannelFor(sam.pub));
+		} finally {
+			eve.dekStore.close(handle.dek);
+		}
+		await encryptAndEmit(CHANNEL, Y.encodeStateAsUpdate(forged), eve.ctx(), inboxChannelFor(sam.pub));
+	}
+
+	it("a record whose root is not the inviter's is refused, and nothing is pinned", async () => {
+		await shareWith(eve, AccessRole.Editor);
+		await eve.drain();
+		const samInvite = await shareWith(sam, AccessRole.Editor);
+		await eve.drain();
+		sam.discard(); // offline: Alice's wrap + opening state never arrive
+
+		await eveBootstrapsSam(false);
+		await sam.drain();
+		expect(sam.unauthorized()).toHaveLength(1);
+		expect((await sam.session.accessTrust()).rootOf(CHANNEL)).toBeNull();
+		expect(await sam.text(CHANNEL)).toBe("");
+		// The invite is untouched, so Alice's own re-send still lands.
+		await alice.engine.share({
+			entityId: CHANNEL,
+			type: CHANNEL_TYPE,
+			invite: samInvite,
+			role: AccessRole.Editor,
+		});
+		await sam.drain();
+		expect((await sam.session.accessTrust()).rootOf(CHANNEL)).toBe(alice.pub);
+		expect(await sam.active(CHANNEL)).toEqual([alice.pub, eve.pub, sam.pub].sort());
+	});
+
+	it("relaying the inviter's genuine record works, and the root is the inviter — not the relayer, not her forgeries", async () => {
+		await shareWith(eve, AccessRole.Editor);
+		await eve.drain();
+		await shareWith(sam, AccessRole.Editor);
+		await eve.drain();
+		sam.discard();
+
+		await eveBootstrapsSam(true);
+		await sam.drain();
+		expect(sam.unauthorized()).toEqual([]);
+		expect((await sam.session.accessTrust()).rootOf(CHANNEL)).toBe(alice.pub);
+		const view = await sam.engine.access(CHANNEL);
+		expect(view.find((m) => m.member === alice.pub)).toMatchObject({ role: AccessRole.Owner });
+		// Eve's self-signed Owner grant is in Sam's doc and means nothing there:
+		// she is what Alice made her, an Editor.
+		expect(view.find((m) => m.member === eve.pub)).toMatchObject({
+			role: AccessRole.Editor,
+			active: true,
+		});
+		expect(await sam.authz.authorizeWrapInstall(CHANNEL, toUrl(eve.pub))).toBe(false);
+	});
+
+	it("a CO-OWNER's share tells the invitee who the root is, and the invitee pins that", async () => {
+		await shareWith(eve, AccessRole.Owner);
+		await eve.drain();
+		const invite = await sam.engine.createInvite("Sam");
+		await eve.engine.share({
+			entityId: CHANNEL,
+			type: CHANNEL_TYPE,
+			invite,
+			role: AccessRole.Viewer,
+		});
+		await sam.drain();
+		await alice.drain();
+		expect(sam.unauthorized()).toEqual([]);
+		expect((await sam.session.accessTrust()).rootOf(CHANNEL)).toBe(alice.pub);
+		expect(await sam.active(CHANNEL)).toEqual([alice.pub, eve.pub, sam.pub].sort());
+		expect(await alice.active(CHANNEL)).toEqual([alice.pub, eve.pub, sam.pub].sort());
+		// Only the root removes a co-owner; when she does, the co-owner's grant
+		// to Sam goes with her.
+		await expect(eve.engine.revoke(CHANNEL, alice.pub)).rejects.toBeInstanceOf(SharingDeniedError);
+		expect(await alice.engine.revoke(CHANNEL, eve.pub)).toBe(true);
+		expect(await alice.active(CHANNEL)).toEqual([alice.pub]);
+	});
+});
+
+function toUrl(b64: string): string {
+	return Buffer.from(b64, "base64").toString("base64url");
+}

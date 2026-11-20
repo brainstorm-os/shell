@@ -339,7 +339,15 @@ export class SharingEngine {
 					// CONTAINER the receiver already belongs to, not on the invite. The
 					// invite stays pinned to the container alone, so one code can open a
 					// collection of any size without becoming a multi-entity credential.
-					await this.#shareOne(childId, rule.childType, opts.invite, opts.role, opts.entityId);
+					//
+					// A child this identity does not own (another member's message
+					// that has not been cascaded to us as an owner) is skipped rather
+					// than allowed to abort the rest: its own owner hands it out.
+					try {
+						await this.#shareOne(childId, rule.childType, opts.invite, opts.role, opts.entityId);
+					} catch (error) {
+						if (!(error instanceof SharingDeniedError)) throw error;
+					}
 				}
 			}
 		}

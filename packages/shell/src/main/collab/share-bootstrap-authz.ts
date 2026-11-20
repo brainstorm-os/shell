@@ -45,7 +45,6 @@
  */
 
 import * as Y from "yjs";
-import { bytesToBase64 } from "../credentials/crypto";
 import { ENTITY_META_TOP } from "../credentials/member-wraps";
 import { readEntityDocProjection } from "../entities/entity-doc-codec";
 import {
@@ -54,8 +53,9 @@ import {
 	MAX_BOOTSTRAP_STATE_BYTES,
 	type ResolvedMember,
 	activeMembers,
-	docTrust,
+	firstSightRoot,
 	hasAccessEntries,
+	hasGrantNaming,
 	isActiveMember,
 	isAuthorizedWriter,
 	roleAtLeast,
@@ -267,18 +267,22 @@ export async function authorizeShareBootstrap(
 	}
 	try {
 		// Layer 0 (0.16.0): the root of authority. This device holds no record for
-		// the entity, so the root is taken on first sight from the record offered
-		// - the self-signed Owner grant of the sender who is handing us the DEK,
-		// or failing that the one candidate under which we are a member. Every
-		// check below is the owner-rooted policy under THAT root, so a grant the
-		// sender signed without being an owner does not make anyone a member. A
-		// record that does not single a root out is refused, not guessed at; so is
-		// one that disagrees with a root this vault pinned earlier.
-		const root = docTrust(probe, input.entityId, {
-			self: input.selfPubB64,
-			sender: bytesToBase64(input.senderKey),
-		}).root;
-		if (root === null) return ShareBootstrapVerdict.DenyNoRoot;
+		// the entity, so the root is taken on first sight - and from the GRANTER of
+		// the grant that names us, not from whoever sent the frame: any member
+		// holds the DEK and can relay a record of her own composition, but only
+		// the granter is authenticated out of band (layer 2). The root is the
+		// granter, when the record carries the granter's own genesis grant, or
+		// else the root the granter attests on our grant. Every check below is the
+		// owner-rooted policy under THAT root, so a grant signed without ownership
+		// makes nobody a member. A record that establishes no root is refused, not
+		// guessed at; so is one that disagrees with a root this vault pinned
+		// earlier.
+		const root = firstSightRoot(probe, input.entityId, input.selfPubB64);
+		if (root === null) {
+			return hasGrantNaming(probe, input.entityId, input.selfPubB64)
+				? ShareBootstrapVerdict.DenyNoRoot
+				: ShareBootstrapVerdict.DenyNoSelfGrant;
+		}
 		const pinned = input.accessTrust.rootOf(input.entityId);
 		if (pinned !== null && pinned !== root) return ShareBootstrapVerdict.DenyRootMismatch;
 		const trust: AccessTrust = { root };

@@ -22,6 +22,10 @@
  *           on first sight (`AccessTrustStore`) and never replaced. The root is
  *           always an active Owner and cannot be revoked or demoted, by anyone,
  *           itself included (ownership transfer is deliberately not built).
+ *           A device being handed the entity for the first time takes the root
+ *           from the GRANTER of its own grant — her genesis grant, or the root
+ *           she attests beside the grant — never from whoever relayed the
+ *           record ({@link firstSightRoot}).
  *
  *   Owners. `owners` is the least fixed point of: the root; plus the member of
  *           any Owner grant signed by a current owner and not revoked by the
@@ -229,6 +233,23 @@ function revokePayload(
 ): Uint8Array {
 	return encoder.encode(
 		`brainstorm/access/v${ACCESS_RECORD_VERSION}/revoke|${entityId}|${member}|${addedAt}|${revokedAt}|${revokedBy}`,
+	);
+}
+
+/** Deterministic signed bytes for a ROOT ATTESTATION: the granter of
+ *  `(member, addedAt)` stating who the entity's root owner is. It rides the
+ *  entry beside the grant (not inside the grant payload, so a pre-0.16 reader
+ *  still verifies the grant) and is read in exactly one place: by the member it
+ *  names, the first time they see the record ({@link firstSightRoot}). */
+function rootAttestationPayload(
+	entityId: string,
+	member: string,
+	addedBy: string,
+	addedAt: number,
+	root: string,
+): Uint8Array {
+	return encoder.encode(
+		`brainstorm/access/v${ACCESS_RECORD_VERSION}/root|${entityId}|${member}|${addedBy}|${addedAt}|${root}`,
 	);
 }
 
@@ -556,6 +577,75 @@ export function deriveAccessRoot(
 	return admitted.length === 1 ? (admitted[0] ?? null) : null;
 }
 
+/**
+ * The root owner of a record `selfB64` is being handed for the FIRST time (the
+ * share-bootstrap gate), or null when the record does not establish one.
+ *
+ * The party trusted on first sight is the GRANTER of the grant that names us —
+ * not whoever relayed the frame, because any member holds the DEK and can send
+ * us a record of their own composition. The gate authenticates that granter
+ * out of band (the invite anchor is a MAC only the holder of our invite secret
+ * could compute over the granter's key; a cascade granter must be a member of a
+ * container we already hold). So the root is:
+ *
+ *   - us, if we signed the record's genesis grant ourselves;
+ *   - the granter, if the record carries the granter's own genesis grant;
+ *   - otherwise the root the granter ATTESTS on our grant (0.16+ granters).
+ *
+ * and in every case our grant must actually count under that root. A grant
+ * from a pre-0.16 co-owner carries no attestation and establishes nothing —
+ * the entity's root owner has to share it, or the co-owner upgrade.
+ */
+export function firstSightRoot(doc: Y.Doc, entityId: string, selfB64: string): string | null {
+	const genesis = new Set<string>();
+	const naming: Array<{ grant: GrantStatement; attested: string | null }> = [];
+	for (const entry of readAccessArray(doc)?.toArray() ?? []) {
+		if (!(entry instanceof Y.Map)) continue;
+		const grant = grantOf(entry as Y.Map<unknown>);
+		if (!grant || !grantSignatureValid(entityId, grant)) continue;
+		if (grant.role === AccessRole.Owner && grant.member === grant.addedBy) genesis.add(grant.member);
+		if (grant.member !== selfB64) continue;
+		const root = readString(entry as Y.Map<unknown>, "root");
+		const rootSig = readString(entry as Y.Map<unknown>, "rootSig");
+		const attested =
+			root !== null &&
+			rootSig !== null &&
+			safeVerify(
+				grant.addedBy,
+				rootAttestationPayload(entityId, grant.member, grant.addedBy, grant.addedAt, root),
+				rootSig,
+			)
+				? root
+				: null;
+		naming.push({ grant, attested });
+	}
+	if (genesis.has(selfB64)) return selfB64;
+	// Anchored grants first (the strongest out-of-band binding), then a fixed
+	// order, so every device considers the same grant first.
+	naming.sort(
+		(a, b) =>
+			Number(b.grant.anchor !== null) - Number(a.grant.anchor !== null) ||
+			b.grant.addedAt - a.grant.addedAt ||
+			(a.grant.grantSig < b.grant.grantSig ? -1 : 1),
+	);
+	for (const { grant, attested } of naming) {
+		const root = genesis.has(grant.addedBy) ? grant.addedBy : attested;
+		if (root === null) continue;
+		const counts = evaluate(doc, entityId, { root }).rows.some(
+			(m) =>
+				m.active && m.member === selfB64 && m.addedBy === grant.addedBy && m.addedAt === grant.addedAt,
+		);
+		if (counts) return root;
+	}
+	return null;
+}
+
+/** Does any correctly-signed grant in the doc name `memberB64`? Structural —
+ *  it says the record MENTIONS them, never that they are a member. */
+export function hasGrantNaming(doc: Y.Doc, entityId: string, memberB64: string): boolean {
+	return collectStatements(doc, entityId).grants.some((g) => g.member === memberB64);
+}
+
 /** UNPINNED trust: the root is derived from the doc on the spot. For a doc this
  *  device does not hold yet (a bootstrap probe) and for tests. Production
  *  readers of a PERSISTED doc go through `AccessTrustStore.trustFor`, which pins
@@ -630,22 +720,39 @@ export function grantAccess(
 		opts.signerSecret,
 		grantPayload(opts.entityId, opts.member, opts.role, addedBy, opts.now, x25519, anchor, via),
 	);
+	// A granter who is not the root tells the new member who is. The member has
+	// no other way to learn it that a relaying collaborator could not forge: the
+	// root's own genesis grant identifies the root only when the root is the one
+	// granting.
+	const root = trust.root;
+	const attest = root !== null && root !== addedBy;
 	doc.transact(() => {
-		arr.push([
-			entryFor(
-				{
-					member: opts.member,
-					x25519,
-					anchor,
-					via,
-					role: opts.role,
-					addedBy,
-					addedAt: opts.now,
-					grantSig: bytesToBase64(sig),
-				},
-				null,
-			),
-		]);
+		const entry = entryFor(
+			{
+				member: opts.member,
+				x25519,
+				anchor,
+				via,
+				role: opts.role,
+				addedBy,
+				addedAt: opts.now,
+				grantSig: bytesToBase64(sig),
+			},
+			null,
+		);
+		if (attest) {
+			entry.set("root", root);
+			entry.set(
+				"rootSig",
+				bytesToBase64(
+					signPayload(
+						opts.signerSecret,
+						rootAttestationPayload(opts.entityId, opts.member, addedBy, opts.now, root),
+					),
+				),
+			);
+		}
+		arr.push([entry]);
 	});
 }
 
