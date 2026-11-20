@@ -162,6 +162,16 @@ function toolName(tool: AgentTool): string {
 	return tool.verb;
 }
 
+/** The delimiters of the tool manifest. A small model repeats a loosely
+ *  introduced list back to the user as if it were part of the answer; a fenced
+ *  block named as internal reads as reference, not as text to continue. */
+export const AGENT_TOOLS_OPEN = "<<<INTERNAL_TOOLS";
+export const AGENT_TOOLS_CLOSE = "INTERNAL_TOOLS>>>";
+
+/** The no-recital rule. Model-facing prompt text. */
+export const AGENT_TOOLS_PRIVACY_GUIDANCE =
+	"That list is internal reference for you, not text for the user: never list, quote, or describe it in an answer. Only if the user asks what you can do, say it in plain words — no tool names, no argument formats.";
+
 /** Build the `system`-region tool manifest + the JSON-protocol instruction.
  *  Exported so the protocol wording is unit-tested without a live model. */
 export function buildAgentSystemPrompt(
@@ -171,7 +181,9 @@ export function buildAgentSystemPrompt(
 	const lines: string[] = [
 		instructions.trim(),
 		"",
-		"You can use tools to gather information or take actions. Available tools:",
+		`You can use tools to gather information or take actions. They are listed between ${AGENT_TOOLS_OPEN} and ${AGENT_TOOLS_CLOSE}.`,
+		AGENT_TOOLS_PRIVACY_GUIDANCE,
+		AGENT_TOOLS_OPEN,
 	];
 	if (offeredTools.length === 0) {
 		lines.push("(none — answer from the conversation alone).");
@@ -181,6 +193,7 @@ export function buildAgentSystemPrompt(
 			lines.push(`- ${toolName(tool)}: ${tool.label}${scope}`);
 		}
 	}
+	lines.push(AGENT_TOOLS_CLOSE);
 	lines.push(
 		"",
 		"Respond with a SINGLE JSON object and nothing else.",
@@ -197,11 +210,10 @@ type ParsedReply =
 	| { kind: "final"; answer: string; citations: string[] }
 	| null;
 
-/** Pull the first balanced top-level JSON object out of a model reply, even
- *  when wrapped in prose / a ```json fence. Returns the raw substring or null. */
-function extractJsonObject(text: string): string | null {
-	const start = text.indexOf("{");
-	if (start < 0) return null;
+/** The index just past the `}` that closes the object opening at `start`, or
+ *  -1 when it never closes. String-aware, so a brace inside a JSON string does
+ *  not count. */
+function balancedEnd(text: string, start: number): number {
 	let depth = 0;
 	let inString = false;
 	let escaped = false;
@@ -217,10 +229,10 @@ function extractJsonObject(text: string): string | null {
 		else if (ch === "{") depth++;
 		else if (ch === "}") {
 			depth--;
-			if (depth === 0) return text.slice(start, i + 1);
+			if (depth === 0) return i + 1;
 		}
 	}
-	return null;
+	return -1;
 }
 
 /** The fields a model reaches for when it nests its answer in an object. */
@@ -251,15 +263,6 @@ function finalText(value: unknown): string {
 /** The keys that mark an object as the protocol envelope rather than JSON the
  *  model wrote as its answer. */
 const ENVELOPE_KEYS = ["final", "citations", "tool", "args"] as const;
-
-/** Is `json` the whole reply, give or take a code fence? */
-function isWholeReply(content: string, json: string): boolean {
-	const unfenced = content
-		.trim()
-		.replace(/^```[a-zA-Z]*\s*/, "")
-		.replace(/\s*```$/, "");
-	return unfenced.trim() === json;
-}
 
 const RAW_CONTROL_ESCAPES: Readonly<Record<string, string>> = {
 	"\n": "\\n",
@@ -313,42 +316,154 @@ function truncatedFinal(content: string): string | null {
 	return typeof decoded?.v === "string" ? decoded.v : partial;
 }
 
+/** A top-level JSON object found in a reply, with the text span it occupies
+ *  (widened to its code fence when the fence holds nothing else). */
+type JsonSpan = { start: number; end: number; value: Record<string, unknown> };
+
+/** How many `{` a reply is scanned from — a bound on the work a reply full of
+ *  unbalanced braces can cause. */
+const JSON_SCAN_STARTS_MAX = 256;
+
+const CODE_FENCE = /```[a-zA-Z]*\s*([\s\S]*?)\s*(?:```|$)/g;
+
+/**
+ * Where the object at `[start, end)` sits, if that is somewhere the PROTOCOL
+ * could be: alone in a code fence, on its own line(s), or at the very start or
+ * end of the reply. An object mid-sentence, or inside a larger code block the
+ * model presented as an example, is the model's own text — null.
+ */
+function protocolPlacement(
+	text: string,
+	start: number,
+	end: number,
+): { start: number; end: number } | null {
+	for (const fence of text.matchAll(CODE_FENCE)) {
+		const fenceStart = fence.index;
+		const fenceEnd = fenceStart + fence[0].length;
+		if (start < fenceStart || end > fenceEnd) continue;
+		return fence[1] === text.slice(start, end) ? { start: fenceStart, end: fenceEnd } : null;
+	}
+	const lineStart = text.lastIndexOf("\n", start - 1) + 1;
+	const nextBreak = text.indexOf("\n", end);
+	const lineEnd = nextBreak < 0 ? text.length : nextBreak;
+	const ownLine =
+		text.slice(lineStart, start).trim() === "" && text.slice(end, lineEnd).trim() === "";
+	const atEdge = text.slice(0, start).trim() === "" || text.slice(end).trim() === "";
+	return ownLine || atEdge ? { start, end } : null;
+}
+
+/** Every top-level JSON object in a reply that sits where the protocol could.
+ *  Braces that do not parse (a schema hint, a placeholder) are stepped over;
+ *  an object that parses is never descended into, so JSON nested in the
+ *  model's own JSON is left alone. */
+function protocolObjects(text: string): JsonSpan[] {
+	const found: JsonSpan[] = [];
+	let at = text.indexOf("{");
+	for (let scanned = 0; at >= 0 && scanned < JSON_SCAN_STARTS_MAX; scanned++) {
+		const end = balancedEnd(text, at);
+		const value = end < 0 ? undefined : parseJsonObject(text.slice(at, end));
+		if (!value || typeof value !== "object" || Array.isArray(value)) {
+			at = text.indexOf("{", at + 1);
+			continue;
+		}
+		const placement = protocolPlacement(text, at, end);
+		if (placement) found.push({ ...placement, value: value as Record<string, unknown> });
+		at = text.indexOf("{", end);
+	}
+	return found;
+}
+
+/** Prose this short, on one line, only introduces the envelope ("Sure!",
+ *  "Here is my answer:") — see {@link composeAnswer}. */
+const PREAMBLE_CHARS_MAX = 80;
+
+/**
+ * The answer when a final envelope arrived with prose around it. The rule:
+ *   1. an empty `final` → the prose is the answer, unless it is one line
+ *      ending in a colon, which announces an answer that never came;
+ *   2. no prose → `final`;
+ *   3. prose that is one short line is a preamble → `final`;
+ *   4. otherwise the prose is the answer, followed by `final` unless the prose
+ *      already says it — nothing the model wrote for the user is dropped.
+ */
+function composeAnswer(prose: string, final: string): string {
+	const said = final.trim();
+	if (prose === "") return final;
+	if (said === "") return !prose.includes("\n") && prose.endsWith(":") ? "" : prose;
+	if (!prose.includes("\n") && prose.length <= PREAMBLE_CHARS_MAX) return final;
+	return prose.toLowerCase().includes(said.toLowerCase()) ? prose : `${prose}\n\n${said}`;
+}
+
+/** `text` with the given spans cut out; what remains is joined as paragraphs. */
+function withoutSpans(text: string, spans: readonly { start: number; end: number }[]): string {
+	const pieces: string[] = [];
+	let from = 0;
+	for (const span of spans) {
+		pieces.push(text.slice(from, span.start));
+		from = span.end;
+	}
+	pieces.push(text.slice(from));
+	return pieces
+		.map((piece) => piece.trim())
+		.filter((piece) => piece.length > 0)
+		.join("\n\n");
+}
+
 /** Parse a model reply into a tool call or a final answer. A reply that is not
  *  the JSON protocol is `null` → the loop treats it as a plain final answer
- *  (the model talked instead of acting), guaranteeing termination. An envelope
- *  with no usable `final` is a final with an EMPTY answer — never `null`, which
- *  would hand the raw envelope to the user as prose. */
+ *  (the model talked instead of acting), guaranteeing termination.
+ *
+ *  An envelope is an object made ONLY of protocol keys — JSON that merely has a
+ *  `final` key among others is the model's own answer. It is recognised
+ *  wherever {@link protocolPlacement} allows, its text is removed from what the
+ *  user sees, and {@link composeAnswer} settles it against any prose around it.
+ *  An envelope with no usable `final` and no prose is a final with an EMPTY
+ *  answer — never `null`, which would hand the raw envelope over as prose. */
 export function parseAgentReply(content: string): ParsedReply {
-	const json = extractJsonObject(content);
-	if (!json) {
-		const answer = truncatedFinal(content);
+	const envelopes: JsonSpan[] = [];
+	for (const found of protocolObjects(content)) {
+		const obj = found.value;
+		if (typeof obj.tool === "string" && obj.tool.length > 0) {
+			if (envelopes.length > 0) continue;
+			const args =
+				obj.args && typeof obj.args === "object" && !Array.isArray(obj.args)
+					? (obj.args as Record<string, unknown>)
+					: {};
+			return { kind: "tool", call: { tool: obj.tool, args } };
+		}
+		const keys = Object.keys(obj);
+		const isEnvelope =
+			keys.length > 0
+				? keys.every((key) => (ENVELOPE_KEYS as readonly string[]).includes(key))
+				: withoutSpans(content, [found]) === "";
+		if (isEnvelope) envelopes.push(found);
+	}
+	if (envelopes.length === 0) {
+		const firstBrace = content.indexOf("{");
+		const cutOff = firstBrace >= 0 && balancedEnd(content, firstBrace) < 0;
+		const answer = cutOff ? truncatedFinal(content) : null;
 		return answer === null ? null : { kind: "final", answer, citations: [] };
 	}
-	const value = parseJsonObject(json);
-	if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-	const obj = value as Record<string, unknown>;
-	if (typeof obj.tool === "string" && obj.tool.length > 0) {
-		const args =
-			obj.args && typeof obj.args === "object" && !Array.isArray(obj.args)
-				? (obj.args as Record<string, unknown>)
-				: {};
-		return { kind: "tool", call: { tool: obj.tool, args } };
-	}
-	const isEnvelope =
-		ENVELOPE_KEYS.some((key) => key in obj) ||
-		(Object.keys(obj).length === 0 && isWholeReply(content, json));
-	if (!isEnvelope) return null;
-	const citations = Array.isArray(obj.citations)
-		? obj.citations.filter((c): c is string => typeof c === "string")
-		: [];
-	return { kind: "final", answer: finalText(obj.final), citations };
+	const finals = envelopes.map((envelope) => finalText(envelope.value.final));
+	const final = finals.find((text) => text.trim().length > 0) ?? "";
+	const citations = envelopes.flatMap((envelope) =>
+		Array.isArray(envelope.value.citations)
+			? envelope.value.citations.filter((c): c is string => typeof c === "string")
+			: [],
+	);
+	return {
+		kind: "final",
+		answer: composeAnswer(withoutSpans(content, envelopes), final),
+		citations: [...new Set(citations)],
+	};
 }
 
 /**
  * THE one place a model reply becomes user-facing answer text — the loop uses
  * it for every final, and a host uses it to re-read a stored reply. A final
- * envelope yields its answer, prose yields itself, and a tool call, an empty
- * envelope or a blank reply yields `""`: the envelope is never the answer.
+ * envelope yields its answer (settled against any prose around it), prose
+ * yields itself, and a tool call, an empty envelope or a blank reply yields
+ * `""`: the envelope's own text is never shown.
  */
 export function resolveAgentAnswer(content: string): string {
 	const parsed = parseAgentReply(content);
