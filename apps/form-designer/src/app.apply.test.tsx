@@ -163,3 +163,23 @@ describe("FormDesignerApp apply-to-type (8.10.5)", () => {
 		expect(statusText(el)).toBe("Add at least one field before saving.");
 	});
 });
+
+describe("FormDesignerApp button faces", () => {
+	it("gives the sidebar New-form and the Add-field actions a variant face, never the faceless bare .bs-btn", async () => {
+		installShell();
+		const el = await renderApp();
+
+		const newForm = el.querySelector<HTMLButtonElement>(".fd-sidebar__header .fd-sidebar__new");
+		expect(newForm?.getAttribute("aria-label")).toBe("New form");
+		expect(newForm?.getAttribute("data-bs-tooltip")).toBe("New form");
+		expect(newForm?.classList.contains("bs-btn--ghost")).toBe(true);
+		expect(el.querySelector(".fd-sidebar__header .fd-section-label")?.textContent).toBe(
+			"Saved forms",
+		);
+
+		const addField = [...el.querySelectorAll<HTMLButtonElement>(".fd-fields__header .bs-btn")].find(
+			(b) => b.textContent?.trim() === "Add field",
+		);
+		expect(addField?.classList.contains("bs-btn--secondary")).toBe(true);
+	});
+});

@@ -54,12 +54,12 @@ body.is-resizing .fd-resize {
 .fd-sidebar__header {
 	display: flex;
 	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-2);
 	height: 44px;
-	padding: 0 var(--space-2);
+	flex-shrink: 0;
+	padding-inline: var(--space-4) var(--space-2);
 	border-bottom: var(--border-width) solid var(--color-border-subtle);
-}
-.fd-sidebar__header .bs-btn {
-	width: 100%;
 }
 .fd-sidebar__list {
 	list-style: none;

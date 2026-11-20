@@ -709,8 +709,15 @@ export function FormDesignerApp(): ReactElement {
 				>
 					<aside className="fd-sidebar" aria-label={t("sidebar.region")}>
 						<div className="fd-sidebar__header">
-							<button type="button" className="bs-btn" onClick={startNewForm}>
-								<span>{t("sidebar.newForm")}</span>
+							<span className="fd-section-label">{t("sidebar.region")}</span>
+							<button
+								type="button"
+								className="bs-btn bs-btn--ghost bs-btn--sm bs-btn--icon fd-sidebar__new"
+								data-bs-tooltip={t("sidebar.newForm")}
+								aria-label={t("sidebar.newForm")}
+								onClick={startNewForm}
+							>
+								<Icon name={IconName.Plus} size={15} />
 							</button>
 						</div>
 						<ul className="fd-sidebar__list">
@@ -952,7 +959,7 @@ function BuilderPane(props: {
 					<button
 						ref={props.addFieldRef}
 						type="button"
-						className="bs-btn bs-btn--sm"
+						className="bs-btn bs-btn--secondary bs-btn--sm"
 						aria-haspopup="menu"
 						onClick={props.onOpenAddField}
 					>
