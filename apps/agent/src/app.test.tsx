@@ -349,6 +349,15 @@ describe("AgentApp — a reply with no answer", () => {
 		expect(message?.querySelector(".agent__msg-actions")).toBeNull();
 	});
 
+	it("prose stored with a trailing empty envelope shows the prose and not the envelope", async () => {
+		installWithAssistantBody('I am not sure what you mean.\n{"final": "", "citations": []}');
+		handle = await renderInto(<AgentApp />);
+		await flush();
+		await flush();
+		const body = handle.container.querySelector(".agent__msg--assistant .agent__msg-body");
+		expect(body?.textContent?.trim()).toBe("I am not sure what you mean.");
+	});
+
 	it("a real answer still carries its actions", async () => {
 		installWithAssistantBody("Here is the plan.");
 		handle = await renderInto(<AgentApp />);

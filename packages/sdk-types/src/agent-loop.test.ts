@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
 	AGENT_EMPTY_ANSWER_NUDGE,
 	AGENT_LOOP_MAX_ITERATIONS_CEILING,
+	AGENT_TOOLS_CLOSE,
+	AGENT_TOOLS_OPEN,
+	AGENT_TOOLS_PRIVACY_GUIDANCE,
 	type AgentLoopPorts,
 	AgentStopReason,
 	type AgentToolCall,
@@ -220,7 +223,113 @@ describe("envelope shapes — the answer is never the raw envelope", () => {
 	});
 });
 
+/** The follow-up report, verbatim: llama3.2 answering "s" — prose, the
+ *  recited tool list (schema hints included), then an empty envelope. */
+const RECITED_PROSE = [
+	"It seems like you just pressed a key. If you'd like to ask a question, request an action, or gather information, please rephrase your request, and I'll help you accordingly. Available tools:",
+	"• open: Open or navigate to an object in your vault by its id",
+	"• propose-note: Propose a new note to add to the vault",
+	'• propose-database: Propose a new database. args: {"name": "<database name>", …}',
+].join("\n");
+const RECITED_TRANSCRIPT = `${RECITED_PROSE}\n{"final": "", "citations": []}`;
+
+const LONG_PROSE =
+	"The launch slipped for two reasons.\nFirst, the venue fell through.\nSecond, the budget was cut.";
+
+describe("an envelope mixed with prose — only the envelope text is removed", () => {
+	const cases: ReadonlyArray<readonly [label: string, content: string, answer: string]> = [
+		["the reported transcript (prose, tool list, empty envelope)", RECITED_TRANSCRIPT, RECITED_PROSE],
+		[
+			"an empty envelope first, then prose",
+			'{"final": "", "citations": []}\nI am not sure what you mean.',
+			"I am not sure what you mean.",
+		],
+		[
+			"a fenced empty envelope after prose",
+			'I am not sure what you mean.\n```json\n{"final": "", "citations": []}\n```',
+			"I am not sure what you mean.",
+		],
+		[
+			"an empty envelope on its own line in the middle of prose",
+			'First part.\n{"final": {}, "citations": []}\nSecond part.',
+			"First part.\n\nSecond part.",
+		],
+		["a one-line preamble gives way to final", 'Here is my answer:\n{"final":"42"}', "42"],
+		[
+			"substantial prose is kept and a final it already contains is dropped",
+			`${LONG_PROSE}\n{"final":"the venue fell through"}`,
+			LONG_PROSE,
+		],
+		[
+			"substantial prose is kept and a different final follows it",
+			`${LONG_PROSE}\n{"final":"Rebook by Friday."}`,
+			`${LONG_PROSE}\n\nRebook by Friday.`,
+		],
+		[
+			"JSON with a final key among other keys is the user's answer",
+			'{"final": true, "score": 3, "round": "semi"}',
+			'{"final": true, "score": 3, "round": "semi"}',
+		],
+		[
+			"an envelope inside a larger example code block is left alone",
+			'The format is:\n```json\n// when done\n{"final": "x", "citations": []}\n```',
+			'The format is:\n```json\n// when done\n{"final": "x", "citations": []}\n```',
+		],
+		[
+			"an envelope mentioned mid-sentence is left alone",
+			'Reply with {"final": "x"} when you are done, please.',
+			'Reply with {"final": "x"} when you are done, please.',
+		],
+		[
+			"an envelope nested in other JSON is left alone",
+			'{"example": {"final": "x"}}',
+			'{"example": {"final": "x"}}',
+		],
+	];
+
+	it.each(cases)("%s", (_label, content, answer) => {
+		expect(resolveAgentAnswer(content)).toBe(answer);
+	});
+
+	it("honours the citations of an envelope stripped out of prose", () => {
+		expect(parseAgentReply('See the plan.\n{"final": "", "citations": ["n1"]}')).toEqual({
+			kind: "final",
+			answer: "See the plan.",
+			citations: ["n1"],
+		});
+	});
+
+	it("finds a tool call that follows unparseable braces in prose", () => {
+		expect(
+			parseAgentReply('I will use args {"name": "<x>", …} now.\n{"tool":"search","args":{"q":"a"}}'),
+		).toEqual({ kind: "tool", call: { tool: "search", args: { q: "a" } } });
+	});
+
+	it("the loop does not retry when the prose around an empty envelope is the answer", async () => {
+		const ports = scriptedPorts([RECITED_TRANSCRIPT, '{"final":"never asked"}']);
+		const result = await runAgentLoop(ports, {
+			instructions: "x",
+			tools: [searchTool],
+			frozenCapabilities: ["intents.dispatch:search"],
+		});
+		expect(result.finalAnswer).toBe(RECITED_PROSE);
+		expect(result.iterations).toBe(1);
+	});
+});
+
 describe("buildAgentSystemPrompt", () => {
+	it("keeps the tool list internal: delimited, and never to be recited", () => {
+		const prompt = buildAgentSystemPrompt("Do the thing.", [searchTool]);
+		expect(prompt).toContain(AGENT_TOOLS_PRIVACY_GUIDANCE);
+		const open = prompt.lastIndexOf(AGENT_TOOLS_OPEN);
+		const close = prompt.lastIndexOf(AGENT_TOOLS_CLOSE);
+		const tool = prompt.indexOf("search: Search the vault");
+		expect(open).toBeGreaterThan(-1);
+		expect(tool).toBeGreaterThan(open);
+		expect(close).toBeGreaterThan(tool);
+		expect(prompt).not.toContain("Available tools:");
+	});
+
 	it("lists offered tools and the JSON protocol", () => {
 		const prompt = buildAgentSystemPrompt("Do the thing.", [searchTool, noteTool]);
 		expect(prompt).toContain("search: Search the vault");
