@@ -35,6 +35,38 @@ export function mimeFromProperties(properties: Record<string, unknown>): string 
 	return undefined;
 }
 
+/** MIME values that say nothing about what a file is. */
+const UNINFORMATIVE_MIMES: ReadonlySet<string> = new Set([
+	"application/octet-stream",
+	"application/zip",
+]);
+
+/** Book formats by filename suffix, longest first. */
+const BOOK_MIME_BY_SUFFIX: ReadonlyArray<readonly [suffix: string, mime: string]> = [
+	[".fb2.zip", "application/x-zip-compressed-fb2"],
+	[".epub", "application/epub+zip"],
+	[".fb2", "application/x-fictionbook+xml"],
+];
+
+/**
+ * The MIME an `open` is routed on. Normally the stored one — but a file row
+ * written before EPUB / FB2 had a label carries `application/octet-stream`,
+ * which matches no opener, so the book could not be opened from the file
+ * manager at all. For those rows (and only when the stored value is
+ * uninformative) the file's NAME decides, by its final extension:
+ * `Dune.fb2.epub` is an EPUB. Read-only — nothing is rewritten here; the
+ * reader corrects the stored label when it opens the file.
+ */
+export function routingMimeFromProperties(properties: Record<string, unknown>): string | undefined {
+	const stored = mimeFromProperties(properties);
+	// No stored MIME means "not a file-shaped entity" — a Note that happens
+	// to be titled `draft.epub` must keep routing by its type alone.
+	if (stored === undefined || !UNINFORMATIVE_MIMES.has(stored)) return stored;
+	const name = typeof properties.name === "string" ? properties.name.trim().toLowerCase() : "";
+	const match = BOOK_MIME_BY_SUFFIX.find(([suffix]) => name.endsWith(suffix));
+	return match?.[1] ?? stored;
+}
+
 /**
  * Build a resolver over the active vault's entities repo. Per-call repo
  * lookup (not a captured handle) so a vault switch can't read a closed DB.
@@ -50,7 +82,7 @@ export function makeEntityTargetResolver(
 			if (!repo) return null;
 			const row = repo.get(entityId);
 			if (!row) return null;
-			const mime = mimeFromProperties(row.properties);
+			const mime = routingMimeFromProperties(row.properties);
 			return mime !== undefined ? { type: row.type, mime } : { type: row.type };
 		} catch {
 			return null;
