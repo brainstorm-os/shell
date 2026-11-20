@@ -791,7 +791,9 @@ describe("design review: the policy's invariants in the awkward corners", () => 
 		});
 		await alice.drain();
 		expect(await alice.active(CHANNEL)).not.toContain(sam.pub);
-	});
+		// ~300 signatures made and verified: 1.4s alone, past the 30s default on
+		// a hosted runner sharing its cores with the rest of the suite.
+	}, 120_000);
 
 	// 6 — an incomplete removal says so.
 	it("a collection revoke reports the children it could not revoke or re-key", async () => {
