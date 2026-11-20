@@ -55,3 +55,30 @@ describe("RowGlyph", () => {
 		}
 	}
 });
+
+describe("RowGlyph opener badge", () => {
+	it("marks a first-party opener icon as an inset glyph, and nothing else", () => {
+		const mail = render(
+			<RowGlyph
+				entity={entity("brainstorm/Bookmark/v1", { name: "b" })}
+				mode={ViewMode.List}
+				iconSize={18}
+				openerAppId="io.brainstorm.bookmarks"
+			/>,
+		);
+		expect(mail.querySelector(".content-row__app-icon")?.getAttribute("data-inset-glyph")).toBe(
+			"true",
+		);
+		const foreign = render(
+			<RowGlyph
+				entity={entity("acme/Widget/v1", { name: "w" })}
+				mode={ViewMode.List}
+				iconSize={18}
+				openerAppId="com.acme.widgets"
+			/>,
+		);
+		expect(foreign.querySelector(".content-row__app-icon")?.hasAttribute("data-inset-glyph")).toBe(
+			false,
+		);
+	});
+});

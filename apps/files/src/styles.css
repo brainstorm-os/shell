@@ -789,8 +789,9 @@ body[data-nav-open="false"] .sidebar:not([data-bs-autohide]) {
  * slot (which would land it beside the card). The compound selector
  * (0,3,0) beats the SDK's host--row rules (≤0,2,0) to restore absolute
  * positioning; the SDK's display none → reveal-on-hover toggle still
- * applies. The row reserves a small trailing gutter (see
- * `.content-row__modified`) so the date ellipsizes before the overlay. */
+ * applies. In List the ⋯ lands on the row's reserved actions track
+ * (`--files-row-actions`), never on a column: its inset is the row's own
+ * margin + padding, so it sits flush with the content edge. */
 .content-row__menu-host {
 	display: block;
 	position: relative;
@@ -799,7 +800,7 @@ body[data-nav-open="false"] .sidebar:not([data-bs-autohide]) {
 .content-row__menu-host.bs-object-menu__host--row > .bs-object-menu__more {
 	position: absolute;
 	top: 50%;
-	inset-inline-end: var(--space-2);
+	inset-inline-end: calc(var(--space-1) + var(--space-2));
 	transform: translateY(-50%);
 	margin: 0;
 }
@@ -819,6 +820,11 @@ body[data-nav-open="false"] .sidebar:not([data-bs-autohide]) {
 	margin: 0 var(--space-1);
 	/* Anchors the absolute cross-app drag grip in the left gutter (DND-4). */
 	position: relative;
+	/* The trailing actions track (`LIST_ACTIONS_TRACK` in list-columns.ts):
+	 * the export grip, a gap, and the shared 28px ⋯ chip. */
+	--files-row-grip: 18px;
+	--files-row-more: 28px;
+	--files-row-actions: calc(var(--files-row-grip) + var(--space-1) + var(--files-row-more));
 }
 
 /* List modes use a fixed virtual pitch (`ROW_HEIGHT`/`ICON_LIST_ROW_HEIGHT`
@@ -892,13 +898,13 @@ body[data-nav-open="false"] .sidebar:not([data-bs-autohide]) {
 	border: none;
 	padding: 0;
 	position: absolute;
-	right: 30px;
+	inset-inline-end: calc(var(--space-2) + var(--files-row-more) + var(--space-1));
 	top: 50%;
 	transform: translateY(-50%);
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	width: 18px;
+	width: var(--files-row-grip);
 	height: 22px;
 	color: var(--text-faint);
 	cursor: grab;
@@ -908,6 +914,18 @@ body[data-nav-open="false"] .sidebar:not([data-bs-autohide]) {
 }
 .content-row:hover .content-row__export-grip {
 	opacity: 1;
+}
+
+/* List: the grip is a real grid child at the start of the reserved actions
+ * track, not an overlay. As an overlay it was pinned 30px in from the row
+ * edge while the last cell reserved only 20px, so it painted over the tail
+ * of whatever column came last ("2 wks ag" under the open icon). */
+.content-row[data-view-mode="list"] .content-row__export-grip {
+	position: static;
+	transform: none;
+	grid-column: -2 / -1;
+	grid-row: 1;
+	justify-self: start;
 }
 
 /* A folder accepting a cross-app object drop (DropSemantic.AddMembership) —
@@ -920,12 +938,20 @@ body[data-nav-open="false"] .sidebar:not([data-bs-autohide]) {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 20px;
-	height: 20px;
+	/* The slot IS the mode's icon size (piped in by RowGlyph), so it matches
+	 * the row's icon track instead of overflowing it. */
+	width: var(--glyph-size, 20px);
+	height: var(--glyph-size, 20px);
 	flex-shrink: 0;
 	overflow: hidden;
 	border-radius: var(--radius-sm);
 	color: var(--glyph-folder);
+	/* A first-party app icon draws its glyph on roughly the middle half of a
+	 * transparent tile (scripts/build-app-icons.ts), so filling the slot with
+	 * the tile leaves a glyph half the size of the folder icon beside it.
+	 * One-lane lists zoom the tile by this factor and let the slot clip the
+	 * empty margin. */
+	--files-inset-glyph-zoom: 2;
 }
 
 .content-row__glyph[data-glyph="file"] {
@@ -977,15 +1003,6 @@ body[data-nav-open="false"] .sidebar:not([data-bs-autohide]) {
 
 .content-row__modified {
 	text-align: end;
-}
-
-/* Reserve room at the row's trailing edge so the hover-revealed ⋯ overlay
- * doesn't sit on top of the LAST visible cell — whichever column the
- * chooser put there (9.8.11). List + icon-list (both one-lane lists); tile
- * modes overlay corners. */
-body[data-view-mode="list"] .content-row > span:last-child,
-body[data-view-mode="icon-list"] .content-row > span:last-child {
-	padding-inline-end: var(--space-5);
 }
 
 /* Icon-list (9.8.10) — same one-lane list grid as List, with a larger
@@ -1164,6 +1181,19 @@ body[data-view-mode="gallery"] .content-row__glyph[data-kind="folder"] {
 	display: block;
 }
 
+/* One-lane lists have no room for a badge: at 18px the squircle frame takes
+ * the edge and leaves a ~9px glyph, smaller and fainter than the folder icon
+ * in the same column. A first-party icon (a known inset glyph) drops the
+ * frame and zooms to the slot, so it reads at the folder icon's size. Any
+ * other app's icon may be full-bleed, so it keeps the framed badge. */
+.content-row[data-view-mode="list"] .content-row__app-icon[data-inset-glyph="true"],
+.content-row[data-view-mode="icon-list"] .content-row__app-icon[data-inset-glyph="true"] {
+	background: none;
+	border: 0;
+	border-radius: 0;
+	transform: scale(var(--files-inset-glyph-zoom));
+}
+
 /* Gallery's media band is tall and flex-filled, so size the badge off the
  * preset glyph metric (matching the folder/emoji glyphs in the same band)
  * rather than filling the whole band like a thumbnail. */
@@ -1302,8 +1332,13 @@ body[data-view-mode="icon-list"] .content-row {
 body[data-view-mode="icon-list"] .content-row__name {
 	flex: 1 1 auto;
 	min-width: 0;
-	/* Trailing gutter so the hover-⋯ overlay never sits on the name. */
-	padding-inline-end: 20px;
+}
+
+/* The hover actions overlay the tile's trailing edge; the name gives them
+ * their width back while they are showing, so neither sits on its tail. */
+body[data-view-mode="icon-list"] .content-row__menu-host:hover .content-row__name,
+body[data-view-mode="icon-list"] .content-row__menu-host:focus-within .content-row__name {
+	padding-inline-end: calc(var(--files-row-actions) + var(--space-1));
 }
 
 body[data-view-mode="icon-list"] .content-row__type,
