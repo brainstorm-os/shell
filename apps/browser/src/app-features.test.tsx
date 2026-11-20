@@ -718,6 +718,34 @@ describe("clip-to-vault (F-235)", () => {
 		return btn;
 	}
 
+	it("is disabled with a reason on the start page and plain-labelled once a page loads", async () => {
+		installWithNetwork(async () => ({ blocks: null }));
+		await render(<BrowserApp />);
+		await act(async () => {});
+
+		const reader = container.querySelector<HTMLButtonElement>(".browser__reader-toggle");
+		expect(clipButton().disabled).toBe(true);
+		expect(clipButton().title).toBe("Open a web page to save it to the vault");
+		expect(reader?.disabled).toBe(true);
+		expect(reader?.title).toBe("Open a web page to use reader view");
+
+		await navigateActiveTabTo("https://example.com/article");
+
+		expect(clipButton().disabled).toBe(false);
+		expect(clipButton().title).toBe("");
+		expect(reader?.disabled).toBe(false);
+		expect(reader?.title).toBe("");
+	});
+
+	it("draws the browser menu with the shared three-dot glyph", async () => {
+		installWithNetwork(async () => ({ blocks: null }));
+		await render(<BrowserApp />);
+		await act(async () => {});
+
+		const menu = container.querySelector(".browser__navbtn.bs-object-menu__more");
+		expect(menu?.querySelectorAll(".bs-object-menu__more-dot")).toHaveLength(3);
+	});
+
 	it("captures the readable body and saves a bookmark with content blocks", async () => {
 		const blocks = [{ type: "paragraph", text: "Hello" }];
 		const readable = installWithNetwork(async () => ({ blocks }));
