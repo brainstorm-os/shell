@@ -60,6 +60,7 @@ export const READONLY_BOOK_PROP_KEYS: ReadonlySet<string> = new Set([
 const FORMAT_LABEL_KEYS = {
 	[BookFormat.Pdf]: "prop.format.pdf",
 	[BookFormat.Epub]: "prop.format.epub",
+	[BookFormat.Fb2]: "prop.format.fb2",
 } as const;
 
 /** Cell values for a book. Progress is the 0..1 fraction snapped to a whole

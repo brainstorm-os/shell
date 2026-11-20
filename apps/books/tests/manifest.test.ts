@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { validateManifest } from "../../../packages/shell/src/main/apps/manifest";
+import { BookMime } from "../src/logic/book-import";
+import { BookFormat } from "../src/types/book";
 
 const MANIFEST_PATH = join(__dirname, "..", "manifest.json");
 
@@ -46,6 +48,29 @@ describe("apps/books/manifest.json", () => {
 		expect(
 			openers.find((op) => op.entityType === "brainstorm/Book/v1" && op.kind === "primary"),
 		).toBeDefined();
+	});
+
+	it("claims every book MIME so a book file opened from Files lands here", () => {
+		const result = validateManifest(readManifest());
+		if (!result.ok) throw new Error(result.reason);
+		const openers = result.manifest.registrations?.openers ?? [];
+		const intents = result.manifest.registrations?.intents ?? [];
+		for (const mime of Object.values(BookMime)) {
+			expect(openers.some((op) => "mime" in op && op.mime === mime)).toBe(true);
+			expect(intents.some((it) => it.verb === "open" && it.mime === mime)).toBe(true);
+		}
+	});
+
+	it("allows every catalog format the app writes", () => {
+		const result = validateManifest(readManifest());
+		if (!result.ok) throw new Error(result.reason);
+		const book = (result.manifest.registrations?.entityTypes ?? []).find(
+			(t) => t.id === "brainstorm/Book/v1",
+		);
+		const schema = book?.schema as { properties?: { format?: { enum?: string[] } } } | undefined;
+		expect([...(schema?.properties?.format?.enum ?? [])].sort()).toEqual(
+			Object.values(BookFormat).sort(),
+		);
 	});
 
 	it("declares narrow per-type entity caps for Book + Highlight", () => {

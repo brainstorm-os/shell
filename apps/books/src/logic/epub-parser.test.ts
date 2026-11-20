@@ -17,6 +17,12 @@ const destroy = vi.fn();
 vi.mock("epubjs", () => ({
 	default: () => ({
 		ready: Promise.resolve(),
+		loaded: {
+			spine: Promise.resolve(),
+			metadata: Promise.resolve(),
+			navigation: Promise.resolve(null),
+		},
+		on: () => {},
 		packaging: { metadata: { title: "Mock Book", creator: "Ada" } },
 		load: () => Promise.resolve({}),
 		destroy,
