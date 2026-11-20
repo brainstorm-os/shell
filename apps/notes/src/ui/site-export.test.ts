@@ -12,6 +12,7 @@ import {
 	openSiteExport,
 	readThemeTokens,
 	siteExportReport,
+	sitePageAccess,
 } from "./site-export";
 
 const LABELS = {
@@ -221,6 +222,59 @@ describe("openSiteExport — the pages are confirmed before anything is saved", 
 		await vi.waitFor(() => expect(onResult).toHaveBeenCalled());
 		expect(writes).toEqual([]);
 		expect(onResult).toHaveBeenCalledWith({ kind: SaveDispositionKind.Cancelled }, null);
+	});
+});
+
+describe("sitePageAccess — who else could have written a page", () => {
+	const member = (pubkey: string, active = true) => ({ pubkey, active });
+	const sharing = (exposure: unknown, members: unknown[] = []) => ({
+		exposure: async () => exposure as { everShared: boolean } | null,
+		access: async () => members as Array<{ pubkey: string; active: boolean }>,
+	});
+
+	it("calls a page private only when the host attests it and the record agrees", async () => {
+		const solo = { scope: "private", solo: true };
+		expect(await sitePageAccess(sharing({ everShared: false }), "n1")).toEqual(solo);
+		expect(await sitePageAccess(sharing({ everShared: false }, [member("me")]), "n1")).toEqual(solo);
+		expect(
+			await sitePageAccess(sharing({ everShared: false }, [member("me"), member("x", false)]), "n1"),
+		).toEqual(solo);
+	});
+
+	it("gives every page that was ever shared a scope of its own, whatever its record lists now", async () => {
+		const emptied = await sitePageAccess(sharing({ everShared: true }, []), "n1");
+		expect(emptied).toEqual({ scope: "shared:n1", solo: false });
+		const other = await sitePageAccess(sharing({ everShared: true }, []), "n2");
+		expect(other?.scope).not.toBe(emptied?.scope);
+		expect(emptied?.scope).not.toBe("private");
+	});
+
+	it("fails closed when the host and the record disagree", async () => {
+		expect(
+			await sitePageAccess(sharing({ everShared: false }, [member("me"), member("them")]), "n1"),
+		).toEqual({ scope: "shared:n1", solo: false });
+	});
+
+	it("answers unknown when the host cannot attest", async () => {
+		expect(await sitePageAccess(undefined, "n1")).toBeNull();
+		expect(await sitePageAccess(sharing(null), "n1")).toBeNull();
+		expect(await sitePageAccess(sharing({}), "n1")).toBeNull();
+		expect(await sitePageAccess(sharing({ everShared: "no" }), "n1")).toBeNull();
+		expect(await sitePageAccess({ access: async () => [] }, "n1")).toBeNull();
+		const throwing = {
+			exposure: async () => {
+				throw new Error("Unavailable");
+			},
+			access: async () => [],
+		};
+		expect(await sitePageAccess(throwing, "n1")).toBeNull();
+		const noRecord = {
+			exposure: async () => ({ everShared: false }),
+			access: async () => {
+				throw new Error("Unavailable");
+			},
+		};
+		expect(await sitePageAccess(noRecord, "n1")).toBeNull();
 	});
 });
 

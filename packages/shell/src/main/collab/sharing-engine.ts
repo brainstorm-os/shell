@@ -57,6 +57,7 @@ import {
 	inviteProfile,
 	shareEntityWithInvite,
 } from "./share-invite";
+import { hasShareTrace } from "./share-trace";
 import { type SurvivorWrap, rewrapDekForSurvivors } from "./survivor-rewrap";
 
 function freshNonce(): Uint8Array {
@@ -767,6 +768,18 @@ export class SharingEngine {
 			// One CURRENT row per member (re-grant-after-revoke wins) — not the raw
 			// per-append audit list, which would surface a stale revoked row (F-287).
 			return resolveCurrentMembers(doc, entityId).map(toAccessView);
+		} finally {
+			doc.destroy();
+		}
+	}
+
+	/** True when the entity's access record has ever involved anyone but this
+	 *  identity — read from what the doc HAS HELD, not from what its record
+	 *  currently lists (see `hasShareTrace`). */
+	async shareTrace(entityId: string): Promise<boolean> {
+		const { doc } = await this.#session.ydocStore.load(entityId);
+		try {
+			return hasShareTrace(doc, this.#session.identity.publicKeyBase64);
 		} finally {
 			doc.destroy();
 		}
