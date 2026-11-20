@@ -154,19 +154,10 @@
 	align-items: start;
 	gap: var(--space-2);
 	/* Tighter vertical rhythm so the list reads as a dense property sheet
-	 * rather than an airy form — horizontal padding stays for the hover row.
-	 * The hover face BLEEDS into the host's gutter instead of indenting the
-	 * text: the negative inline margin cancels the horizontal padding, so a
-	 * label starts on the same x as the section headings, buttons and meta
-	 * rows around it (they sit on the host's inset) rather than 8px further
-	 * in. Every host that renders these rows pads at least `--space-2`. */
-	margin-inline: calc(-1 * var(--space-2));
-	padding: var(--space-1) var(--space-2);
-	border-radius: var(--radius-md);
-}
-
-:root .bs-props__row:hover {
-	background: var(--bg-hover, var(--hover));
+	 * rather than an airy form. The row paints NO hover face: the value cell
+	 * is the editable target and paints its own, and a row fill around it
+	 * read as a box inside a box. */
+	padding: var(--space-1) 0;
 }
 
 :root .bs-props__row-label {

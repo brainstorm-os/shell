@@ -14,7 +14,11 @@
  *    empties hardcoded `--text-size-sm` and half declared colour only,
  *    inheriting their cell's `--text-size-md` — so a single property block
  *    showed two different "Empty" sizes (Tasks: Duration Estimate/Logged
- *    against Status/Due/Project/Tags).
+ *    against Status/Due/Project/Tags). The face is the value's own size:
+ *    a smaller word sat off the row label's baseline.
+ * 4. Every text-bearing face bleeds the same 4px, so values share one left
+ *    edge, and a property row paints no hover of its own — the cell's hover
+ *    inside a row fill read as a box inside a box.
  */
 
 import { readFileSync } from "node:fs";
@@ -88,7 +92,7 @@ describe("property cell empty affordance (one face across every kind)", () => {
 		);
 		expect(shared).toHaveLength(1);
 		expect(shared[0]?.body).toContain("color: var(--text-faint)");
-		expect(shared[0]?.body).toContain("font-size: var(--text-size-sm)");
+		expect(shared[0]?.body).toContain("font-size: var(--text-size-md)");
 	});
 
 	it("no cell kind re-declares its own Empty size or colour", () => {
@@ -118,5 +122,36 @@ describe("property cell empty affordance (one face across every kind)", () => {
 				shared?.index ?? -1,
 			);
 		}
+	});
+});
+
+describe("property cell left edge and hover surface", () => {
+	const all = rules(read("./cells.css"));
+
+	it("every text-bearing face bleeds the same 4px", () => {
+		const faces = [
+			".bs-cell-pill",
+			".bs-cell-plain",
+			".bs-cell-tag-trigger",
+			".bs-cell-link-trigger",
+			".bs-cell-progress",
+			".bs-cell-formula",
+		];
+		for (const face of faces) {
+			const rule = all.find(
+				(candidate) =>
+					candidate.body.includes("margin") &&
+					candidate.selector
+						.split(",")
+						.map((part) => part.trim())
+						.includes(face),
+			);
+			expect(rule?.body, face).toContain("margin: 0 -4px");
+		}
+	});
+
+	it("the property row declares no hover background", () => {
+		const css = read("../properties-panel/properties-panel.css");
+		expect(css).not.toMatch(/\.bs-props__row:hover\s*\{[^}]*background/);
 	});
 });
