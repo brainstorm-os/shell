@@ -61,3 +61,22 @@ export const LIST_COLUMN_WIDTH: Record<ListColumn, string> = {
 export function listIconTrack(iconSizePx: number): string {
 	return `${iconSizePx}px`;
 }
+
+/** The trailing track every list row reserves for its hover actions (the
+ *  export grip and the ⋯). Declared in `styles.css` on `.content-row`. The
+ *  actions used to be overlays parked over the last column, which is how a
+ *  date lost its tail under the open icon; an overlay cannot float over a
+ *  column, so the space is a real track inside the row. */
+export const LIST_ACTIONS_TRACK = "var(--files-row-actions)";
+
+/** The whole list-mode `grid-template-columns`: icon · name · the chooser's
+ *  columns · actions. One function so every row of a list — and the test
+ *  that pins the trailing track — builds the same geometry. */
+export function listRowTemplate(iconTrack: string, columns: readonly ListColumn[]): string {
+	return [
+		iconTrack,
+		"minmax(0, 1fr)",
+		...columns.map((column) => LIST_COLUMN_WIDTH[column]),
+		LIST_ACTIONS_TRACK,
+	].join(" ");
+}

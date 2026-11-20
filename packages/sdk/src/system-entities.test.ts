@@ -56,12 +56,30 @@ describe("child entity types (F-318)", () => {
 		expect(isChildEntityType("brainstorm/Message/v1")).toBe(true);
 	});
 
+	it("classifies a synced Email — it lives in its account's folders, read inside Mailbox", () => {
+		expect(isChildEntityType(ChildEntityType.Email)).toBe(true);
+		expect(isChildEntityType("brainstorm/Email/v1")).toBe(true);
+	});
+
+	it("keeps the mail CONTAINERS and fetched attachments out", () => {
+		// A MailFolder is a container (the Channel of mail), a MailAccount is a
+		// deliberate creation with its own management UX, and a fetched
+		// attachment is an ordinary File/v1 that stands on its own.
+		for (const type of [
+			"brainstorm/MailFolder/v1",
+			"brainstorm/MailAccount/v1",
+			"brainstorm/File/v1",
+		]) {
+			expect(isChildEntityType(type), type).toBe(false);
+			expect(isSystemEntityType(type), type).toBe(false);
+		}
+	});
+
 	it("keeps standalone content and containers out", () => {
 		for (const type of [
 			"io.brainstorm.chat/Channel/v1",
 			"brainstorm/Conversation/v1",
 			"brainstorm/Note/v1",
-			"brainstorm/Email/v1",
 			"brainstorm/Task/v1",
 			"",
 		]) {

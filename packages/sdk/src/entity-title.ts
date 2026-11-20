@@ -14,11 +14,12 @@
  *
  * The chain is type-agnostic on purpose (no per-type allowlist):
  *
- *   `title` → `name` → `displayName` → `label` → the leaf of `path`
+ *   `title` → `name` → `displayName` → `label` → `subject` → the leaf of `path`
  *
  * Each key exists in the vault today: a Note/Bookmark/Event has `title`, a
  * Person/File/Folder has `name`, a `brainstorm/Profile/v1` has ONLY
- * `displayName`, several app-authored rows carry `label`, and a
+ * `displayName`, several app-authored rows carry `label`, a
+ * `brainstorm/Email/v1` carries only `subject`, and a
  * `brainstorm/CodeFile/v1` carries only `path`. Blank and whitespace-only
  * values fall through to the next key rather than painting an empty label,
  * and the winner comes back trimmed.
@@ -37,6 +38,12 @@
 /** The property keys consulted, in precedence order. `path` is handled
  *  separately (its leaf is taken, not the raw value) and so is not listed. */
 export const ENTITY_TITLE_KEYS = ["title", "name", "displayName", "label"] as const;
+
+/** The property naming a mail message (`brainstorm/Email/v1`), which carries
+ *  no title-shaped key. Kept out of {@link ENTITY_TITLE_KEYS} for the same
+ *  reason `path` is: that list is also the set of keys a rename box may WRITE
+ *  (the Graph inspector), and a received message's subject is immutable. */
+export const ENTITY_SUBJECT_KEY = "subject";
 
 /** The property holding a vault path, whose leaf segment names the object
  *  when no title-shaped key is set (`brainstorm/CodeFile/v1`). */
@@ -68,6 +75,8 @@ export function resolveEntityTitle(
 		const value = readString(properties[key]);
 		if (value !== null) return value;
 	}
+	const subject = readString(properties[ENTITY_SUBJECT_KEY]);
+	if (subject !== null) return subject;
 	const path = readString(properties[ENTITY_PATH_KEY]);
 	return path === null ? null : pathLeaf(path);
 }

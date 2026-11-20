@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
 	DEFAULT_LIST_COLUMNS,
+	LIST_ACTIONS_TRACK,
 	ListColumn,
 	isListColumn,
 	listIconTrack,
+	listRowTemplate,
 	parseListColumns,
 	toggleListColumn,
 } from "./list-columns";
@@ -43,5 +45,25 @@ describe("listIconTrack", () => {
 
 	it("tracks the mode's icon size so density presets stay aligned", () => {
 		expect(listIconTrack(28)).toBe("28px");
+	});
+});
+
+describe("list row template reserves a trailing actions track", () => {
+	// The hover actions (export grip + ⋯) used to be overlays parked on top of
+	// the LAST column, so "2 wks ago" lost its tail under the open icon. They
+	// now own a track of their own, whatever the column chooser shows.
+	it("ends in the actions track for every column set", () => {
+		for (const columns of [
+			[],
+			[ListColumn.Kind],
+			DEFAULT_LIST_COLUMNS,
+			[ListColumn.Size, ListColumn.Modified, ListColumn.Kind],
+		]) {
+			const tracks = listRowTemplate("18px", columns).split(/\s+(?![^(]*\))/);
+			expect(tracks[0]).toBe("18px");
+			expect(tracks[1]).toBe("minmax(0, 1fr)");
+			expect(tracks.at(-1)).toBe(LIST_ACTIONS_TRACK);
+			expect(tracks).toHaveLength(columns.length + 3);
+		}
 	});
 });

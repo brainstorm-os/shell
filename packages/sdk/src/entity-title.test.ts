@@ -20,6 +20,21 @@ describe("resolveEntityTitle", () => {
 		expect(resolveEntityTitle({ path: "readme.md" })).toBe("readme.md");
 	});
 
+	it("names an Email by its subject — after every title-shaped key, before the path leaf", () => {
+		// `brainstorm/Email/v1` stores its label in `subject` and nothing else,
+		// so every synced message read "(untitled)" in Files / Database / Graph.
+		expect(resolveEntityTitle({ subject: "Quarterly numbers", messageId: "<1@x>" })).toBe(
+			"Quarterly numbers",
+		);
+		expect(resolveEntityTitle({ label: "Pinned", subject: "s" })).toBe("Pinned");
+		expect(resolveEntityTitle({ subject: "s", path: "INBOX/1" })).toBe("s");
+		expect(resolveEntityTitle({ subject: "  Re: lunch  " })).toBe("Re: lunch");
+		// A message with no subject stays nameless — the caller's untitled
+		// fallback applies, same as every other nameless object.
+		expect(resolveEntityTitle({ subject: "   ", messageId: "<1@x>" })).toBeNull();
+		expect(hasEntityTitle({ subject: "" })).toBe(false);
+	});
+
 	it("skips blank and whitespace-only values instead of painting an empty label", () => {
 		expect(resolveEntityTitle({ title: "", name: "Ada" })).toBe("Ada");
 		expect(resolveEntityTitle({ title: "   ", name: "", displayName: "Ada" })).toBe("Ada");

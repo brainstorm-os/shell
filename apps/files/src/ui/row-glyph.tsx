@@ -23,6 +23,12 @@ function extensionChip(name: string): string | null {
 	return ext.toUpperCase();
 }
 
+/** First-party app ids. Their icons are generated as an inset glyph on a
+ *  transparent tile (`scripts/build-app-icons.ts`), which is what lets a
+ *  one-lane list zoom the glyph to the slot; any other app's icon may be
+ *  full-bleed and keeps the framed badge. */
+const FIRST_PARTY_APP_PREFIX = "io.brainstorm.";
+
 function isTileMode(mode: ViewMode): boolean {
 	return mode === ViewMode.Grid || mode === ViewMode.Gallery;
 }
@@ -94,6 +100,7 @@ export function RowGlyph({ entity, mode, iconSize, openerAppId }: RowGlyphProps)
 			) : appIcon ? (
 				<img
 					className="content-row__app-icon"
+					data-inset-glyph={appIcon.startsWith(FIRST_PARTY_APP_PREFIX) ? "true" : undefined}
 					src={`brainstorm://app-icon/${appIcon}`}
 					alt=""
 					loading="lazy"

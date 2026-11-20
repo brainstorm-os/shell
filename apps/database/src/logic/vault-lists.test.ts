@@ -240,6 +240,25 @@ describe("buildVaultLists", () => {
 		expect(lists.some((l) => l.id === "list_vault_brainstorm-message-v1")).toBe(true);
 	});
 
+	it("All vault items excludes synced Emails — they stay in their mail folders", () => {
+		const mailHeavy: VaultSnapshotInput = {
+			entities: [
+				entity("n1", "io.brainstorm.notes/Note/v1", { title: "Real doc" }),
+				entity("e1", "brainstorm/Email/v1", { accountRef: "a", folderRefs: ["f"], subject: "Hi" }),
+				entity("e2", "brainstorm/Email/v1", { accountRef: "a", folderRefs: ["f"], subject: "Re" }),
+			],
+			links: [],
+		};
+		const { lists } = buildVaultLists(mailHeavy, NOW);
+		const all = lists.find((l) => l.id === ALL_VAULT_LIST_ID);
+		expect(all?.source).toEqual({
+			kind: ListSourceKind.ByType,
+			types: ["io.brainstorm.notes/Note/v1"],
+		});
+		// The dedicated Emails type-list is still there to drill into.
+		expect(lists.some((l) => l.id === "list_vault_brainstorm-email-v1")).toBe(true);
+	});
+
 	it("skips the All vault items List when the vault holds only child-typed rows", () => {
 		const onlyMessages: VaultSnapshotInput = {
 			entities: [

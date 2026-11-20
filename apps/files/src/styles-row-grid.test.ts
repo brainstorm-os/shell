@@ -55,3 +55,48 @@ describe("list row grid keeps a fixed icon track", () => {
 		expect(collapse, "an empty glyph host must keep its grid slot").toHaveLength(0);
 	});
 });
+
+describe("list row hover actions never cover a column", () => {
+	const css = readFileSync(CSS_PATH, "utf8");
+	const all = rules(css);
+	const bodyOf = (selector: string): string =>
+		all
+			.filter((r) => r.selectors.includes(selector))
+			.map((r) => r.body)
+			.join("\n");
+
+	it("the export grip is a real grid child of the list row, in the trailing track", () => {
+		const body = bodyOf('.content-row[data-view-mode="list"] .content-row__export-grip');
+		expect(body, "list-mode export grip rule missing").not.toBe("");
+		expect(body).toMatch(/position:\s*static/);
+		expect(body).toMatch(/grid-column:\s*-2\s*\/\s*-1/);
+	});
+
+	it("declares the actions track from the grip + ⋯ widths", () => {
+		expect(bodyOf(".content-row")).toMatch(/--files-row-actions:\s*calc\(/);
+	});
+
+	it("no longer fakes the reservation with padding on the last cell", () => {
+		const padded = all.filter((r) =>
+			r.selectors.some((s) => s.includes(".content-row > span:last-child")),
+		);
+		expect(padded, "the trailing track replaces the last-cell padding").toHaveLength(0);
+	});
+});
+
+describe("list row type icons match the folder glyph's optical size", () => {
+	const css = readFileSync(CSS_PATH, "utf8");
+	const all = rules(css);
+
+	it("drops the squircle frame and zooms the inset first-party glyph in one-lane lists", () => {
+		const rule = all.find((r) =>
+			r.selectors.includes(
+				'.content-row[data-view-mode="list"] .content-row__app-icon[data-inset-glyph="true"]',
+			),
+		);
+		expect(rule, "list-mode app-icon rule missing").toBeDefined();
+		expect(rule?.body).toMatch(/border:\s*(0|none)/);
+		expect(rule?.body).toMatch(/background:\s*none/);
+		expect(rule?.body).toMatch(/transform:\s*scale\(var\(--files-inset-glyph-zoom\)\)/);
+	});
+});
