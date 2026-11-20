@@ -14,7 +14,6 @@
   "menu.saveCopy": "Save a copy…",
   "menu.saveDialogTitle": "Save a copy",
   "counter.position": "{index} of {total}",
-  "counter.empty": "0 of 0",
   "stage.noFileSelected": "Nothing to preview",
   "stage.noFileSelectedHint": "Open a file or image from Files, or press Space on any object to Quick Look it here.",
   "stage.noPreviewFor": "No preview for {mime}",

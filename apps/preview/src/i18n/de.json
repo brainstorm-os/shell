@@ -14,7 +14,6 @@
   "menu.saveCopy": "Kopie speichern…",
   "menu.saveDialogTitle": "Kopie speichern",
   "counter.position": "{index} von {total}",
-  "counter.empty": "0 von 0",
   "stage.noFileSelected": "Nichts zum Vorschauen",
   "stage.noFileSelectedHint": "Öffne eine Datei oder ein Bild aus Dateien oder drücke die Leertaste auf einem Objekt, um es hier per Quick Look anzusehen.",
   "stage.noPreviewFor": "Keine Vorschau für {mime}",

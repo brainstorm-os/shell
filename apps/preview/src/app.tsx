@@ -304,8 +304,6 @@ export function PreviewApp(): ReactElement {
 	const sidebarAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !sidebarOpen });
 
 	const chip = useMemo(() => chipLabelFor(context, total), [context, total]);
-	const counterText =
-		total > 0 ? t("counter.position", { index: cursor + 1, total }) : t("counter.empty");
 
 	const rootClass = [
 		"preview",
@@ -321,16 +319,17 @@ export function PreviewApp(): ReactElement {
 			<LiveRegion />
 			<header className="app-header" data-testid="app-header">
 				<div className="app-header__left">
-					<Nav
-						disabled={!navUsable}
-						counter={counterText}
-						onPrev={() => stepBy(-1)}
-						onNext={() => stepBy(1)}
-					/>
+					{total > 0 ? (
+						<Nav
+							disabled={!navUsable}
+							counter={t("counter.position", { index: cursor + 1, total })}
+							onPrev={() => stepBy(-1)}
+							onNext={() => stepBy(1)}
+						/>
+					) : null}
 					{chip ? <SourceChip kind={chip.kind} label={chip.label} /> : null}
 					{/* Every app-header carries a title face; with nothing open, fall
-					    back to the app name so the header never reads blank (Marcus
-					    911 — Preview showed only a "0 of 0" counter, no title). */}
+					    back to the app name so the header never reads blank. */}
 					<span
 						className="app-header__title preview__filename"
 						title={activeFile?.info.name ?? t("app.title")}
