@@ -185,42 +185,49 @@ function collectBlocks(el: Element, out: ContentBlock[]): void {
 	}
 }
 
-type SpineBuilder = {
-	spine: SpineItem[];
-	/** Headings of title-only sections ("Part One") waiting for the first
-	 *  section with prose, so a part divider never becomes an empty chapter. */
-	pending: ContentBlock[];
-};
-
-function emit(builder: SpineBuilder, blocks: ContentBlock[]): void {
-	if (blocks.length === 0) return;
-	if (blocks.every((block) => block.kind === BlockKind.Heading)) {
-		builder.pending.push(...blocks);
-		return;
-	}
-	const all = [...builder.pending, ...blocks];
-	builder.pending = [];
-	const heading = all.find((block) => block.kind === BlockKind.Heading);
-	builder.spine.push({
-		title: heading?.text ?? positionalChapterTitle(builder.spine.length + 1),
-		blocks: all,
-	});
-}
-
-/** Flatten a `<body>` / `<section>` tree into spine items: a node's own
- *  content is one chapter, each nested section its own, in document order. */
-function walkSection(node: Element, builder: SpineBuilder): void {
+/**
+ * Flatten a `<body>` / `<section>` tree into spine items, one per section, in
+ * document order. The reader's model has no hierarchy, so nesting becomes a
+ * flat list that still names every level:
+ *
+ *  - a section's own content is one chapter, titled by ITS `<title>`;
+ *  - each nested section is its own chapter, listed after its parent;
+ *  - a section that is only a title ("Part One") is a title page of its own,
+ *    so the part is in the contents and no chapter loses its title to it;
+ *  - the body's `<title>` is the BOOK's title, not a chapter. It heads an
+ *    opening page only when the body has front matter (an epigraph) to put
+ *    under it; otherwise it is dropped and the first chapter leads.
+ *
+ * Text that follows a nested section is kept as a further untitled chapter
+ * rather than re-using its parent's title for a second contents entry.
+ */
+function walkSection(node: Element, spine: SpineItem[], isBody: boolean, bookTitle: string): void {
+	const titleEl = firstChild(node, "title");
+	let title = titleEl ? headingText(titleEl) : "";
+	if (isBody && !title) title = bookTitle;
 	let own: ContentBlock[] = [];
+	const flush = (): void => {
+		const blocks = own;
+		own = [];
+		if (blocks.length === 0) return;
+		const hasProse = blocks.some((block) => block.kind === BlockKind.Paragraph);
+		if (isBody && !hasProse) return;
+		const heading = isBody ? undefined : blocks.find((block) => block.kind === BlockKind.Heading);
+		spine.push({
+			title: title || heading?.text || positionalChapterTitle(spine.length + 1),
+			blocks,
+		});
+		title = "";
+	};
 	for (const child of childElements(node)) {
 		if (tagOf(child) === "section") {
-			emit(builder, own);
-			own = [];
-			walkSection(child, builder);
+			flush();
+			walkSection(child, spine, false, bookTitle);
 		} else {
 			collectBlocks(child, own);
 		}
 	}
-	emit(builder, own);
+	flush();
 }
 
 /** A notes body holds one tiny section per footnote. Reading it as chapters
@@ -324,24 +331,19 @@ export function parseFb2Markup(xml: string): Fb2Book {
 		? childElements(titleInfo, "author").map(personName).filter(Boolean).join(", ")
 		: "";
 
-	const builder: SpineBuilder = { spine: [], pending: [] };
-	const bodies = childElements(root, "body");
-	bodies.forEach((body, index) => {
+	const spine: SpineItem[] = [];
+	childElements(root, "body").forEach((body, index) => {
 		if (index > 0 && body.hasAttribute("name")) {
-			const notes = notesItem(body, builder.spine.length + 1);
-			if (notes) builder.spine.push(notes);
+			const notes = notesItem(body, spine.length + 1);
+			if (notes) spine.push(notes);
 			return;
 		}
-		walkSection(body, builder);
+		walkSection(body, spine, true, title);
 	});
-	if (builder.pending.length > 0) {
-		const blocks = builder.pending;
-		builder.spine.push({ title: blocks[0]?.text ?? title, blocks });
-	}
-	if (builder.spine.length === 0) builder.spine.push({ title: title || UNTITLED_BOOK, blocks: [] });
+	if (spine.length === 0) spine.push({ title: title || UNTITLED_BOOK, blocks: [] });
 
 	return {
-		content: { title: title || UNTITLED_BOOK, author, spine: builder.spine },
+		content: { title: title || UNTITLED_BOOK, author, spine },
 		cover: coverFrom(root, titleInfo),
 	};
 }
