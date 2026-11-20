@@ -31,6 +31,7 @@
 
 import {
 	AGENT_DELEGATED_BY_PROPERTY_KEY,
+	AGENT_NO_ANSWER_REPLY,
 	AGENT_PROVENANCE_PROPERTY_KEY,
 	AgentEventKind,
 	AgentEventOutcome,
@@ -159,6 +160,8 @@ export const NO_PERMISSION_REPLY =
 	"I can't run yet — I have no AI permission in this vault. Open Settings → Team and grant me “Use AI models” (and anything else you want me to see).";
 export const GENERATE_FAILED_REPLY =
 	"I couldn't reach a model provider just now, so I have no answer. Check Settings → AI (provider + key), then mention me again.";
+export const DRAFTS_ONLY_REPLY =
+	"I drafted the items below. Nothing is saved until they are approved.";
 
 /** The turn-header marker. Untrusted bodies are escaped so they can never
  *  contain it, which is what makes a header unforgeable — see
@@ -676,7 +679,7 @@ async function runOneAgent(
 	const body =
 		result.stopReason === AgentStopReason.GenerateFailed
 			? GENERATE_FAILED_REPLY
-			: result.finalAnswer.trim() || GENERATE_FAILED_REPLY;
+			: channelAnswerBody(result.finalAnswer, staged.length);
 	writeAgentReply(deps, repo, channelId, agent, body, nextSeq);
 
 	// Agent-12a — persist the run's durable account: the loop transcript
@@ -719,7 +722,7 @@ async function runOneAgent(
 			repo,
 			channelId,
 			outcome.child,
-			outcome.answer || GENERATE_FAILED_REPLY,
+			channelAnswerBody(outcome.answer, outcome.staged.length),
 			rowSeq,
 			{ [DELEGATED_BY_PROPERTY_KEY]: agent.def.fingerprint },
 		);
@@ -741,6 +744,16 @@ async function runOneAgent(
 			[CHANNEL_PROPOSAL_PROPERTY_KEY]: buildProposalProperty(artifact, { channelId }),
 		});
 	}
+}
+
+/**
+ * The text of an agent's channel reply once its run finished. A run that
+ * reached a model and came back with nothing to say is NOT a provider failure,
+ * so it gets its own line — and when it staged drafts, a line that is true of
+ * the cards that follow rather than a claim of no answer.
+ */
+export function channelAnswerBody(finalAnswer: string, stagedCount: number): string {
+	return finalAnswer.trim() || (stagedCount > 0 ? DRAFTS_ONLY_REPLY : AGENT_NO_ANSWER_REPLY);
 }
 
 /** The card's plain-text body — what a surface that does not render the card

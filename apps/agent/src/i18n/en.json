@@ -177,6 +177,7 @@
   "error.quotaExhausted": "The Agent app has used up its 30-day AI budget. Raise or clear the budget in Settings → AI to keep chatting.",
   "error.generic": "Something went wrong generating a reply.",
   "provenance.via": "via {model}",
+  "reply.noAnswer": "I didn't have an answer for that. Try rephrasing.",
   "widget.label": "Agent",
   "widget.count.one": "{count} conversation",
   "widget.count.other": "{count} conversations",

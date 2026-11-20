@@ -39,6 +39,7 @@ import {
 	emptyProposalState,
 	intersectAgentTools,
 	proposalReducer,
+	resolveAgentAnswer,
 } from "@brainstorm-os/sdk-types";
 import {
 	AttachContextButton,
@@ -810,10 +811,14 @@ export function AgentApp(): ReactElement {
 				const citations = citationsFromProperty(e.properties.citations);
 				const attachments = parseAttachments(e.properties.attachments);
 				const richBody = str(e.properties.richBody);
+				const role = str(e.properties.role);
+				const body = str(e.properties.body);
 				return {
 					id: e.id,
-					role: str(e.properties.role),
-					body: str(e.properties.body),
+					role,
+					// A reply stored before the loop stopped passing envelopes through
+					// is re-read by the same rule, so it never shows as raw JSON.
+					body: role === MessageRole.Assistant ? resolveAgentAnswer(body) : body,
 					...(richBody ? { richBody } : {}),
 					createdAt: str(e.properties.createdAt),
 					...(typeof seq === "number" ? { seq } : {}),
@@ -1673,7 +1678,11 @@ export function AgentApp(): ReactElement {
 											<TurnTimeline items={m.timeline} onEscalate={allowEscalation} />
 										) : null}
 										<div className="agent__msg-body">
-											{m.role === MessageRole.Assistant ? (
+											{m.role === MessageRole.Assistant && m.body.trim().length === 0 ? (
+												<span className="agent__msg-no-answer" data-testid="agent-no-answer">
+													{t("reply.noAnswer")}
+												</span>
+											) : m.role === MessageRole.Assistant ? (
 												<Markdown
 													source={m.bodyMarkdown ?? m.body}
 													onEntityLink={(target) =>

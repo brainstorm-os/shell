@@ -15,7 +15,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CapabilityLedger, GrantedVia } from "@brainstorm-os/capabilities/ledger";
 import {
+	AGENT_EMPTY_ANSWER_NUDGE,
 	AGENT_INVOKER_PROPERTY_KEY,
+	AGENT_NO_ANSWER_REPLY,
 	AGENT_PROPOSAL_PREVIEW_PROPERTY_KEY,
 	AgentEventKind,
 	AgentRunOutcome,
@@ -26,6 +28,7 @@ import {
 	BUILTIN_AGENT_MENTION_REF,
 	BuiltinAgentUnavailableReason,
 	MessageRole,
+	PROPOSE_CLAIM_GUIDANCE,
 	SenderKind,
 	readAgentProvenance,
 } from "@brainstorm-os/sdk-types";
@@ -52,13 +55,14 @@ import {
 	CHANNEL_CONTEXT_CLOSE,
 	CHANNEL_CONTEXT_OPEN,
 	REQUEST_HEADING,
+	buildBuiltinInstructions,
 	maybeRunBuiltinAgent,
 	projectInvocation,
 	quoteUntrusted,
 	resolveBuiltinAgentMentionTarget,
 } from "./builtin-agent-runner";
 import { CHANNEL_PROPOSAL_PROPERTY_KEY, ChannelProposalStatus } from "./channel-proposals";
-import { grantString } from "./mention-runner";
+import { DRAFTS_ONLY_REPLY, grantString } from "./mention-runner";
 import { AgentTraceRecorder } from "./trace/agent-trace-recorder";
 import { AgentTraceRepository } from "./trace/agent-trace-repo";
 
@@ -86,6 +90,9 @@ function split(cap: string): { capability: string; scope: string | null } {
 }
 
 let channelSeq = 0;
+
+/** The owner-reported payload: a small local model answering nonsense. */
+const EMPTY_ENVELOPE = '{"final": {}, "citations": []}';
 
 describe("@agent in Chat (Agent-13)", () => {
 	let vaultDir: string;
@@ -393,6 +400,47 @@ describe("@agent in Chat (Agent-13)", () => {
 		aiThrows = true;
 		await maybeRunBuiltinAgent(deps, humanMessage("@Agent hello"), CHAT_APP);
 		expect(agentRows().map((r) => r.properties.body)).toEqual([BUILTIN_GENERATE_FAILED_REPLY]);
+	});
+
+	it("an empty envelope is retried once, and the real answer is what gets posted", async () => {
+		aiScript = [EMPTY_ENVELOPE, '{"final": "Could you say more about what you need?"}'];
+		await maybeRunBuiltinAgent(deps, humanMessage("@Agent asdasd"), CHAT_APP);
+		expect(aiEnvelopes).toHaveLength(2);
+		expect(promptOf(aiEnvelopes[1]).rest.at(-1)?.content).toBe(AGENT_EMPTY_ANSWER_NUDGE);
+		expect(agentRows().map((r) => r.properties.body)).toEqual([
+			"Could you say more about what you need?",
+		]);
+	});
+
+	it("a model with no answer twice posts the no-answer line — never the envelope, never a provider error", async () => {
+		aiScript = [EMPTY_ENVELOPE, EMPTY_ENVELOPE, '{"final": "too late"}'];
+		await maybeRunBuiltinAgent(deps, humanMessage("@Agent asdasd"), CHAT_APP);
+		expect(aiEnvelopes).toHaveLength(2);
+		expect(agentRows().map((r) => r.properties.body)).toEqual([AGENT_NO_ANSWER_REPLY]);
+	});
+
+	it("a reply claiming a draft with NO tool call leaves no card — the card is the staged state", async () => {
+		aiScript = ['{"final": "I have drafted a task to book the venue. Please review and approve."}'];
+		await maybeRunBuiltinAgent(deps, humanMessage("@Agent book the venue"), CHAT_APP);
+		expect(cards()).toHaveLength(0);
+		expect(agentRows()).toHaveLength(1);
+	});
+
+	it("drafts staged with no closing answer are introduced by a line that is true of them", async () => {
+		aiScript = [
+			'{"tool": "propose-task", "args": {"title": "Book the venue"}}',
+			EMPTY_ENVELOPE,
+			EMPTY_ENVELOPE,
+		];
+		await maybeRunBuiltinAgent(deps, humanMessage("@Agent book the venue"), CHAT_APP);
+		expect(cards()).toHaveLength(1);
+		expect(agentRows()[0]?.properties.body).toBe(DRAFTS_ONLY_REPLY);
+	});
+
+	it("a propose-capable run is told a draft exists only when the tool was called", async () => {
+		await maybeRunBuiltinAgent(deps, humanMessage("@Agent book the venue"), CHAT_APP);
+		expect(promptOf(aiEnvelopes[0]).system.join("\n")).toContain(PROPOSE_CLAIM_GUIDANCE);
+		expect(buildBuiltinInstructions("Ada", false)).not.toContain(PROPOSE_CLAIM_GUIDANCE);
 	});
 
 	it("the Agent app without Message write posts NOTHING — its own ceiling holds", async () => {

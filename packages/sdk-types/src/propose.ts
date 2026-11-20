@@ -285,12 +285,15 @@ export function buildProposalAck(result: BuildProposalResult): Record<string, un
 	};
 }
 
+/** The no-false-claim rule. A draft exists only because the tool was called, so
+ *  a reply that announces one without the call describes something that did not
+ *  happen — and no host can tell from the wording. */
+export const PROPOSE_CLAIM_GUIDANCE =
+	"A draft exists ONLY if you called its propose-* tool in this turn: saying you drafted, created, or proposed something without calling the tool is an error. If you call no tool, say plainly that nothing was created.";
+
 /** System-prompt guidance appended when propose tools are offered, so the model
  *  understands the create tools only STAGE drafts for the user's approval. */
-export const PROPOSE_TOOL_GUIDANCE =
-	"When you use a propose-* tool you are DRAFTING an item for the user to review, not saving it. " +
-	"Never say you have created, saved, or added something — say you have proposed it and ask the user to approve. " +
-	"Propose only what the user actually asked for.";
+export const PROPOSE_TOOL_GUIDANCE = `When you use a propose-* tool you are DRAFTING an item for the user to review, not saving it. Never say you have created, saved, or added something — say you have proposed it and ask the user to approve. ${PROPOSE_CLAIM_GUIDANCE} Propose only what the user actually asked for.`;
 
 /** The pending-proposal buffer the host holds for a conversation turn. */
 export type ProposalState = { pending: readonly ProposedArtifact[] };

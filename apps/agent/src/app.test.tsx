@@ -290,6 +290,76 @@ describe("AgentApp stored transcript rendering (F-319)", () => {
 	});
 });
 
+describe("AgentApp — a reply with no answer", () => {
+	function installWithAssistantBody(body: string): void {
+		const snapshot = {
+			entities: [
+				{
+					id: "conv_1",
+					type: "brainstorm/Conversation/v1",
+					properties: { title: "asdasd" },
+					createdAt: 1,
+					updatedAt: 1,
+					deletedAt: null,
+					ownerAppId: "io.brainstorm.agent",
+				},
+				{
+					id: "msg_1",
+					type: "brainstorm/Message/v1",
+					properties: {
+						conversation: "conv_1",
+						role: "assistant",
+						body,
+						aiProvenance: { provider: "ollama", model: "llama3.2", generatedAt: "t" },
+						createdAt: "2026-06-30T00:00:00.000Z",
+						seq: 1,
+					},
+					createdAt: 2,
+					updatedAt: 2,
+					deletedAt: null,
+					ownerAppId: "io.brainstorm.agent",
+				},
+			],
+			links: [],
+		};
+		window.brainstorm = {
+			capabilities: ["entities.read:*"],
+			services: {
+				vaultEntities: {
+					list: async () => snapshot,
+					onChange: () => ({ unsubscribe: () => undefined }),
+				},
+				intents: { dispatch: vi.fn(async () => ({ handled: true })) },
+			},
+		} as unknown as typeof window.brainstorm;
+	}
+
+	it.each([
+		["the stored empty envelope from the report", '{"final": {}, "citations": []}'],
+		["an empty body", ""],
+	])("%s renders the fallback line with no save actions", async (_label, stored) => {
+		installWithAssistantBody(stored);
+		handle = await renderInto(<AgentApp />);
+		await flush();
+		await flush();
+		const message = handle.container.querySelector(".agent__msg--assistant");
+		const body = message?.querySelector(".agent__msg-body");
+		expect(body?.textContent).toBe("I didn't have an answer for that. Try rephrasing.");
+		expect(body?.textContent).not.toContain("final");
+		expect(message?.querySelector(".agent__msg-actions")).toBeNull();
+	});
+
+	it("a real answer still carries its actions", async () => {
+		installWithAssistantBody("Here is the plan.");
+		handle = await renderInto(<AgentApp />);
+		await flush();
+		await flush();
+		const message = handle.container.querySelector(".agent__msg--assistant");
+		expect(message?.querySelector('[data-testid="agent-no-answer"]')).toBeNull();
+		expect(message?.querySelector(".agent__msg-actions")).not.toBeNull();
+	});
+});
+
 describe("AgentApp created-object back-links (Agent-11c)", () => {
 	function installWithCreatedObject(): { dispatch: ReturnType<typeof vi.fn> } {
 		const dispatch = vi.fn((_envelope: unknown) => Promise.resolve(null));

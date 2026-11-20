@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	AGENT_EMPTY_ANSWER_NUDGE,
 	AGENT_LOOP_MAX_ITERATIONS_CEILING,
 	type AgentLoopPorts,
 	AgentStopReason,
@@ -8,6 +9,7 @@ import {
 	buildAgentSystemPrompt,
 	intersectAgentTools,
 	parseAgentReply,
+	resolveAgentAnswer,
 	runAgentLoop,
 } from "./agent-loop";
 import type { AgentTool } from "./automations";
@@ -145,6 +147,79 @@ describe("parseAgentReply", () => {
 	});
 });
 
+/** The owner-reported payload: llama3.2 answering a nonsense message. */
+const SCREENSHOT_PAYLOAD = '{"final": {}, "citations": []}';
+
+describe("envelope shapes — the answer is never the raw envelope", () => {
+	const cases: ReadonlyArray<readonly [label: string, content: string, answer: string]> = [
+		["a string final", '{"final":"hi","citations":[]}', "hi"],
+		["the screenshot payload (final is an empty object)", SCREENSHOT_PAYLOAD, ""],
+		["final object with a text field", '{"final":{"text":"from text"}}', "from text"],
+		["final object with a content field", '{"final":{"content":"from content"}}', "from content"],
+		["final object with a message field", '{"final":{"message":"from message"}}', "from message"],
+		["final object with an answer field", '{"final":{"answer":"from answer"}}', "from answer"],
+		["final object with no text field", '{"final":{"status":"ok","n":1}}', ""],
+		["final object whose text field is blank", '{"final":{"text":"   "}}', ""],
+		["final array of strings", '{"final":["one","two"]}', "one\ntwo"],
+		["final array of text objects", '{"final":[{"text":"one"},{"nope":1}]}', "one"],
+		["final empty array", '{"final":[]}', ""],
+		["final null", '{"final":null}', ""],
+		["final boolean", '{"final":true}', ""],
+		["final number", '{"final":42}', "42"],
+		["whitespace-only final", '{"final":"  \\n "}', ""],
+		[
+			"a final with a raw newline in the string",
+			'{"final":"line one\nline two"}',
+			"line one\nline two",
+		],
+		["a blank final with a raw newline in the string", '{"final":" \n "}', ""],
+		["an envelope with citations but no final", '{"citations":["n1"]}', ""],
+		["an envelope with an unusable tool", '{"tool":5,"args":{}}', ""],
+		["a bare empty object", "{}", ""],
+		["a fenced bare empty object", "```json\n{}\n```", ""],
+		["a fenced empty envelope", '```json\n{"final": {}, "citations": []}\n```', ""],
+		["an empty envelope wrapped in prose", 'Here you go:\n{"final": {}}', ""],
+		["a string final wrapped in prose", 'Sure!\n```json\n{"final":"hi"}\n```', "hi"],
+		["an empty reply", "", ""],
+		["a whitespace-only reply", " \n\t ", ""],
+		["plain prose", "The answer is 42.", "The answer is 42."],
+		[
+			"prose that mentions an empty object",
+			"Use {} for an empty object.",
+			"Use {} for an empty object.",
+		],
+		["a non-envelope JSON object", '{"name":"Ada","age":36}', '{"name":"Ada","age":36}'],
+		[
+			"a final cut off mid-string",
+			'{"final": "The plan has \\"two\\" parts',
+			'The plan has "two" parts',
+		],
+		["a fenced final cut off mid-string", '```json\n{"final": "half an ans', "half an ans"],
+		["a final cut off before its string", '{"final": ', ""],
+		["cut-off JSON that is not an envelope", '{"name": "Ada', '{"name": "Ada'],
+	];
+
+	it.each(cases)("%s", (_label, content, answer) => {
+		const resolved = resolveAgentAnswer(content);
+		expect(resolved).toBe(answer);
+		// The invariant behind the bug: an envelope never reaches the user.
+		expect(resolved).not.toContain('"final"');
+		expect(resolved).not.toContain('"citations"');
+	});
+
+	it("a tool call is not an answer", () => {
+		expect(resolveAgentAnswer('{"tool":"search","args":{}}')).toBe("");
+	});
+
+	it("keeps the citations of an envelope whose final is an object", () => {
+		expect(parseAgentReply('{"final":{"text":"hi"},"citations":["n1",2]}')).toEqual({
+			kind: "final",
+			answer: "hi",
+			citations: ["n1"],
+		});
+	});
+});
+
 describe("buildAgentSystemPrompt", () => {
 	it("lists offered tools and the JSON protocol", () => {
 		const prompt = buildAgentSystemPrompt("Do the thing.", [searchTool, noteTool]);
@@ -259,5 +334,63 @@ describe("runAgentLoop", () => {
 		const err = result.steps.find((s) => s.kind === "tool-error");
 		expect(err).toMatchObject({ kind: "tool-error", tool: "search", error: "boom" });
 		expect(result.finalAnswer).toBe("recovered");
+	});
+
+	describe("empty answer recovery", () => {
+		const nudges = (messages: readonly AiChatMessage[]): number =>
+			messages.filter((m) => messageText(m.content) === AGENT_EMPTY_ANSWER_NUDGE).length;
+
+		it("retries once when the model returns the empty envelope, then answers", async () => {
+			const ports = scriptedPorts([SCREENSHOT_PAYLOAD, '{"final":"I am not sure what you mean."}']);
+			const result = await runAgentLoop(ports, config());
+			expect(result.stopReason).toBe(AgentStopReason.Final);
+			expect(result.finalAnswer).toBe("I am not sure what you mean.");
+			expect(result.iterations).toBe(2);
+			// The retry told the model its last message had no answer.
+			const second = ports.seen[1] ?? [];
+			expect(second.at(-1)).toEqual({ role: MessageRole.User, content: AGENT_EMPTY_ANSWER_NUDGE });
+			expect(second.at(-2)).toEqual({ role: MessageRole.Assistant, content: SCREENSHOT_PAYLOAD });
+		});
+
+		it("gives up after ONE retry with an empty answer — never the raw envelope", async () => {
+			const ports = scriptedPorts([SCREENSHOT_PAYLOAD, SCREENSHOT_PAYLOAD, '{"final":"too late"}']);
+			const result = await runAgentLoop(ports, config());
+			expect(result.stopReason).toBe(AgentStopReason.Final);
+			expect(result.finalAnswer).toBe("");
+			expect(result.iterations).toBe(2);
+			expect(ports.seen).toHaveLength(2);
+			expect(nudges(ports.seen[1] ?? [])).toBe(1);
+			// The raw output stays on the record for the trace.
+			expect(result.steps).toEqual([
+				{ kind: "assistant", content: SCREENSHOT_PAYLOAD },
+				{ kind: "assistant", content: SCREENSHOT_PAYLOAD },
+			]);
+		});
+
+		it("still retries when the run was bounded to a single iteration", async () => {
+			const ports = scriptedPorts(["", '{"final":"hello"}']);
+			const result = await runAgentLoop(ports, config({ tools: [], maxIterations: 1 }));
+			expect(result.finalAnswer).toBe("hello");
+			expect(result.iterations).toBe(2);
+		});
+
+		it("the single retry is spent once, across the whole run", async () => {
+			const ports = scriptedPorts([
+				SCREENSHOT_PAYLOAD,
+				'{"tool":"search","args":{}}',
+				SCREENSHOT_PAYLOAD,
+				'{"final":"never asked"}',
+			]);
+			const result = await runAgentLoop(ports, config());
+			expect(result.finalAnswer).toBe("");
+			expect(result.iterations).toBe(3);
+		});
+
+		it("an iteration ceiling reached on a tool call reports no answer, not the tool JSON", async () => {
+			const ports = scriptedPorts(['{"tool":"search","args":{}}']);
+			const result = await runAgentLoop(ports, config({ maxIterations: 2 }));
+			expect(result.stopReason).toBe(AgentStopReason.MaxIterations);
+			expect(result.finalAnswer).toBe("");
+		});
 	});
 });

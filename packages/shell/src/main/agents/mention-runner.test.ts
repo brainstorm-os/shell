@@ -13,10 +13,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import {
+	AGENT_NO_ANSWER_REPLY,
 	AgentEventKind,
 	AgentRunOutcome,
 	AgentRunSurface,
 	MessageRole,
+	PROPOSE_CLAIM_GUIDANCE,
 	ProposeKind,
 	SenderKind,
 	readAgentProvenance,
@@ -263,6 +265,22 @@ describe("mention-runner (Agent-Teams-3)", () => {
 		await maybeRunMentionedAgents(deps, created, CHAT_APP);
 		expect(aiEnvelopes).toHaveLength(0);
 		expect(channelReplies()).toHaveLength(0);
+	});
+
+	it("a model with no answer gets one retry, then the no-answer line — never its envelope", async () => {
+		await grantAgentCapability(session, agent.def.fingerprint, "ai.use");
+		aiReply = async () => ({ content: '{"final": {}, "citations": []}' });
+		const created = humanMessage("@Researcher asdasd", [agent.def.pubkey]);
+		await maybeRunMentionedAgents(deps, created, CHAT_APP);
+		expect(aiEnvelopes).toHaveLength(2);
+		const replies = channelReplies();
+		expect(replies).toHaveLength(1);
+		expect(replies[0]?.body).toBe(AGENT_NO_ANSWER_REPLY);
+	});
+
+	it("a propose-capable agent is told a draft exists only when the tool was called", () => {
+		expect(buildChannelInstructions("Researcher", "", true)).toContain(PROPOSE_CLAIM_GUIDANCE);
+		expect(buildChannelInstructions("Researcher", "", false)).not.toContain(PROPOSE_CLAIM_GUIDANCE);
 	});
 
 	it("a generate failure posts the honest failure reply, never silence", async () => {

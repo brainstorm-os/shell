@@ -22,7 +22,10 @@
  * The loop parses that JSON, dispatches a tool call (cap-checked), feeds the
  * result back as a `tool`-role message, and repeats to a bounded iteration cap.
  * A non-JSON / unparseable reply is treated as the final answer (the model
- * chose to talk, not act) so the loop always terminates. This is additive: when
+ * chose to talk, not act) so the loop always terminates. The envelope itself is
+ * never the answer: {@link resolveAgentAnswer} is the ONE place a reply becomes
+ * user-facing text, and a reply with nothing to say gets one bounded retry
+ * before the loop reports an empty `finalAnswer`. This is additive: when
  * a native tool-calling channel lands it can replace the parser without changing
  * the loop's control flow or the security model below.
  *
@@ -46,6 +49,16 @@ export const AGENT_LOOP_MAX_ITERATIONS_CEILING = 12;
 
 /** The default iteration bound when a caller pins none. */
 export const AGENT_LOOP_DEFAULT_MAX_ITERATIONS = 6;
+
+/** The host-authored turn appended when a reply carried no answer — the one
+ *  bounded retry. Model-facing prompt text. */
+export const AGENT_EMPTY_ANSWER_NUDGE =
+	'Your last message contained no answer. Reply again with {"final": "<your answer in plain words>"}. If you cannot help with the request, say so plainly in that answer.';
+
+/** What a channel surface posts when a run ends with no answer. Chat CONTENT
+ *  (vault data) written by the shell-hosted runners, so a plain string; the
+ *  Agent app renders its own localised line instead. */
+export const AGENT_NO_ANSWER_REPLY = "I didn't have an answer for that. Try rephrasing.";
 
 /** Why an agent loop stopped — drives provenance + the caller's UI. */
 export enum AgentStopReason {
@@ -81,7 +94,10 @@ export type AgentLoopStep =
 
 export type AgentLoopResult = {
 	stopReason: AgentStopReason;
-	/** The model's final answer text (empty on a generate failure). */
+	/** The model's final answer text. EMPTY on a generate failure, at the
+	 *  iteration ceiling, and when the model had no answer even after the one
+	 *  retry — a host shows its own fallback then, never the raw reply (that
+	 *  stays in `steps`). */
 	finalAnswer: string;
 	/** Vault entities the final answer cited (`brainstorm://` ids), if any. */
 	citations: string[];
@@ -207,18 +223,108 @@ function extractJsonObject(text: string): string | null {
 	return null;
 }
 
+/** The fields a model reaches for when it nests its answer in an object. */
+const ANSWER_TEXT_FIELDS = ["text", "content", "message", "answer"] as const;
+
+/** Coerce a `final` value to answer text. Only a string is the answer as
+ *  given; a structured value is never stringified at the user — it yields its
+ *  obvious text field, or nothing. */
+function finalText(value: unknown): string {
+	if (typeof value === "string") return value;
+	if (typeof value === "number" && Number.isFinite(value)) return String(value);
+	if (Array.isArray(value)) {
+		return value
+			.map((item) => finalText(item).trim())
+			.filter((text) => text.length > 0)
+			.join("\n");
+	}
+	if (value && typeof value === "object") {
+		const obj = value as Record<string, unknown>;
+		for (const field of ANSWER_TEXT_FIELDS) {
+			const text = obj[field];
+			if (typeof text === "string" && text.trim().length > 0) return text;
+		}
+	}
+	return "";
+}
+
+/** The keys that mark an object as the protocol envelope rather than JSON the
+ *  model wrote as its answer. */
+const ENVELOPE_KEYS = ["final", "citations", "tool", "args"] as const;
+
+/** Is `json` the whole reply, give or take a code fence? */
+function isWholeReply(content: string, json: string): boolean {
+	const unfenced = content
+		.trim()
+		.replace(/^```[a-zA-Z]*\s*/, "")
+		.replace(/\s*```$/, "");
+	return unfenced.trim() === json;
+}
+
+const RAW_CONTROL_ESCAPES: Readonly<Record<string, string>> = {
+	"\n": "\\n",
+	"\r": "\\r",
+	"\t": "\\t",
+};
+
+/** Escape the raw line breaks and tabs small models leave inside JSON
+ *  strings, which `JSON.parse` rejects. Text outside a string is untouched. */
+function escapeRawControlChars(json: string): string {
+	let out = "";
+	let inString = false;
+	let escaped = false;
+	for (const ch of json) {
+		if (inString) {
+			if (escaped) escaped = false;
+			else if (ch === "\\") escaped = true;
+			else if (ch === '"') inString = false;
+			out += RAW_CONTROL_ESCAPES[ch] ?? ch;
+			continue;
+		}
+		if (ch === '"') inString = true;
+		out += ch;
+	}
+	return out;
+}
+
+function parseJsonObject(json: string): unknown {
+	try {
+		return JSON.parse(json);
+	} catch {
+		try {
+			return JSON.parse(escapeRawControlChars(json));
+		} catch {
+			return undefined;
+		}
+	}
+}
+
+/** A reply that opens a final envelope and is cut off before it closes (the
+ *  provider's token limit). Captures whatever of the answer string arrived. */
+const TRUNCATED_FINAL = /^(?:```[a-zA-Z]*\s*)?\{\s*"final"\s*:\s*(?:"((?:[^"\\]|\\[\s\S])*))?/;
+
+/** Salvage the answer from a cut-off final envelope; null when the reply is
+ *  not one. */
+function truncatedFinal(content: string): string | null {
+	const match = TRUNCATED_FINAL.exec(content.trim());
+	if (!match) return null;
+	const partial = (match[1] ?? "").replace(/\\$/, "");
+	const decoded = parseJsonObject(`{"v":"${partial}"}`) as { v?: unknown } | undefined;
+	return typeof decoded?.v === "string" ? decoded.v : partial;
+}
+
 /** Parse a model reply into a tool call or a final answer. A reply that is not
  *  the JSON protocol is `null` → the loop treats it as a plain final answer
- *  (the model talked instead of acting), guaranteeing termination. */
+ *  (the model talked instead of acting), guaranteeing termination. An envelope
+ *  with no usable `final` is a final with an EMPTY answer — never `null`, which
+ *  would hand the raw envelope to the user as prose. */
 export function parseAgentReply(content: string): ParsedReply {
 	const json = extractJsonObject(content);
-	if (!json) return null;
-	let value: unknown;
-	try {
-		value = JSON.parse(json);
-	} catch {
-		return null;
+	if (!json) {
+		const answer = truncatedFinal(content);
+		return answer === null ? null : { kind: "final", answer, citations: [] };
 	}
+	const value = parseJsonObject(json);
 	if (!value || typeof value !== "object" || Array.isArray(value)) return null;
 	const obj = value as Record<string, unknown>;
 	if (typeof obj.tool === "string" && obj.tool.length > 0) {
@@ -228,13 +334,26 @@ export function parseAgentReply(content: string): ParsedReply {
 				: {};
 		return { kind: "tool", call: { tool: obj.tool, args } };
 	}
-	if (typeof obj.final === "string") {
-		const citations = Array.isArray(obj.citations)
-			? obj.citations.filter((c): c is string => typeof c === "string")
-			: [];
-		return { kind: "final", answer: obj.final, citations };
-	}
-	return null;
+	const isEnvelope =
+		ENVELOPE_KEYS.some((key) => key in obj) ||
+		(Object.keys(obj).length === 0 && isWholeReply(content, json));
+	if (!isEnvelope) return null;
+	const citations = Array.isArray(obj.citations)
+		? obj.citations.filter((c): c is string => typeof c === "string")
+		: [];
+	return { kind: "final", answer: finalText(obj.final), citations };
+}
+
+/**
+ * THE one place a model reply becomes user-facing answer text — the loop uses
+ * it for every final, and a host uses it to re-read a stored reply. A final
+ * envelope yields its answer, prose yields itself, and a tool call, an empty
+ * envelope or a blank reply yields `""`: the envelope is never the answer.
+ */
+export function resolveAgentAnswer(content: string): string {
+	const parsed = parseAgentReply(content);
+	const answer = parsed === null ? content : parsed.kind === "final" ? parsed.answer : "";
+	return answer.trim().length === 0 ? "" : answer;
 }
 
 function clampIterations(requested: number | undefined): number {
@@ -249,8 +368,10 @@ function clampIterations(requested: number | undefined): number {
  *   2. seed the transcript (system manifest + instruction + prior turns);
  *   3. generate → parse → if a tool call, RE-CHECK it against the offered set
  *      and frozen caps (refuse otherwise), dispatch, feed the result back;
- *      if a final answer (or a non-protocol reply), stop;
- *   4. stop at `maxIterations` regardless.
+ *      if a final answer (or a non-protocol reply), stop — unless it says
+ *      nothing, which earns ONE retry per run ({@link AGENT_EMPTY_ANSWER_NUDGE});
+ *      a second empty reply ends the run with an empty `finalAnswer`;
+ *   4. stop at `maxIterations` regardless (the retry may add one generate).
  * Never throws on a tool failure (recorded + fed back so the model can react);
  * a `generate` throw stops the loop with `GenerateFailed`.
  */
@@ -274,8 +395,10 @@ export async function runAgentLoop(
 	const steps: AgentLoopStep[] = [];
 	let provenance: AiProvenance | undefined;
 	let iterations = 0;
+	let budget = maxIterations;
+	let retriedEmptyAnswer = false;
 
-	while (iterations < maxIterations) {
+	while (iterations < budget) {
 		iterations++;
 		let reply: { content: string; provenance?: AiProvenance };
 		try {
@@ -299,9 +422,18 @@ export async function runAgentLoop(
 
 		// A final answer, or a reply that isn't the tool protocol → done.
 		if (!parsed || parsed.kind === "final") {
+			const finalAnswer = resolveAgentAnswer(reply.content);
+			if (finalAnswer === "" && !retriedEmptyAnswer) {
+				// Capped at one so a stubborn model cannot loop; a run bounded to a
+				// single iteration still gets it.
+				retriedEmptyAnswer = true;
+				budget = Math.max(budget, iterations + 1);
+				messages.push({ role: MessageRole.User, content: AGENT_EMPTY_ANSWER_NUDGE });
+				continue;
+			}
 			return {
 				stopReason: AgentStopReason.Final,
-				finalAnswer: parsed ? parsed.answer : reply.content,
+				finalAnswer,
 				citations: parsed ? parsed.citations : [],
 				iterations,
 				steps,
@@ -343,9 +475,11 @@ export async function runAgentLoop(
 		}
 	}
 
+	// The ceiling is only ever reached on a tool call, and a tool call is not an
+	// answer.
 	return {
 		stopReason: AgentStopReason.MaxIterations,
-		finalAnswer: lastAssistantText(steps),
+		finalAnswer: "",
 		citations: [],
 		iterations,
 		steps,
@@ -363,14 +497,4 @@ function refusalText(reason: ToolRefusalReason): string {
 	return reason === ToolRefusalReason.UnknownTool
 		? "refused: no such tool is available"
 		: "refused: not permitted by this workflow's capabilities";
-}
-
-/** The last assistant text seen — the best-effort answer when the loop hits its
- *  iteration ceiling without a final reply. */
-function lastAssistantText(steps: readonly AgentLoopStep[]): string {
-	for (let i = steps.length - 1; i >= 0; i--) {
-		const step = steps[i];
-		if (step?.kind === "assistant") return step.content;
-	}
-	return "";
 }

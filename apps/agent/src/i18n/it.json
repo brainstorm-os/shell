@@ -103,6 +103,7 @@
   "error.quotaExhausted": "L'app Agent ha esaurito il suo budget di IA di 30 giorni. Aumenta o azzera il budget in Impostazioni → IA per continuare a chattare.",
   "error.generic": "Qualcosa è andato storto durante la generazione di una risposta.",
   "provenance.via": "tramite {model}",
+  "reply.noAnswer": "Non avevo una risposta. Prova a riformulare.",
   "widget.label": "Agent",
   "widget.count.one": "{count} conversazione",
   "widget.count.other": "{count} conversazioni",

@@ -79,6 +79,7 @@ import {
 	MENTION_PROPOSALS_MAX,
 	MENTION_TRANSCRIPT_CHARS_MAX,
 	boundContext,
+	channelAnswerBody,
 	escapeChannelBody,
 	grantString,
 	proposalMessageBody,
@@ -483,7 +484,7 @@ async function runBuiltinAgent(
 	const failed = result.stopReason === AgentStopReason.GenerateFailed;
 	const body = failed
 		? BUILTIN_GENERATE_FAILED_REPLY
-		: result.finalAnswer.trim() || BUILTIN_GENERATE_FAILED_REPLY;
+		: channelAnswerBody(result.finalAnswer, staged.length);
 	if (!(await postOrRefuse(body))) return;
 
 	// Each draft is its own card message. The reserved property is the approval

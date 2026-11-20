@@ -12,9 +12,17 @@ import {
 	type Intent,
 	type IntentResult,
 	MessageRole,
+	PROPOSE_CLAIM_GUIDANCE,
+	messageText,
 } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
-import { makeDispatchTool, makeGenerate, runAgentTurn, usedToolNames } from "../src/logic/turn";
+import {
+	AGENT_TOOL_SYSTEM_PROMPT,
+	makeDispatchTool,
+	makeGenerate,
+	runAgentTurn,
+	usedToolNames,
+} from "../src/logic/turn";
 
 const openTool: AgentTool = { verb: "open", label: "Open an object" };
 
@@ -96,6 +104,41 @@ describe("makeDispatchTool (security mapping)", () => {
 });
 
 describe("runAgentTurn", () => {
+	/** The owner-reported payload: llama3.2 answering "asdasd". */
+	const EMPTY_ENVELOPE = '{"final": {}, "citations": []}';
+	const nonsenseTurn = {
+		tools: [openTool],
+		frozenCapabilities: ["intents.dispatch:open"],
+		transcript: [{ role: MessageRole.User, content: "asdasd" }],
+	};
+
+	it("an empty envelope is retried once and the real answer is the turn's reply", async () => {
+		const ai = fakeAi([EMPTY_ENVELOPE, '{"final":"I am not sure what you mean."}']);
+		const result = await runAgentTurn({ ai, intents: fakeIntents() }, nonsenseTurn);
+		expect(result.finalAnswer).toBe("I am not sure what you mean.");
+		expect(ai.calls).toHaveLength(2);
+	});
+
+	it("an empty envelope twice ends the turn with NO answer — the raw JSON stays in the steps", async () => {
+		const ai = fakeAi([EMPTY_ENVELOPE, EMPTY_ENVELOPE, '{"final":"too late"}']);
+		const result = await runAgentTurn({ ai, intents: fakeIntents() }, nonsenseTurn);
+		expect(result.finalAnswer).toBe("");
+		expect(ai.calls).toHaveLength(2);
+		expect(result.steps).toEqual([
+			{ kind: "assistant", content: EMPTY_ENVELOPE },
+			{ kind: "assistant", content: EMPTY_ENVELOPE },
+		]);
+	});
+
+	it("tells the model a draft exists only when its propose tool was called", async () => {
+		expect(AGENT_TOOL_SYSTEM_PROMPT).toContain(PROPOSE_CLAIM_GUIDANCE);
+		const ai = fakeAi(['{"final":"ok"}']);
+		await runAgentTurn({ ai, intents: fakeIntents() }, nonsenseTurn);
+		const system = ai.calls[0]?.messages[0];
+		expect(system?.role).toBe(MessageRole.System);
+		expect(messageText(system?.content ?? "")).toContain(PROPOSE_CLAIM_GUIDANCE);
+	});
+
 	it("runs a tool call then a final answer; surfaces the used tool", async () => {
 		const ai = fakeAi([
 			'{"tool":"open","args":{"entityId":"ent_42"}}',
