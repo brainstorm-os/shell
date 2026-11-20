@@ -400,6 +400,7 @@ import {
 	getPresenceRouter,
 	installPresenceRouter,
 } from "./sync/presence-wiring";
+import { makeRemoteDocApplier } from "./sync/remote-doc-applier";
 import { RestoreEngine } from "./sync/restore-engine";
 import { getRestoreEngine, setRestoreEngine } from "./sync/restore-wiring";
 import { SelectiveSyncStore, selectiveSyncPolicyPath } from "./sync/selective-sync-store";
@@ -4130,10 +4131,15 @@ void app.whenReady().then(async () => {
 							doc.destroy();
 						}
 					},
-					applyRemoteUpdate: async (entityId, _type, update, sender) => {
-						await applyRemoteDocFn?.(entityId, Buffer.from(update).toString("base64"));
-						if (sender) historyBinding.current()?.noteWrite(entityId, [memberPrincipal(sender)]);
-					},
+					applyRemoteUpdate: makeRemoteDocApplier({
+						apply: () => applyRemoteDocFn,
+						noteSender: (entityId, sender) =>
+							historyBinding.current()?.noteWrite(entityId, [memberPrincipal(sender)]),
+						onApplied: () => {
+							broadcastVaultEntitiesStaleSignal(launchSetup.getLauncherSync()?.allWindows() ?? []);
+							scheduleSearchReindex();
+						},
+					}),
 					// PRES-2b — a decrypted remote AWARENESS frame (cursors / "who's
 					// here") for a tracked entity. Route it into this session's presence
 					// router, which merges it into the proxy awareness and pushes the

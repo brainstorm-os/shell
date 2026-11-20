@@ -47,6 +47,7 @@ import { EntitiesRepository, ShareInvitesRepository } from "../storage/entities-
 import { decodeFrame } from "../sync/envelope-codec";
 import { LiveSyncEngine } from "../sync/live-sync-engine";
 import type { RelayPort, RelaySurface } from "../sync/relay-port";
+import { makeRemoteDocApplier } from "../sync/remote-doc-applier";
 import { WireKind } from "../sync/routing-header";
 import { VaultSession } from "../vault/session";
 
@@ -128,6 +129,8 @@ async function makePeer(name: string, relay: ChannelRelay) {
 	const repo = new EntitiesRepository(entitiesDb);
 	const shareInvites = new ShareInvitesRepository(entitiesDb);
 	const refusals: string[] = [];
+	/** Entity ids this shell told its app windows to re-list for. */
+	const repaints: string[] = [];
 
 	let applyRemoteDoc: ApplyRemoteDocFn | null = null;
 	const changes = new EntityChangeEmitter();
@@ -210,9 +213,10 @@ async function makePeer(name: string, relay: ChannelRelay) {
 				doc.destroy();
 			}
 		},
-		applyRemoteUpdate: async (entityId, _type, update) => {
-			await applyRemoteDoc?.(entityId, Buffer.from(update).toString("base64"));
-		},
+		applyRemoteUpdate: makeRemoteDocApplier({
+			apply: () => applyRemoteDoc,
+			onApplied: (entityId) => repaints.push(entityId),
+		}),
 		installWrap: async (wrap, entityId, senderPubB64) => {
 			const senderKey = base64UrlToBytes(senderPubB64);
 			if (senderKey.length !== ED25519_PUBLIC_BYTES) return null;
@@ -289,6 +293,7 @@ async function makePeer(name: string, relay: ChannelRelay) {
 		live: liveEngine,
 		repo,
 		refusals,
+		repaints,
 		cascadeErrors,
 		pub: session.identity.publicKeyBase64,
 		/** Create an entity the way an app does. */
@@ -300,7 +305,20 @@ async function makePeer(name: string, relay: ChannelRelay) {
 		post: async (channelId: string, body: string): Promise<string> => {
 			const reply = (await call("create", {
 				type: MESSAGE_TYPE_URL,
-				properties: { conversation: channelId, body },
+				// The shape `apps/chat` `buildMessageProperties` writes, for an author
+				// who has set no display name.
+				properties: {
+					conversation: channelId,
+					sender: {
+						kind: "participant",
+						personRef: session.identity.publicKeyBase64,
+						displayName: "",
+					},
+					role: "user",
+					body,
+					createdAt: new Date().toISOString(),
+					seq: idSeq,
+				},
 			})) as { id?: string } | null;
 			return reply?.id ?? "";
 		},
@@ -389,6 +407,10 @@ describe("a shared chat channel carries every member's messages to every other m
 
 		expect(marcus.bodyOf(message)).toBe("kickoff at ten");
 		expect(marcus.refusals).toEqual([]);
+		// Landing in the index is not arriving: an open channel only repaints when
+		// the shell says an entity changed, and a remote apply bypasses the broker
+		// wrapper that normally says so.
+		expect(marcus.repaints).toContain(message);
 	});
 
 	// The two-shell dogfood specs build their channel through the dev bridge's
