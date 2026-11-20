@@ -488,4 +488,15 @@ export const ENTITIES_MIGRATIONS: SqliteMigration[] = [
 			`);
 		},
 	},
+	{
+		version: 16,
+		description: "entities.db v16 — access_statements.signer (bounded per-signer statement memory)",
+		up: (db) => {
+			// Who signed each remembered statement, so the memory can be bounded
+			// PER SIGNER: one member must not be able to fill it and crowd out the
+			// root's revokes. Rows written before this carry '' and count against
+			// nobody's quota.
+			db.exec("ALTER TABLE access_statements ADD COLUMN signer TEXT NOT NULL DEFAULT ''");
+		},
+	},
 ];

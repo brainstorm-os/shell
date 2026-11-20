@@ -316,6 +316,48 @@ function macEquals(a: string, b: string): boolean {
 }
 
 /**
+ * Does `anchor` carry the MAC only a holder of OUR invite secret could have
+ * computed for this `(entity, member, granter)`? Pure: nothing is read from or
+ * written to the invite ledger, and expiry is not considered - this answers
+ * "did the party we handed an invite to make this grant", for a device that is
+ * working out, after the fact, who invited it to an entity it already holds.
+ */
+export function verifyInviteAnchor(input: {
+	anchor: unknown;
+	entityId: string;
+	memberPubB64: string;
+	ownerPubB64: string;
+	deriveSecret: DeriveInviteSecretFn;
+}): boolean {
+	const parsed = parseInviteAnchor(input.anchor);
+	if (!parsed) return false;
+	if (![input.entityId, input.memberPubB64, input.ownerPubB64].every(withinBounds)) return false;
+	const nonce = nonceForInviteId(parsed.inviteId);
+	if (!nonce) return false;
+	let secret: Uint8Array;
+	try {
+		secret = input.deriveSecret(nonce, parsed.expiresAt);
+	} catch {
+		return false;
+	}
+	try {
+		const expected = parseInviteAnchor(
+			computeInviteAnchor({
+				secret,
+				inviteId: parsed.inviteId,
+				expiresAt: parsed.expiresAt,
+				entityId: input.entityId,
+				memberPubB64: input.memberPubB64,
+				ownerPubB64: input.ownerPubB64,
+			}),
+		);
+		return expected !== null && macEquals(expected.macB64, parsed.macB64);
+	} finally {
+		secret.fill(0);
+	}
+}
+
+/**
  * Verify an anchor carried by a grant and, if it holds, spend the invite.
  *
  * Verification is PURELY cryptographic: the secret is re-derived from the anchor's

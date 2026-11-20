@@ -24,13 +24,26 @@
  * writing CONTENT at all.
  */
 
+import * as Y from "yjs";
 import { base64ToBytes } from "../credentials/crypto";
 import { ED25519_PUBLIC_BYTES } from "../credentials/identity";
 import type { EntityDekStore } from "../entities/entity-dek-store";
 import { base64UrlToBytes } from "../pairing/pairing-channel";
 import type { VaultSession } from "../vault/session";
-import { isAuthorizedWriter, isSharedRecord, keyBytesEqual } from "./access-record";
+import {
+	type AccessTrust,
+	hasAccessEntries,
+	isAuthorizedWriter,
+	isSharedRecord,
+	keyBytesEqual,
+} from "./access-record";
 import type { AccessTrustStore } from "./access-trust";
+import {
+	type ContainerRuleDeps,
+	admittedByContainers,
+	governingContainers,
+	parentNamedBy,
+} from "./container-rule";
 import { type ShareInviteStoreLike, deriveInviteSecret } from "./invite-anchor";
 import { ShareBootstrapVerdict, authorizeShareBootstrap } from "./share-bootstrap-authz";
 import { authorizesWrapInstall } from "./wrap-install-authz";
@@ -43,6 +56,8 @@ export type SyncAuthzDeps = {
 	shareInvites: ShareInviteStoreLike;
 	/** The locally materialized type of an entity, or null. */
 	typeOf: (entityId: string) => string | null;
+	/** This device's stored properties for an entity, or null. */
+	propertiesOf: (entityId: string) => Record<string, unknown> | null;
 	/** Told when the bootstrap gate refuses a first-share frame. Defaults to a
 	 *  console warning naming the entity and the verdict. */
 	onBootstrapRefused?: (entityId: string, verdict: ShareBootstrapVerdict) => void;
@@ -66,37 +81,40 @@ function senderKeyOf(senderPubB64Url: string): Uint8Array | null {
 	return key.length === ED25519_PUBLIC_BYTES ? key : null;
 }
 
-/**
- * THE CONTAINER RULE. Is `senderKey` a current Editor+ of every container that
- * governs `entityId`? Vacuously true for an entity that is not a cascade child.
- *
- * A channel's message is its own entity with its own record, and its author is
- * that record's root owner - which no revoke can undo. So "removed from the
- * channel" cannot be enforced on the message's record alone: the removed member
- * would keep every message they wrote, and every message they were granted on
- * until someone revoked them child by child. Asking the container makes the
- * removal hold for the whole history at once, their own messages included, on
- * every device that has seen the container's revoke.
- */
-async function admittedByContainers(
-	deps: SyncAuthzDeps,
-	containers: readonly string[],
-	senderKey: Uint8Array,
-): Promise<boolean> {
-	for (const containerId of containers) {
-		const { doc } = await deps.session.ydocStore.load(containerId);
-		try {
-			const trust = deps.accessTrust.trustFor(doc, containerId);
-			if (!isAuthorizedWriter(doc, containerId, senderKey, trust)) return false;
-		} finally {
-			doc.destroy();
-		}
-	}
-	return true;
-}
-
 export function createSyncAuthz(deps: SyncAuthzDeps): SyncAuthz {
 	const { session, dekStore, accessTrust } = deps;
+	const containerRule: ContainerRuleDeps = {
+		session,
+		accessTrust,
+		rowOf: (entityId) => {
+			const type = deps.typeOf(entityId);
+			return type === null ? null : { type, properties: deps.propertiesOf(entityId) ?? {} };
+		},
+	};
+	/** The container rule for one inbound update, AFTER the sender has passed on
+	 *  the child's own record: they must stand in every container that governs
+	 *  it, and - if the update moves the child - in the destination as well.
+	 *  Applies the update to `doc`, which is this call's throwaway copy. */
+	const admittedAsChild = async (
+		doc: Y.Doc,
+		entityId: string,
+		trust: AccessTrust,
+		senderKey: Uint8Array,
+		plaintext: Uint8Array,
+	): Promise<boolean> => {
+		const governing = await governingContainers(containerRule, doc, entityId, trust);
+		if (!(await admittedByContainers(containerRule, governing, senderKey))) return false;
+		const type = deps.typeOf(entityId) ?? undefined;
+		const before = parentNamedBy(type, doc);
+		if (plaintext.byteLength > 0) Y.applyUpdate(doc, plaintext);
+		const after = parentNamedBy(type, doc);
+		if (after === before || (after !== undefined && governing.includes(after))) return true;
+		// A re-parent. Dropping the parent altogether orphans the child out of
+		// its channel's view while its members still hold it: refused. Naming a
+		// new one needs standing there, as this device resolves that container.
+		if (after === undefined) return false;
+		return admittedByContainers(containerRule, [after], senderKey);
+	};
 	const onBootstrapRefused =
 		deps.onBootstrapRefused ??
 		((entityId, verdict) => {
@@ -145,7 +163,21 @@ export function createSyncAuthz(deps: SyncAuthzDeps): SyncAuthz {
 				try {
 					const trust = accessTrust.trustFor(doc, entityId);
 					if (isAuthorizedWriter(doc, entityId, senderKey, trust)) {
-						return admittedByContainers(deps, accessTrust.containersOf(doc, entityId, trust), senderKey);
+						return await admittedAsChild(doc, entityId, trust, senderKey, plaintext);
+					}
+					// A record is here but establishes no root (an entity from before
+					// 0.16 whose record someone had deleted from): nobody resolves, so
+					// nobody may write - EXCEPT that the true owner's statements, when
+					// they come back, must be able to land. Judge the update on what
+					// the record would be WITH it, by evidence only an inviter of ours
+					// could have produced.
+					if (trust.root === null && hasAccessEntries(doc)) {
+						Y.applyUpdate(doc, plaintext);
+						const root = accessTrust.recoverRoot(doc, entityId);
+						if (root === null) return false;
+						const recovered: AccessTrust = { root };
+						if (!isAuthorizedWriter(doc, entityId, senderKey, recovered)) return false;
+						return await admittedAsChild(doc, entityId, recovered, senderKey, new Uint8Array());
 					}
 					const verdict = await authorizeShareBootstrap({
 						localDoc: doc,
@@ -167,8 +199,8 @@ export function createSyncAuthz(deps: SyncAuthzDeps): SyncAuthz {
 					}
 					// The gate checked the GRANTER against the container; the frame's
 					// sender has to stand in it too. (The gate pinned the container.)
-					return admittedByContainers(
-						deps,
+					return await admittedByContainers(
+						containerRule,
 						accessTrust.containersOf(doc, entityId, { root: null }),
 						senderKey,
 					);
@@ -207,7 +239,11 @@ export function createSyncAuthz(deps: SyncAuthzDeps): SyncAuthz {
 					// A child's key is rotated only by someone who still stands in its
 					// container: its author stays its Owner for ever, and must not be
 					// able to re-key it after being removed from the channel.
-					return admittedByContainers(deps, accessTrust.containersOf(doc, entityId, trust), senderKey);
+					return await admittedByContainers(
+						containerRule,
+						await governingContainers(containerRule, doc, entityId, trust),
+						senderKey,
+					);
 				} finally {
 					doc.destroy();
 				}

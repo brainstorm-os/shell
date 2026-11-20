@@ -4030,6 +4030,7 @@ void app.whenReady().then(async () => {
 					accessTrust: await session.accessTrust(),
 					shareInvites,
 					typeOf: (id) => entitiesRepo.get(id)?.type ?? null,
+					propertiesOf: (id) => entitiesRepo.get(id)?.properties ?? null,
 				});
 				const authorizeWrapInstall = syncAuthz.authorizeWrapInstall;
 				const engine = installLiveSyncEngine({
