@@ -4,7 +4,7 @@
   "releases": [
     {
       "version": "0.16.0",
-      "date": "2026-11-19",
+      "date": "2026-11-20",
       "icon": "🤝",
       "title": "Ask the agent in Chat, publish a website, and apps that work together",
       "summary": "Mention the agent in a channel and approve what it proposes. Turn a note into a task in one click, publish a page tree as a website, and embed maps and music. Plus a pass over every app and your first day.",
@@ -169,6 +169,70 @@
         },
         {
           "kind": "h1",
+          "text": "Safer sharing"
+        },
+        {
+          "kind": "p",
+          "text": "Who can change the member list of something you share is now enforced, not assumed."
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Only owners manage members.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " An editor or viewer can no longer add people, remove people or change roles. The person who created a shared object always stays its owner."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Removing someone from a channel is complete.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " They can no longer edit earlier messages, their own included, and the channel's messages are re-keyed for the people who remain."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Chat between people works as you expect.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " A message from someone else appears in an open channel straight away, edits to a message reach everyone, and "
+            },
+            {
+              "text": "You",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " names only your own messages."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "ℹ️",
+          "text": [
+            {
+              "text": "If you share with someone on 0.15. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Sharing keeps working. One change: only the original owner of an object can invite someone who is on 0.16."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
           "text": "Sync on your own network"
         },
         {
@@ -284,6 +348,49 @@
         {
           "kind": "h1",
           "text": "Fixes"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Books.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Books that would not open now do, including "
+            },
+            {
+              "text": "FB2",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " files and EPUBs with a damaged table of contents. If a book still cannot be opened, Books says why."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Files.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Emails no longer fill your vault with rows called untitled. They are named by their subject and stay in Mailbox. Row actions no longer cover the date."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Agent.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " The agent no longer answers with raw data or lists its own tools. If it has no answer, it says so."
+            }
+          ]
         },
         {
           "kind": "li",
