@@ -493,7 +493,12 @@ export function ChatApp(): ReactElement {
 	// device, so it can never be allowed to say "You" about somebody else.
 	const authorLabels = useMemo<AuthorLabels>(() => {
 		const names = new Map<string, string>();
-		for (const m of rosterMembers) if (m.displayName) names.set(m.pubkey, m.displayName);
+		// A roster member with no profile yet is named the way the member panel
+		// names them, so one person is not two different stubs on one screen.
+		for (const m of rosterMembers) {
+			const name = m.displayName || shortFingerprint(m.fingerprint);
+			if (name) names.set(m.pubkey, name);
+		}
 		return {
 			selfRef: identity.personRef,
 			selfName: identity.displayName,
