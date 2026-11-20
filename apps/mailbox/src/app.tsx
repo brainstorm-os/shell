@@ -506,7 +506,7 @@ export function MailboxApp(): ReactElement {
 					{canCompose ? (
 						<button
 							type="button"
-							className="mb-iconbtn"
+							className="header-icon-btn"
 							onClick={onCompose}
 							aria-label={t("compose.open")}
 							data-bs-tooltip={t("compose.open")}
@@ -517,7 +517,7 @@ export function MailboxApp(): ReactElement {
 					{usingVault && mailSvc && accounts.length > 0 ? (
 						<button
 							type="button"
-							className={`mb-iconbtn${syncBusy ? " is-on" : ""}`}
+							className="header-icon-btn"
 							onClick={onSyncNow}
 							disabled={syncBusy}
 							aria-busy={syncBusy}
@@ -577,7 +577,7 @@ export function MailboxApp(): ReactElement {
 					{!syncBusy ? (
 						<button
 							type="button"
-							className="mb-iconbtn mb-syncbar__dismiss"
+							className="header-icon-btn"
 							onClick={() => setSyncNote(null)}
 							aria-label={t("sync.dismiss")}
 						>

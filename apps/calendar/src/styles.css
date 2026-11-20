@@ -211,12 +211,6 @@ body.is-resizing .calendar-resize {
 	background: var(--hover);
 }
 
-.cal-sidebar__row[aria-pressed="true"] {
-	background: var(--accent-soft);
-	color: var(--text);
-	border-color: color-mix(in srgb, var(--accent) 28%, transparent);
-}
-
 .cal-sidebar__label {
 	min-width: 0;
 	font-weight: var(--text-weight-medium);
@@ -296,9 +290,7 @@ body.is-resizing .calendar-resize {
 
 .cal-toolbar__tabs {
 	display: inline-flex;
-	/* Match the 28px header buttons (search / new) so the view switcher sits on
-	 * the same baseline — control-height-sm (24px) left it visibly short. */
-	height: 28px;
+	height: var(--control-height-sm, 24px);
 	box-shadow: inset 0 0 0 1px var(--border-strong);
 	border-radius: var(--radius-sm);
 	overflow: hidden;
@@ -1018,45 +1010,6 @@ body.is-resizing .calendar-resize {
 
 .cal-agenda__row {
 	min-width: 0;
-}
-
-/* ─── New event button ────────────────────────────────────────────── */
-
-/* 28px is the deliberate calendar header-control size (see `.cal-toolbar__tabs`):
- * between control-height-sm (24px, too short) and -md (32px); shared with the
- * tab switcher + contacts' `.contacts-icon-btn` for a consistent header baseline. */
-.cal-toolbar__new {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 28px;
-	height: 28px;
-	border-radius: var(--radius-sm);
-	color: var(--text-dim);
-	background: transparent;
-	transition: background-color 80ms ease, color 80ms ease;
-}
-
-.cal-toolbar__new:hover {
-	background: var(--hover);
-	color: var(--text);
-}
-
-.cal-toolbar__search {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 28px;
-	height: 28px;
-	border-radius: var(--radius-sm);
-	color: var(--text-dim);
-	background: transparent;
-	transition: background-color 80ms ease, color 80ms ease;
-}
-
-.cal-toolbar__search:hover {
-	background: var(--hover);
-	color: var(--text);
 }
 
 /* Event search overlay (9.15.12). */

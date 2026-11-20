@@ -750,7 +750,7 @@ select {
 	padding: 0;
 	border: none;
 	background: transparent;
-	color: var(--text-faint);
+	color: var(--color-text-secondary);
 	cursor: grab;
 	opacity: 0;
 	transition: opacity var(--motion-duration-fast, 0.1s) var(--motion-easing-standard, ease);
@@ -758,6 +758,9 @@ select {
 }
 :root .bs-drag-grip:focus-visible {
 	opacity: 1;
+}
+:root .bs-drag-grip:hover {
+	color: var(--text);
 }
 :root [data-dragging="true"] .bs-drag-grip,
 :root .bs-drag-grip:active {
@@ -1000,7 +1003,7 @@ select {
 	color: var(--text-dim);
 	cursor: pointer;
 }
-:root .header-icon-btn:hover:not(:disabled) {
+:root .header-icon-btn:hover:not(:disabled):not([aria-disabled="true"]) {
 	background: var(--hover);
 	color: var(--text);
 }
@@ -1013,7 +1016,8 @@ select {
 	background: var(--accent-soft);
 	color: var(--accent-strong);
 }
-:root .header-icon-btn:disabled {
+:root .header-icon-btn:disabled,
+:root .header-icon-btn[aria-disabled="true"] {
 	opacity: 0.5;
 	cursor: not-allowed;
 }

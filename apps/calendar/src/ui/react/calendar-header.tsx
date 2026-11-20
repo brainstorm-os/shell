@@ -83,22 +83,22 @@ export function CalendarHeaderActions({
 		<>
 			<button
 				type="button"
-				className="cal-toolbar__new"
+				className="header-icon-btn cal-toolbar__new"
 				data-bs-tooltip={t("calendar.header.newEvent")}
 				aria-label={t("calendar.header.newEvent")}
 				onClick={onNewEvent}
 			>
-				<Icon name={IconName.Plus} size={18} />
+				<Icon name={IconName.Plus} size={16} />
 			</button>
 			<ViewTabs viewKind={viewKind} onViewKind={onViewKind} />
 			<button
 				type="button"
-				className="cal-toolbar__search"
+				className="header-icon-btn cal-toolbar__search"
 				data-bs-tooltip={t("calendar.search.button")}
 				aria-label={t("calendar.search.button")}
 				onClick={onSearch}
 			>
-				<Icon name={IconName.Search} size={18} />
+				<Icon name={IconName.Search} size={16} />
 			</button>
 		</>
 	);

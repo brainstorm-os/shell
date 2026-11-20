@@ -222,7 +222,7 @@ function HeaderMenuButton({
 		<button
 			ref={ref}
 			type="button"
-			className="whiteboard__hdr-btn"
+			className="header-icon-btn"
 			data-bs-tooltip={label}
 			aria-label={label}
 			aria-haspopup="menu"
@@ -630,7 +630,7 @@ export function WhiteboardApp(): ReactElement {
 					<button
 						ref={exportBtnRef}
 						type="button"
-						className={`whiteboard__hdr-btn${confirm ? (confirm.ok ? " is-success" : " is-error") : ""}`}
+						className={`header-icon-btn${confirm ? (confirm.ok ? " whiteboard__hdr-btn--success" : " whiteboard__hdr-btn--error") : ""}`}
 						data-bs-tooltip={exportLabel}
 						aria-label={exportLabel}
 						aria-haspopup="dialog"
@@ -641,7 +641,7 @@ export function WhiteboardApp(): ReactElement {
 					<span className="whiteboard__hdr-sep" aria-hidden="true" />
 					<button
 						type="button"
-						className="whiteboard__hdr-btn"
+						className="header-icon-btn"
 						data-bs-tooltip={t("whiteboard.layers.toggle")}
 						aria-label={t("whiteboard.layers.toggle")}
 						aria-pressed={eng()?.isLayersOpen() ? "true" : "false"}
@@ -700,11 +700,11 @@ export function WhiteboardApp(): ReactElement {
 						<button
 							type="button"
 							className="whiteboard__zoom-btn"
-							data-bs-tooltip={t("whiteboard.zoom.in")}
-							aria-label={t("whiteboard.zoom.in")}
-							onClick={() => eng()?.zoomBy(1.1)}
+							data-bs-tooltip={t("whiteboard.zoom.out")}
+							aria-label={t("whiteboard.zoom.out")}
+							onClick={() => eng()?.zoomBy(1 / 1.1)}
 						>
-							<WbIcon glyph={WhiteboardIcon.Plus} />
+							<WbIcon glyph={WhiteboardIcon.Minus} />
 						</button>
 						<button
 							type="button"
@@ -718,11 +718,11 @@ export function WhiteboardApp(): ReactElement {
 						<button
 							type="button"
 							className="whiteboard__zoom-btn"
-							data-bs-tooltip={t("whiteboard.zoom.out")}
-							aria-label={t("whiteboard.zoom.out")}
-							onClick={() => eng()?.zoomBy(1 / 1.1)}
+							data-bs-tooltip={t("whiteboard.zoom.in")}
+							aria-label={t("whiteboard.zoom.in")}
+							onClick={() => eng()?.zoomBy(1.1)}
 						>
-							<WbIcon glyph={WhiteboardIcon.Minus} />
+							<WbIcon glyph={WhiteboardIcon.Plus} />
 						</button>
 						<span className="whiteboard__zoom-sep" aria-hidden="true" />
 						<button

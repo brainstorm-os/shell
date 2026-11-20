@@ -2160,12 +2160,12 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 					{openTaskRecord ? null : (
 						<button
 							type="button"
-							className="tasks-header__action"
+							className="header-icon-btn tasks-header__action"
 							data-bs-tooltip={t("tasks.header.newTask")}
 							aria-label={t("tasks.header.newTask")}
 							onClick={() => handleComposeIntent({})}
 						>
-							<IconView name={IconName.Plus} size={18} />
+							<IconView name={IconName.Plus} size={16} />
 						</button>
 					)}
 					<PanelToggleButton
