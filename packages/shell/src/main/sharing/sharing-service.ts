@@ -31,6 +31,7 @@
 import { Buffer } from "node:buffer";
 import { type CapabilityLedger, LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import type {
+	EntityExposure,
 	PendingInvite,
 	ShareInviteToken,
 	SharedContact,
@@ -373,6 +374,37 @@ export function makeSharingServiceHandler(options: SharingServiceOptions): Servi
 		return edit ? { editor: edit.editor, editedAt: edit.editedAt } : null;
 	}
 
+	/** IE-12 — has this object ever involved anyone but this vault's owner?
+	 *  Answered from HOST-side evidence a collaborator cannot rewrite by sync:
+	 *  the tombstones the access record leaves in this device's copy of the doc,
+	 *  and this device's own log of whose edits it has applied. The current
+	 *  member list (`access`) is read from a record any Editor can empty, so it
+	 *  cannot answer this. Gated exactly like `lastEdit`. Any failure to read
+	 *  the evidence answers `everShared: true`. */
+	async function handleExposure(envelope: Envelope): Promise<EntityExposure | null> {
+		await requireCapability(envelope, options, SHARING_READ_CAPABILITY);
+		const entityId = typeof envelope.args[0] === "string" ? envelope.args[0] : "";
+		if (!entityId) throw makeError("Invalid", "sharing.exposure: entityId required");
+		const repo = (await options.getEntitiesRepo?.()) ?? null;
+		if (!repo) return null;
+		const type = repo.get(entityId)?.type;
+		if (!type) return null;
+		try {
+			await requireCapability(envelope, options, `entities.read:${type}`);
+		} catch (error) {
+			if ((error as Error).name === "Denied") return null;
+			throw error;
+		}
+		try {
+			const engine = engineFor();
+			const lastEditor = repo.lastEdits.get(entityId)?.editor ?? null;
+			const editedByAnother = lastEditor !== null && lastEditor !== engine.whoami().userPubB64;
+			return { everShared: editedByAnother || (await engine.shareTrace(entityId)) };
+		} catch {
+			return { everShared: true };
+		}
+	}
+
 	return async (envelope: Envelope): Promise<unknown> => {
 		switch (envelope.method) {
 			case "pendingInvite":
@@ -381,6 +413,8 @@ export function makeSharingServiceHandler(options: SharingServiceOptions): Servi
 				return await handleDefaultRole(envelope);
 			case "lastEdit":
 				return await handleLastEdit(envelope);
+			case "exposure":
+				return await handleExposure(envelope);
 			case "createInvite":
 				return await handleCreateInvite(envelope);
 			case "share":

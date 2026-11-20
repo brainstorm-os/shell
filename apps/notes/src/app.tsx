@@ -106,6 +106,7 @@ import {
 	fetchVaultAsset,
 	readThemeTokens,
 	siteExportReport,
+	sitePageAccess,
 } from "./ui/site-export";
 
 const NAV_PREF_KEY = "notes.navOpen";
@@ -937,15 +938,7 @@ export function NotesApp() {
 				const page = notesRef.current.get(id);
 				return page ? { title: page.title, parentId: page.parentPageId ?? null } : null;
 			},
-			pageAccess: async (id) => {
-				const sharing = runtime?.services.sharing;
-				if (!sharing) return null;
-				const writers = (await sharing.access(id))
-					.filter((member) => member.active)
-					.map((member) => member.pubkey)
-					.sort();
-				return { scope: writers.join(","), solo: writers.length <= 1 };
-			},
+			pageAccess: (id) => sitePageAccess(runtime?.services.sharing, id),
 			fetchAsset: fetchVaultAsset,
 			readTokens: () => readThemeTokens(document.documentElement.style),
 			labels: {

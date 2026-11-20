@@ -629,6 +629,29 @@ describe("buildSiteArchive — what leaves the vault", () => {
 		expect(fetched).toEqual(["vault-asset"]);
 	});
 
+	it("counts an inline image the way it is emitted, whatever whitespace surrounds its source", async () => {
+		const payload = `data:image/png;base64,${"A".repeat(4000)}`;
+		const dataImage = (src: string): Inline => ({
+			decorator: "image-block",
+			props: { src, alt: "" },
+		});
+		const padded = [" ", "  ", "\t", "\n", " \r\n "].flatMap((pad) =>
+			Array.from({ length: 10 }, () => [dataImage(`${pad}${payload}${pad}`)]),
+		);
+		const { plan, buildInput } = harness({
+			root: { title: "Home", body: [[dataImage(payload)], ...padded] },
+		});
+		const archive = await buildSiteArchive({
+			...buildInput,
+			plan: await plan("root"),
+			confirmedIds: ["root"],
+			maxAssetBytes: 3000,
+		});
+		expect(archive.skippedAssets).toBe(51);
+		expect(archive.bytes.length).toBeLessThan(6000);
+		expect(unzip(archive.bytes).get("index.html")).not.toContain("<img");
+	});
+
 	it("drops an image whose fetch fails instead of failing the site", async () => {
 		const { plan, buildInput } = harness({ root: { title: "Home", body: [[image("x")]] } });
 		const archive = await buildSiteArchive({

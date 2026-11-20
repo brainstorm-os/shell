@@ -1765,6 +1765,15 @@ export type SharedMember = {
 	revokedAt: number | null;
 };
 
+/** Whether an object has ever involved anyone but this vault's owner, as the
+ *  HOST attests it. Unlike {@link SharedMember} rows — read from a record
+ *  inside the object that any collaborator can rewrite — this cannot be
+ *  changed by content synced from someone else, and it never turns back to
+ *  `false`: an object shared once and since made private stays `true`. */
+export type EntityExposure = {
+	everShared: boolean;
+};
+
 /** A saved contact — a teammate whose verified invite you've kept, so you can
  *  share to them by a click (share-by-name) instead of re-pasting a code. */
 export type SharedContact = {
@@ -1822,6 +1831,10 @@ export type SharingService = {
 	/** The resolved access record (active grants + revoked audit) for `entityId`.
 	 *  Requires `sharing.read`. */
 	access(entityId: string): Promise<SharedMember[]>;
+	/** Host-attested: has `entityId` ever involved anyone but this vault's
+	 *  owner? `null` for an object the caller cannot read. The answer to rely
+	 *  on before treating an object as private. Requires `sharing.read`. */
+	exposure(entityId: string): Promise<EntityExposure | null>;
 	/** Collab-C7 — the invite a `brainstorm://invite/` link the user opened
 	 *  delivered, verified, for the share dialog to PRE-FILL (consumed on read).
 	 *  Null when none is waiting. Requires `sharing.share`. Optional: an older

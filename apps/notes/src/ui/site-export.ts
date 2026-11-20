@@ -130,6 +130,38 @@ export function siteExportReport(
 	return { tone: SiteExportTone.Warning, title, detail: omissions.join(" ") };
 }
 
+const PRIVATE_SCOPE = "private";
+
+/** The slice of the shell's sharing service a publish needs. */
+export type SiteSharingSurface = {
+	exposure?: (entityId: string) => Promise<{ everShared: boolean } | null>;
+	access: (entityId: string) => Promise<ReadonlyArray<{ pubkey: string; active: boolean }>>;
+};
+
+/** Who else could have written a page — decided by the HOST's attestation
+ *  (`sharing.exposure`), never by the member list alone: that list lives in
+ *  the page's own synced record, and a collaborator can empty it to make a
+ *  shared page read as private. A page is private only when the host says it
+ *  was never shared AND its record lists nobody else. Every other page gets a
+ *  scope of its own, so it can never match another page's — which rules out
+ *  sub-pages, linked pages and vault images for it. `null` (the host cannot
+ *  attest, as on an older shell) means unknown, and the publisher fails closed. */
+export async function sitePageAccess(
+	sharing: SiteSharingSurface | undefined,
+	entityId: string,
+): Promise<{ scope: string; solo: boolean } | null> {
+	if (!sharing?.exposure) return null;
+	try {
+		const exposure = await sharing.exposure(entityId);
+		if (typeof exposure?.everShared !== "boolean") return null;
+		const others = (await sharing.access(entityId)).filter((member) => member.active).length > 1;
+		if (exposure.everShared || others) return { scope: `shared:${entityId}`, solo: false };
+		return { scope: PRIVATE_SCOPE, solo: true };
+	} catch {
+		return null;
+	}
+}
+
 /** The theme the app is painted with right now: the shell sets every design
  *  token as an inline custom property on the root element. */
 export function readThemeTokens(style: CSSStyleDeclaration): Record<string, string> {
