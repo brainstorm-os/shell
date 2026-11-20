@@ -22,10 +22,11 @@ import * as Y from "yjs";
 import { getEntityMetaMap } from "../credentials/member-wraps";
 import { ENTITY_ACCESS_KEY } from "./access-record";
 
-type Shared = Y.AbstractType<unknown>;
+/** The two item lists every Yjs shared type keeps: its sequence and its keys. */
+type Shared = { _start: Y.Item | null; _map: Map<string, Y.Item> };
 
 function nestedType(item: Y.Item): Shared | null {
-	return item.content instanceof Y.ContentType ? (item.content.type as Shared) : null;
+	return item.content instanceof Y.ContentType ? item.content.type : null;
 }
 
 /** True when anything under `root` was ever deleted or overwritten. */
