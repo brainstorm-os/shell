@@ -155,14 +155,21 @@ export function listWraps(doc: Y.Doc): MemberWrapPayload[] {
 }
 
 /** Find a wrap addressed to `recipientPub`. Returns null if no entry
- *  matches — the caller's device hasn't been added to this entity yet. */
+ *  matches — the caller's device hasn't been added to this entity yet. With
+ *  `version`, only a wrap of THAT rotation ordinal matches: after a rotation
+ *  the doc still holds the recipient's wraps of superseded keys, and handing
+ *  one of those out as "already wrapped" gives them a key nothing is sealed
+ *  under any more. */
 export function findWrapForRecipient(
 	doc: Y.Doc,
 	recipientPub: Uint8Array,
+	version?: number,
 ): MemberWrapPayload | null {
 	const target = bytesToBase64(recipientPub);
 	for (const w of listWraps(doc)) {
-		if (w.recipientPubB64 === target) return w;
+		if (w.recipientPubB64 !== target) continue;
+		if (version !== undefined && wrapDekVersionOf(w) !== version) continue;
+		return w;
 	}
 	return null;
 }

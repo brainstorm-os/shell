@@ -121,6 +121,8 @@ export class SharingEngine {
 	#pendingRepo: PendingRotationsRepository | null = null;
 	#invitesRepo: ShareInvitesRepository | null = null;
 	#draining = false;
+	/** entity id → "another pass was asked for while one was running". */
+	readonly #reasserting = new Map<string, boolean>();
 	#rosterCache: readonly FanoutDevice[] | null = null;
 	#rosterInFlight: Promise<readonly FanoutDevice[]> | null = null;
 
@@ -409,6 +411,9 @@ export class SharingEngine {
 		this.#types.set(childId, childType);
 		const handle = dekStore.open(childId);
 		if (!handle) return 0;
+		// From here on this device knows which container governs the child - the
+		// one it is being shared into, not whatever its parent property says later.
+		(await this.#session.accessTrust()).pinContainer(childId, containerId);
 		const exposed = this.#session.exposeIdentityForPairing();
 		const relay = this.requireRelay();
 		let shared = 0;
@@ -439,7 +444,7 @@ export class SharingEngine {
 						// rule's child type — instead of trusting this signature alone.
 						via: containerId,
 					});
-					const existing = findWrapForRecipient(doc, recipientPub);
+					const existing = findWrapForRecipient(doc, recipientPub, handle.version);
 					if (existing) return existing;
 					const w = wrapDekForRecipient(handle.dek, recipientPub, childId, childType, handle.version);
 					appendWrap(doc, w);
@@ -497,6 +502,7 @@ export class SharingEngine {
 	): Promise<void> {
 		const dekStore = await this.ensureDekStore();
 		this.#types.set(entityId, type);
+		if (via !== undefined) (await this.#session.accessTrust()).pinContainer(entityId, via);
 		const exposed = this.#session.exposeIdentityForPairing();
 		// Collab-C6-b — remember the invitee's verified name locally, so THIS
 		// vault's roster resolves them on every entity from now on, not only the
@@ -544,6 +550,18 @@ export class SharingEngine {
 				// this identity. The owner's own X25519 rides it so a peer member's
 				// later child cascade can wrap to the owner too (design 71).
 				this.#writeGenesisGrant(doc, entityId, before, this.#session.deviceX25519.publicKeyBase64);
+				// A cascade child the invitee already stands on (a message they wrote
+				// before being removed and re-invited: they are its root owner, at a
+				// role no re-share could "change") needs no grant - only the CURRENT
+				// key, which a rotation since may have moved past the wrap they hold.
+				if (via !== undefined && isActiveMember(doc, entityId, invite.userPubB64, trustNow())) {
+					const recipientPub = base64ToBytes(invite.x25519PubB64);
+					const held = findWrapForRecipient(doc, recipientPub, handle.version);
+					if (held) return held;
+					const fresh = wrapDekForRecipient(handle.dek, recipientPub, entityId, type, handle.version);
+					appendWrap(doc, fresh);
+					return fresh;
+				}
 				return shareEntityWithInvite(doc, {
 					entityId,
 					invite,
@@ -594,6 +612,92 @@ export class SharingEngine {
 	 * anyone removing the root owner).
 	 */
 	async revoke(entityId: string, memberB64: string): Promise<boolean> {
+		const type = this.#types.get(entityId) ?? (await this.ensureEntitiesRepo()).get(entityId)?.type;
+		const isContainer = type !== undefined && containmentRuleForParent(type) !== null;
+		// Leaving is the member's own act on the container alone: the container
+		// rule already stops them writing its children on every other device.
+		if (!isContainer || memberB64 === this.#session.identity.publicKeyBase64) {
+			return this.#revokeOne(entityId, memberB64);
+		}
+		return this.revokeFromCollection(entityId, type, memberB64);
+	}
+
+	/**
+	 * Design 71 flow 3 — remove `memberB64` from a container AND from what it
+	 * contains.
+	 *
+	 * Revoking on the container is what takes effect: the container rule makes
+	 * every other device refuse the member's writes to, and re-keying of, every
+	 * child from the moment it sees that revoke - the children they authored
+	 * included, where no revoke on the child could ever reach them (an author is
+	 * the root owner of their own message).
+	 *
+	 * The children are then walked for CONFIDENTIALITY going forward: on each
+	 * child this identity owns, the member's grant is revoked where the policy
+	 * allows it (never on a child they authored) and the child's DEK is rotated
+	 * to the members who still stand in the container. After that, an edit to an
+	 * old message is no more readable by the removed member than a new message
+	 * is. What they were already sent stays readable to them - not a goal.
+	 *
+	 * Sequential and not resumable: a child this device does not own, or holds
+	 * no key for, or never reaches because the shell quit mid-walk, keeps its
+	 * old key (its later edits stay readable by the removed member) while the
+	 * writer gate still refuses them.
+	 */
+	async revokeFromCollection(
+		containerId: string,
+		containerType: string,
+		memberB64: string,
+	): Promise<boolean> {
+		if (!(await this.#revokeOne(containerId, memberB64))) return false;
+		const selfPub = this.#session.identity.publicKeyBase64;
+		const exposed = this.#session.exposeIdentityForPairing();
+		for (const childId of await this.#childrenOf(containerId, containerType)) {
+			try {
+				const rotate = await this.#mutateRecord(childId, (doc, trustNow) => {
+					const trust = trustNow();
+					if (!mayGrant(doc, childId, selfPub, trust)) return false;
+					if (mayRevoke(doc, childId, selfPub, memberB64, trust)) {
+						revokeAccess(doc, {
+							entityId: childId,
+							member: memberB64,
+							signerSecret: exposed.secretKey,
+							now: Date.now(),
+							trust,
+						});
+					}
+					return true;
+				});
+				if (!rotate) continue;
+				const dekStore = await this.ensureDekStore();
+				const held = dekStore.open(childId);
+				if (!held) continue;
+				dekStore.close(held.dek);
+				await this.#rotateAfterRevoke(childId);
+			} catch (error) {
+				console.warn(`[sharing] revoke cascade skipped ${childId}: ${(error as Error).message}`);
+			}
+		}
+		return true;
+	}
+
+	/** The children of a container: what the index says points at it now, plus
+	 *  everything this device pinned to it (a child whose parent property was
+	 *  later re-pointed is still its child for authorization). */
+	async #childrenOf(containerId: string, containerType: string): Promise<string[]> {
+		const children = new Set((await this.#session.accessTrust()).containedIn(containerId));
+		const rule = containmentRuleForParent(containerType);
+		if (rule) {
+			const result = await queryVaultListSource(childrenSourceFor(rule, containerId), () =>
+				this.ensureEntitiesRepo(),
+			);
+			if (result.ok) for (const id of result.ids) children.add(id);
+		}
+		return [...children];
+	}
+
+	/** Revoke on ONE entity's record, rotating its DEK when this identity may. */
+	async #revokeOne(entityId: string, memberB64: string): Promise<boolean> {
 		const exposed = this.#session.exposeIdentityForPairing();
 		const selfPub = this.#session.identity.publicKeyBase64;
 		const outcome = await this.#mutateRecord(entityId, (doc, trustNow) => {
@@ -854,10 +958,59 @@ export class SharingEngine {
 	async #currentMembersOf(entityId: string): Promise<readonly ResolvedMember[]> {
 		const store = await this.#session.accessTrust();
 		const { doc } = await this.#session.ydocStore.load(entityId);
+		let members: ResolvedMember[];
+		let containers: string[];
 		try {
-			return resolveCurrentMembers(doc, entityId, store.trustFor(doc, entityId));
+			const trust = store.trustFor(doc, entityId);
+			members = resolveCurrentMembers(doc, entityId, trust);
+			containers = store.containersOf(doc, entityId, trust);
 		} finally {
 			doc.destroy();
+		}
+		// The container rule, on the key side: a child's key goes only to those
+		// who still stand in its container, whatever the child's own record says
+		// (it will always say its author is an Owner).
+		for (const containerId of containers) {
+			const inContainer = new Set(
+				(await this.#activeMembersWithKeys(containerId)).map((m) => m.member),
+			);
+			members = members.map((m) => (inContainer.has(m.member) ? m : { ...m, active: false }));
+		}
+		return members;
+	}
+
+	/**
+	 * Put back anything this device remembers of `entityId`'s record that the
+	 * doc no longer shows, and emit it — called when a remote update has just
+	 * landed on the entity. Only the ROOT owner does this, and only it needs to:
+	 * a current member can blank a revoke or delete a grant in an ordinary
+	 * update, which changes nothing here (resolution reads memory) but would
+	 * mislead a device that was offline when the statement was made. Re-asserting
+	 * on receipt, rather than on the owner's next change to the record, closes
+	 * that as soon as the tampering reaches the owner.
+	 *
+	 * Coalesced per entity: a burst of inbound updates costs one pass plus one
+	 * trailing pass, never one per frame. Never throws.
+	 */
+	async reassertRecord(entityId: string): Promise<void> {
+		const pending = this.#reasserting.get(entityId);
+		if (pending !== undefined) {
+			this.#reasserting.set(entityId, true);
+			return;
+		}
+		this.#reasserting.set(entityId, false);
+		try {
+			for (let again = true; again; ) {
+				this.#reasserting.set(entityId, false);
+				const store = await this.#session.accessTrust();
+				if (store.rootOf(entityId) !== this.#session.identity.publicKeyBase64) return;
+				await this.#mutateRecord(entityId, () => undefined);
+				again = this.#reasserting.get(entityId) === true;
+			}
+		} catch (error) {
+			console.warn(`[sharing] re-assert failed for ${entityId}: ${(error as Error).message}`);
+		} finally {
+			this.#reasserting.delete(entityId);
 		}
 	}
 

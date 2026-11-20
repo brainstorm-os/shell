@@ -1,11 +1,13 @@
 /**
- * `access_roots` + `access_statements` repository (0.16.0 sharing
+ * `access_roots` + `access_statements` + `entity_containers` repository (0.16.0 sharing
  * authorization) — what THIS device knows about who holds authority over a
  * shared entity, kept outside the entity's own doc because the doc is writable
  * by every member.
  *
  *   - `access_roots` pins the entity's root owner on first sight. First pin
  *     wins: a later record can never move it.
+ *   - `entity_containers` pins the container a shared child was first seen in,
+ *     which is what the writer gate consults for the child (first pin wins).
  *   - `access_statements` is the device's memory of signed grants and revokes it
  *     has seen take effect, so deleting one from the doc's array changes nothing
  *     here.
@@ -95,5 +97,30 @@ export class AccessTrustRepository {
 			).run(entityId, record.kind, record.sig, record.body, now);
 			if (Number(result.changes) > 0) room--;
 		}
+	}
+
+	getContainer(entityId: string): string | null {
+		const row = this.stmt("SELECT container_id FROM entity_containers WHERE entity_id = ?").get(
+			entityId,
+		) as { container_id: string } | undefined;
+		return row?.container_id ?? null;
+	}
+
+	/** Pin the container `entityId` was first seen in. First pin wins; returns
+	 *  the container now in force. */
+	pinContainer(entityId: string, containerId: string, now: number): string {
+		this.stmt(
+			"INSERT INTO entity_containers (entity_id, container_id, pinned_at) VALUES (?, ?, ?) " +
+				"ON CONFLICT(entity_id) DO NOTHING",
+		).run(entityId, containerId, now);
+		return this.getContainer(entityId) ?? containerId;
+	}
+
+	/** Every entity pinned to `containerId`. */
+	listContained(containerId: string): string[] {
+		const rows = this.stmt(
+			"SELECT entity_id FROM entity_containers WHERE container_id = ? ORDER BY pinned_at, entity_id",
+		).all(containerId) as Array<{ entity_id: string }>;
+		return rows.map((row) => row.entity_id);
 	}
 }

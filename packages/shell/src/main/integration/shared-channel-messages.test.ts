@@ -24,20 +24,22 @@ import type { CapabilityLedger as CapabilityLedgerType } from "@brainstorm-os/ca
 import { MESSAGE_TYPE_URL } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { __ydocCacheResetForTest, handleYDocEnvelope } from "../../workers/ydoc";
-import { AccessRole, activeMembers } from "../collab/access-record";
+import { AccessRole, activeMembers, getAccessArray } from "../collab/access-record";
 import { createAutoShareReactor } from "../collab/auto-share-reactor";
+import { inboxChannelFor } from "../collab/inbox-channel";
 import { ShareBootstrapVerdict } from "../collab/share-bootstrap-authz";
 import { SharingEngine } from "../collab/sharing-engine";
 import { createSyncAuthz } from "../collab/sync-authz";
-import { base64ToBytes, bytesToBase64 } from "../credentials/crypto";
+import { base64ToBytes, bytesToBase64, generateSymmetricKey } from "../credentials/crypto";
 import { ED25519_PUBLIC_BYTES, verifySignature } from "../credentials/identity";
-import { wrapDekVersionOf } from "../credentials/member-wraps";
+import { listWraps, wrapDekForRecipient, wrapDekVersionOf } from "../credentials/member-wraps";
 import { type ApplyRemoteDocFn, makeEntitiesServiceHandler } from "../entities/entities-service";
 import { EntityChangeEmitter } from "../entities/entity-change-emitter";
 import { installEntityDek } from "../entities/install-wrap";
 import { base64UrlToBytes } from "../pairing/pairing-channel";
 import { EntitiesRepository, ShareInvitesRepository } from "../storage/entities-repo";
 import { decodeFrame } from "../sync/envelope-codec";
+import { emitWrapBootstrap } from "../sync/envelope-pipeline";
 import { LiveSyncEngine } from "../sync/live-sync-engine";
 import type { RelayPort, RelaySurface } from "../sync/relay-port";
 import { makeRemoteDocApplier } from "../sync/remote-doc-applier";
@@ -185,7 +187,12 @@ async function makePeer(name: string, relay: ChannelRelay) {
 		authorizeWriter: syncAuthz.authorizeWriter,
 		applyRemoteUpdate: makeRemoteDocApplier({
 			apply: () => applyRemoteDoc,
-			onApplied: (entityId) => repaints.push(entityId),
+			onApplied: (entityId) => {
+				repaints.push(entityId);
+				// As `main/index.ts`: the root owner re-asserts its record whenever a
+				// remote update lands on an entity it owns.
+				void sharing.reassertRecord(entityId);
+			},
 		}),
 		installWrap: async (wrap, entityId, senderPubB64) => {
 			if (!(await syncAuthz.authorizeWrapInstall(entityId, senderPubB64))) return null;
@@ -292,6 +299,53 @@ async function makePeer(name: string, relay: ChannelRelay) {
 			} finally {
 				doc.destroy();
 			}
+		},
+		/** The rotation ordinal of the DEK this vault currently holds for an entity. */
+		dekVersionOf: async (entityId: string): Promise<number> => {
+			const handle = dekStore.open(entityId);
+			if (!handle) return 0;
+			dekStore.close(handle.dek);
+			return handle.version;
+		},
+		/** Does this vault's copy of the doc carry a wrap of the entity's CURRENT
+		 *  key addressed to `other`'s device? */
+		holdsCurrentWrapFor: async (
+			entityId: string,
+			other: { session: VaultSession },
+		): Promise<boolean> => {
+			const handle = dekStore.open(entityId);
+			if (!handle) return false;
+			dekStore.close(handle.dek);
+			const { doc } = await session.ydocStore.load(entityId);
+			try {
+				const target = other.session.deviceX25519.publicKeyBase64;
+				return listWraps(doc).some(
+					(wrap) => wrap.recipientPubB64 === target && wrapDekVersionOf(wrap) === handle.version,
+				);
+			} finally {
+				doc.destroy();
+			}
+		},
+		/** Seal a key of this peer's choosing for `entityId` to `victim`'s device at
+		 *  `version`, and drop it on their inbox — a forged rotation. */
+		pushHostileKey: async (
+			entityId: string,
+			victim: { session: VaultSession; pub: string },
+			version: number,
+		): Promise<void> => {
+			const wrap = wrapDekForRecipient(
+				generateSymmetricKey(),
+				victim.session.deviceX25519.publicKey,
+				entityId,
+				MESSAGE_TYPE_URL,
+				version,
+			);
+			await emitWrapBootstrap(
+				entityId,
+				wrap,
+				sharing.makeCtx(surface.currentPort()),
+				inboxChannelFor(victim.pub),
+			);
 		},
 		dispose: async (): Promise<void> => {
 			offReactor();
@@ -544,13 +598,13 @@ describe("a shared chat channel carries every member's messages to every other m
 		expect(await mira.activeMembersOf(fromOwner)).toEqual([mira.pub, priya.pub].sort());
 	});
 
-	// OPEN (design 71 flow 3, `revokeFromCollection`, is not implemented): a
-	// revoke is recorded on the CHANNEL only, so every message that predates it
-	// still lists the revoked member as an Editor and their rewrite of it is
-	// accepted - their own messages and everyone else's. `it.fails` pins the hole:
-	// it turns red the day the revoke cascades onto the children, and the marker
-	// is then removed.
-	it.fails("a revoked member cannot rewrite messages that predate the revoke", async () => {
+	// Design 71 flow 3. Removing a member from a channel has to hold for the
+	// channel's HISTORY too: every message is its own entity with its own record,
+	// and its author is that record's root owner, so no revoke on the message can
+	// ever remove them from what they posted. The writer gate therefore also
+	// asks the CONTAINER: a child is written only by a current Editor+ of the
+	// container this device first saw it in.
+	it("a revoked member cannot rewrite messages that predate the revoke", async () => {
 		const [mira, marcus] = (await boot("mira", "marcus")) as [Peer, Peer];
 		const channel = await sharedChannel(mira, [{ peer: marcus, role: AccessRole.Editor }], peers);
 		const his = await marcus.post(channel, "his, before");
@@ -564,6 +618,221 @@ describe("a shared chat channel carries every member's messages to every other m
 		await settle(peers);
 
 		expect([mira.bodyOf(his), mira.bodyOf(hers)]).toEqual(["his, before", "hers, before"]);
+	});
+
+	it("three members: after the owner removes one, their rewrites of ANYONE's earlier message are refused everywhere, and they cannot post", async () => {
+		const [mira, marcus, priya] = (await boot("mira", "marcus", "priya")) as [Peer, Peer, Peer];
+		const channel = await sharedChannel(
+			mira,
+			[
+				{ peer: marcus, role: AccessRole.Editor },
+				{ peer: priya, role: AccessRole.Editor },
+			],
+			peers,
+		);
+		const hers = await mira.post(channel, "mira, before");
+		const his = await marcus.post(channel, "marcus, before");
+		const theirs = await priya.post(channel, "priya, before");
+		await settle(peers);
+		expect([priya.bodyOf(hers), priya.bodyOf(his), mira.bodyOf(theirs)]).toEqual([
+			"mira, before",
+			"marcus, before",
+			"priya, before",
+		]);
+
+		await mira.sharing.revoke(channel, marcus.pub);
+		await settle(peers);
+
+		for (const id of [hers, his, theirs]) await marcus.edit(id, { body: "rewritten by marcus" });
+		const posted = await marcus.post(channel, "still here");
+		await settle(peers);
+
+		for (const peer of [mira, priya]) {
+			expect([peer.bodyOf(hers), peer.bodyOf(his), peer.bodyOf(theirs)], peer.name).toEqual([
+				"mira, before",
+				"marcus, before",
+				"priya, before",
+			]);
+			expect(peer.bodyOf(posted), peer.name).toBeNull();
+		}
+		// The two who remain still talk, and still edit what they wrote before.
+		await priya.edit(theirs, { body: "priya, edited after" });
+		await mira.edit(his, { body: "marcus, moderated by the owner" });
+		await settle(peers);
+		expect(mira.bodyOf(theirs)).toBe("priya, edited after");
+		expect(priya.bodyOf(his)).toBe("marcus, moderated by the owner");
+	});
+
+	it("a revoked member cannot escape the container check by moving their message to a channel of their own", async () => {
+		const [mira, marcus] = (await boot("mira", "marcus")) as [Peer, Peer];
+		const channel = await sharedChannel(mira, [{ peer: marcus, role: AccessRole.Editor }], peers);
+		const his = await marcus.post(channel, "his, before");
+		await settle(peers);
+		await mira.sharing.revoke(channel, marcus.pub);
+		await settle(peers);
+
+		const elsewhere = await marcus.create(CHANNEL_TYPE, { name: "mine" });
+		await marcus.edit(his, { conversation: elsewhere, body: "moved and rewritten" });
+		await settle(peers);
+
+		expect(mira.repo.get(his)?.properties.conversation).toBe(channel);
+		expect(mira.bodyOf(his)).toBe("his, before");
+	});
+
+	it("moving a message does not move who may write it: the container it was first seen in still decides", async () => {
+		const [mira, marcus] = (await boot("mira", "marcus")) as [Peer, Peer];
+		const channel = await sharedChannel(mira, [{ peer: marcus, role: AccessRole.Editor }], peers);
+		const his = await marcus.post(channel, "his, before");
+		await settle(peers);
+
+		// While still a member he re-points it at a channel only he is in. The
+		// property changes (it is content, and he may write content)…
+		const elsewhere = await marcus.create(CHANNEL_TYPE, { name: "mine" });
+		await marcus.edit(his, { conversation: elsewhere });
+		await settle(peers);
+		expect(mira.repo.get(his)?.properties.conversation).toBe(elsewhere);
+
+		// …and it buys him nothing once he is removed from the original.
+		await mira.sharing.revoke(channel, marcus.pub);
+		await settle(peers);
+		await marcus.edit(his, { body: "rewritten from the other channel" });
+		await settle(peers);
+		expect(mira.bodyOf(his)).toBe("his, before");
+	});
+
+	it("a member who LEAVES can no longer write the channel's messages either", async () => {
+		const [mira, marcus] = (await boot("mira", "marcus")) as [Peer, Peer];
+		const channel = await sharedChannel(mira, [{ peer: marcus, role: AccessRole.Editor }], peers);
+		const his = await marcus.post(channel, "his, before");
+		const hers = await mira.post(channel, "hers, before");
+		await settle(peers);
+
+		expect(await marcus.sharing.revoke(channel, marcus.pub)).toBe(true);
+		await settle(peers);
+		expect(await mira.activeMembersOf(channel)).toEqual([mira.pub]);
+
+		await marcus.edit(his, { body: "from outside" });
+		await marcus.edit(hers, { body: "from outside" });
+		await settle(peers);
+		expect([mira.bodyOf(his), mira.bodyOf(hers)]).toEqual(["his, before", "hers, before"]);
+	});
+
+	it("what the owner writes after removing a member is not readable by them — new messages AND edits to old ones", async () => {
+		const [mira, marcus, priya] = (await boot("mira", "marcus", "priya")) as [Peer, Peer, Peer];
+		const channel = await sharedChannel(
+			mira,
+			[
+				{ peer: marcus, role: AccessRole.Editor },
+				{ peer: priya, role: AccessRole.Editor },
+			],
+			peers,
+		);
+		const hers = await mira.post(channel, "hers, before");
+		const his = await marcus.post(channel, "his, before");
+		await settle(peers);
+
+		await mira.sharing.revoke(channel, marcus.pub);
+		await settle(peers);
+		await mira.edit(hers, { body: "hers, after — not for marcus" });
+		await mira.edit(his, { body: "his, moderated — not for marcus" });
+		await settle(peers);
+
+		// The survivor installed the rotated keys and reads both edits.
+		expect(priya.bodyOf(hers)).toBe("hers, after — not for marcus");
+		expect(priya.bodyOf(his)).toBe("his, moderated — not for marcus");
+		// The removed member still has what was delivered before (not a goal to
+		// take back) and nothing after.
+		expect(marcus.bodyOf(hers)).toBe("hers, before");
+		expect(marcus.bodyOf(his)).toBe("his, before");
+		// No message carries a wrap of its CURRENT key for him.
+		for (const id of [hers, his]) expect(await mira.holdsCurrentWrapFor(id, marcus), id).toBe(false);
+	});
+
+	it("a removed member cannot re-key a message, not even one they authored", async () => {
+		const [mira, marcus] = (await boot("mira", "marcus")) as [Peer, Peer];
+		const channel = await sharedChannel(mira, [{ peer: marcus, role: AccessRole.Editor }], peers);
+		const his = await marcus.post(channel, "his, before");
+		await settle(peers);
+		await mira.sharing.revoke(channel, marcus.pub);
+		await settle(peers);
+
+		// He is the root owner of his own message, which is exactly who may rotate
+		// an entity's key. He seals one of his choosing to the owner's device.
+		const before = await mira.dekVersionOf(his);
+		await marcus.pushHostileKey(his, mira, before + 1);
+		await settle(peers);
+		expect(await mira.dekVersionOf(his)).toBe(before);
+	});
+
+	it("a re-invited member posts again and is handed the history again", async () => {
+		const [mira, marcus] = (await boot("mira", "marcus")) as [Peer, Peer];
+		const channel = await sharedChannel(mira, [{ peer: marcus, role: AccessRole.Editor }], peers);
+		const hers = await mira.post(channel, "hers, before");
+		const his = await marcus.post(channel, "his, before");
+		await settle(peers);
+		await mira.sharing.revoke(channel, marcus.pub);
+		await settle(peers);
+		await mira.edit(hers, { body: "hers, while he was out" });
+		await settle(peers);
+
+		const invite = await marcus.sharing.createInvite("marcus");
+		await mira.sharing.shareCollection({
+			entityId: channel,
+			type: CHANNEL_TYPE,
+			invite,
+			role: AccessRole.Editor,
+		});
+		await mira.live.refreshMembership(channel, CHANNEL_TYPE);
+		await settle(peers);
+
+		const posted = await marcus.post(channel, "back");
+		await settle(peers);
+		expect(mira.bodyOf(posted)).toBe("back");
+		// The owner's earlier message comes back to him current, and he may edit
+		// his own earlier one again.
+		expect(marcus.bodyOf(hers)).toBe("hers, while he was out");
+		await marcus.edit(his, { body: "his, edited after returning" });
+		await settle(peers);
+		expect(mira.bodyOf(his)).toBe("his, edited after returning");
+	});
+
+	it("the owner re-asserts a revoke a current member blanks out, as soon as the tampering reaches it", async () => {
+		const [mira, marcus, priya] = (await boot("mira", "marcus", "priya")) as [Peer, Peer, Peer];
+		const channel = await sharedChannel(
+			mira,
+			[
+				{ peer: marcus, role: AccessRole.Editor },
+				{ peer: priya, role: AccessRole.Editor },
+			],
+			peers,
+		);
+		await mira.sharing.revoke(channel, marcus.pub);
+		await settle(peers);
+
+		// Priya, still an Editor, blanks the revoke: an ordinary update from an
+		// authorized writer, applied whole on every device.
+		await priya.sharing.mutateAndEmit(channel, (doc) => {
+			for (const entry of getAccessArray(doc).toArray()) {
+				if (entry.get("member") !== marcus.pub) continue;
+				entry.set("revokedAt", null);
+				entry.set("revokedBy", null);
+				entry.set("revokeSig", null);
+			}
+		});
+		await settle(peers);
+
+		// What the DOC says, with no device memory to lean on - which is all a
+		// device that was offline for the revoke would have. The owner put the
+		// revoke back without anyone touching the record again, and it travelled.
+		for (const peer of [mira, priya]) {
+			const { doc } = await peer.session.ydocStore.load(channel);
+			try {
+				const inDocAlone = activeMembers(doc, channel, { root: mira.pub }).map((m) => m.member);
+				expect(inDocAlone, peer.name).not.toContain(marcus.pub);
+			} finally {
+				doc.destroy();
+			}
+		}
 	});
 
 	it("a message posted while a member is offline is NOT delivered later; the next one is", async () => {

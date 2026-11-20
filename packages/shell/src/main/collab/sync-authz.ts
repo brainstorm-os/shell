@@ -7,6 +7,9 @@
  *   - `authorizeWriter`      — may this authenticated sender's update be applied?
  *   - `authorizeWrapInstall` — may this sender install (rotate) the entity DEK?
  *
+ * For a shared CHILD (a channel's message), the writer and the wrap-install
+ * decisions additionally apply the container rule (`admittedByContainers`).
+ *
  * All three read the record through the owner-rooted policy under this
  * device's pinned trust (`AccessTrustStore.trustFor`). None of them reads a raw
  * entry, and each fails closed on any error.
@@ -63,6 +66,35 @@ function senderKeyOf(senderPubB64Url: string): Uint8Array | null {
 	return key.length === ED25519_PUBLIC_BYTES ? key : null;
 }
 
+/**
+ * THE CONTAINER RULE. Is `senderKey` a current Editor+ of every container that
+ * governs `entityId`? Vacuously true for an entity that is not a cascade child.
+ *
+ * A channel's message is its own entity with its own record, and its author is
+ * that record's root owner - which no revoke can undo. So "removed from the
+ * channel" cannot be enforced on the message's record alone: the removed member
+ * would keep every message they wrote, and every message they were granted on
+ * until someone revoked them child by child. Asking the container makes the
+ * removal hold for the whole history at once, their own messages included, on
+ * every device that has seen the container's revoke.
+ */
+async function admittedByContainers(
+	deps: SyncAuthzDeps,
+	containers: readonly string[],
+	senderKey: Uint8Array,
+): Promise<boolean> {
+	for (const containerId of containers) {
+		const { doc } = await deps.session.ydocStore.load(containerId);
+		try {
+			const trust = deps.accessTrust.trustFor(doc, containerId);
+			if (!isAuthorizedWriter(doc, containerId, senderKey, trust)) return false;
+		} finally {
+			doc.destroy();
+		}
+	}
+	return true;
+}
+
 export function createSyncAuthz(deps: SyncAuthzDeps): SyncAuthz {
 	const { session, dekStore, accessTrust } = deps;
 	const onBootstrapRefused =
@@ -111,8 +143,9 @@ export function createSyncAuthz(deps: SyncAuthzDeps): SyncAuthz {
 			try {
 				const { doc } = await session.ydocStore.load(entityId);
 				try {
-					if (isAuthorizedWriter(doc, entityId, senderKey, accessTrust.trustFor(doc, entityId))) {
-						return true;
+					const trust = accessTrust.trustFor(doc, entityId);
+					if (isAuthorizedWriter(doc, entityId, senderKey, trust)) {
+						return admittedByContainers(deps, accessTrust.containersOf(doc, entityId, trust), senderKey);
 					}
 					const verdict = await authorizeShareBootstrap({
 						localDoc: doc,
@@ -128,8 +161,17 @@ export function createSyncAuthz(deps: SyncAuthzDeps): SyncAuthz {
 						typeOf: deps.typeOf,
 						accessTrust,
 					});
-					if (verdict !== ShareBootstrapVerdict.Allow) onBootstrapRefused(entityId, verdict);
-					return verdict === ShareBootstrapVerdict.Allow;
+					if (verdict !== ShareBootstrapVerdict.Allow) {
+						onBootstrapRefused(entityId, verdict);
+						return false;
+					}
+					// The gate checked the GRANTER against the container; the frame's
+					// sender has to stand in it too. (The gate pinned the container.)
+					return admittedByContainers(
+						deps,
+						accessTrust.containersOf(doc, entityId, { root: null }),
+						senderKey,
+					);
 				} finally {
 					doc.destroy();
 				}
@@ -151,15 +193,21 @@ export function createSyncAuthz(deps: SyncAuthzDeps): SyncAuthz {
 				if (!holdsDek) return true; // bootstrap: no key to substitute
 				const { doc } = await session.ydocStore.load(entityId);
 				try {
-					return authorizesWrapInstall({
+					const trust = accessTrust.trustFor(doc, entityId);
+					const allowed = authorizesWrapInstall({
 						entityId,
 						senderKey,
 						selfPub: session.identity.publicKey,
 						holdsDek,
 						localDoc: doc,
-						trust: accessTrust.trustFor(doc, entityId),
+						trust,
 						decodeMemberKey: base64ToBytes,
 					});
+					if (!allowed || keyBytesEqual(senderKey, session.identity.publicKey)) return allowed;
+					// A child's key is rotated only by someone who still stands in its
+					// container: its author stays its Owner for ever, and must not be
+					// able to re-key it after being removed from the channel.
+					return admittedByContainers(deps, accessTrust.containersOf(doc, entityId, trust), senderKey);
 				} finally {
 					doc.destroy();
 				}
