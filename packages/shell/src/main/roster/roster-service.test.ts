@@ -24,14 +24,16 @@ import * as Y from "yjs";
 import type { Envelope } from "../../ipc/envelope";
 import { ENVELOPE_PROTOCOL_VERSION } from "../../ipc/envelope";
 import { AccessRole, grantAccess } from "../collab/access-record";
+import { AccessTrustStore } from "../collab/access-trust";
 import {
 	fingerprintPublicKey,
 	generateIdentity,
+	publicKeyFromSecret,
 	publicKeyToBase64,
 	signPayload as signWith,
 } from "../credentials/identity";
 import { DataStores } from "../storage/data-stores";
-import { EntitiesRepository } from "../storage/entities-repo";
+import { AccessTrustRepository, EntitiesRepository } from "../storage/entities-repo";
 import { YDocStore } from "../storage/ydoc-store";
 import type { VaultSession } from "../vault/session";
 import {
@@ -74,6 +76,8 @@ async function makeEnv() {
 			signWith(selfKp.secretKey, p),
 		ydocStore,
 		dataStores: stores,
+		accessTrust: async () =>
+			new AccessTrustStore(new AccessTrustRepository(await stores.open("entities")), selfPub),
 	} as unknown as VaultSession;
 	return { vaultDir, stores, ydocStore, selfKp, selfPub, session };
 }
@@ -86,6 +90,15 @@ async function grantMemberOnDisk(
 	role: AccessRole,
 ): Promise<void> {
 	const doc = new Y.Doc();
+	// The granter's genesis grant first: a grant only counts when its signer is
+	// an owner of the record, and the genesis grant is what makes them one.
+	grantAccess(doc, {
+		entityId: CHANNEL,
+		member: publicKeyToBase64(publicKeyFromSecret(granterSecret)),
+		role: AccessRole.Owner,
+		signerSecret: granterSecret,
+		now: 999,
+	});
 	grantAccess(doc, { entityId: CHANNEL, member, role, signerSecret: granterSecret, now: 1000 });
 	await ydocStore.appendUpdate(CHANNEL, Y.encodeStateAsUpdate(doc));
 	doc.destroy();

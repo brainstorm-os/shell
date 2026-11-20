@@ -17,7 +17,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { encryptAndEmit, receiveAndApply } from "../sync/envelope-pipeline";
 import { removeTestDir } from "../test-support/remove-test-dir";
-import { AccessRole, resolveMembers } from "./access-record";
+import { AccessRole, docTrust, resolveMembers } from "./access-record";
 import { CollabLink, REMOTE_ORIGIN } from "./collab-harness";
 
 const BRIEF = "ent_northbound_brief";
@@ -93,7 +93,7 @@ describe("collab C4 — Mira ↔ Marcus two-vault scenarios", () => {
 		// validly revoked — "who had access between X and Y" is still answerable.
 		const marcusDoc = link.collaborator.docs.get(BRIEF);
 		if (!marcusDoc) throw new Error("expected Marcus brief doc");
-		const history = resolveMembers(marcusDoc, BRIEF).filter(
+		const history = resolveMembers(marcusDoc, BRIEF, docTrust(marcusDoc, BRIEF)).filter(
 			(m) => m.member === link.collaborator.userPubB64,
 		);
 		expect(history).toHaveLength(1);

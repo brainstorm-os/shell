@@ -434,4 +434,39 @@ export const ENTITIES_MIGRATIONS: SqliteMigration[] = [
 			`);
 		},
 	},
+	{
+		version: 14,
+		description: "entities.db v14 — access_roots + access_statements (0.16.0 sharing authorization)",
+		up: (db) => {
+			// The membership of a shared entity is a log of signed statements INSIDE
+			// the entity's own doc, which every member can write. Two things about
+			// it therefore have to live where a collaborator cannot reach:
+			//
+			//  - `access_roots` — the entity's root owner, pinned the first time
+			//    this device sees the record (trust on first use from whoever handed
+			//    us the DEK) and never replaced. Authority chains from it.
+			//  - `access_statements` — the signed grants and revokes this device has
+			//    seen take effect. The doc is only their transport: deleting one
+			//    from the array does not un-revoke or un-grant here.
+			//
+			// No FK to `entities`: a root is pinned at the share bootstrap gate, when
+			// the row may not exist yet, and a pruned entity must not silently lose
+			// its pin. LOCAL state — never syncs, never crosses the wire.
+			db.exec(`
+				CREATE TABLE access_roots (
+					entity_id  TEXT PRIMARY KEY,
+					root_pub   TEXT NOT NULL,
+					pinned_at  INTEGER NOT NULL
+				);
+				CREATE TABLE access_statements (
+					entity_id  TEXT NOT NULL,
+					kind       TEXT NOT NULL,
+					sig        TEXT NOT NULL,
+					body       TEXT NOT NULL,
+					seen_at    INTEGER NOT NULL,
+					PRIMARY KEY (entity_id, kind, sig)
+				);
+			`);
+		},
+	},
 ];

@@ -46,7 +46,7 @@ import type { ContactsStore } from "../collab/contacts-store";
 import { cacheRemoteProfile } from "../collab/profile-store";
 import { type ShareInvite, inviteProfile, verifyShareInvite } from "../collab/share-invite";
 import type { CollabAccessView, CollabRelayLike } from "../collab/sharing-engine";
-import { SharingEngine } from "../collab/sharing-engine";
+import { SharingDeniedError, SharingEngine } from "../collab/sharing-engine";
 import type { EntitiesRepository } from "../storage/entities-repo";
 import type { SettingsRepository } from "../storage/settings-repo";
 import type { VaultSession } from "../vault/session";
@@ -89,6 +89,18 @@ function makeError(name: string, message: string): Error {
 	const err = new Error(message);
 	err.name = name;
 	return err;
+}
+
+/** The engine refuses a membership change the local identity has no authority
+ *  to make (only an owner may share or remove; nobody may remove the root
+ *  owner). Surface it as the broker's `Denied`, like a missing capability. */
+async function asDenied<T>(run: () => Promise<T>): Promise<T> {
+	try {
+		return await run();
+	} catch (error) {
+		if (error instanceof SharingDeniedError) throw makeError("Denied", error.message);
+		throw error;
+	}
 }
 
 const ROSTER_TO_ACCESS_ROLE: Readonly<Record<RosterRole, AccessRole>> = {
@@ -295,7 +307,7 @@ export function makeSharingServiceHandler(options: SharingServiceOptions): Servi
 		if (!entityId || !type) throw makeError("Invalid", "sharing.share: entityId + type required");
 		const invite = await resolveInvite(input, options);
 		const role = parseRole(input.role);
-		const view = await engineFor().share({ entityId, type, invite, role });
+		const view = await asDenied(() => engineFor().share({ entityId, type, invite, role }));
 		options.refreshMembership?.(entityId, type);
 		return view.map(toSharedMember);
 	}
@@ -310,7 +322,7 @@ export function makeSharingServiceHandler(options: SharingServiceOptions): Servi
 		}
 		const invite = await resolveInvite(input, options);
 		const role = parseRole(input.role);
-		const view = await engineFor().shareCollection({ entityId, type, invite, role });
+		const view = await asDenied(() => engineFor().shareCollection({ entityId, type, invite, role }));
 		options.refreshMembership?.(entityId, type);
 		return view.map(toSharedMember);
 	}
@@ -325,7 +337,7 @@ export function makeSharingServiceHandler(options: SharingServiceOptions): Servi
 			throw makeError("Invalid", "sharing.revoke: entityId + member required");
 		}
 		const engine = engineFor();
-		await engine.revoke(entityId, member);
+		await asDenied(() => engine.revoke(entityId, member));
 		if (type) options.refreshMembership?.(entityId, type);
 		return (await engine.access(entityId)).map(toSharedMember);
 	}

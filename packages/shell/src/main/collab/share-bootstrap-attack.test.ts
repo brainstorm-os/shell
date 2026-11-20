@@ -150,6 +150,7 @@ describe("Collab-C5-invite-anchor — a co-member cannot inject a second entity"
 				now,
 				invites: aliceInvites,
 				deriveInviteSecret: (n, exp) => deriveInviteSecret((b) => alice.signPayload(b), n, exp),
+				accessTrust: await alice.accessTrust(),
 				loadDoc: async (id) => (await alice.ydocStore.load(id)).doc,
 				typeOf: (id) => types[id] ?? null,
 			});
@@ -418,6 +419,7 @@ describe("Collab-C5-invite-anchor — a co-member cannot inject a second entity"
 							now: Date.now(),
 							invites: aliceInvites,
 							deriveInviteSecret: (n, exp) => deriveInviteSecret((b) => alice.signPayload(b), n, exp),
+							accessTrust: await alice.accessTrust(),
 							loadDoc: async (id) => (await alice.ydocStore.load(id)).doc,
 							typeOf: () => null,
 						}),
@@ -565,28 +567,46 @@ describe("Collab-C5-invite-anchor — a co-member cannot inject a second entity"
 	});
 
 	it("REVOKED: a member removed from the container can no longer cascade into it", async () => {
-		const invite = await aliceEngine.createInvite("Alice");
-		const channel = forgeState(SHARED, { anchor: anchorOf(invite, SHARED) });
-		expect(await aliceGate(SHARED, channel)).toBe(ShareBootstrapVerdict.Allow);
-		await alice.ydocStore.appendUpdate(SHARED, channel);
-
+		// The container is ALICE's: she owns it, Mallory is an Editor in it. (Before
+		// 0.16 this case had Mallory own the container and Alice, a mere Editor,
+		// revoke her — which the authorization policy no longer lets a member do.)
+		await aliceEngine.provisionEntity(SHARED, "io.brainstorm.chat/Channel/v1");
+		const accessTrust = await alice.accessTrust();
+		const exposed = alice.exposeIdentityForPairing();
+		const mutate = async (change: (doc: Y.Doc) => void): Promise<void> => {
+			const { doc } = await alice.ydocStore.load(SHARED);
+			try {
+				const before = Y.encodeStateVector(doc);
+				change(doc);
+				await alice.ydocStore.appendUpdate(SHARED, Y.encodeStateAsUpdate(doc, before));
+			} finally {
+				doc.destroy();
+			}
+		};
+		await mutate((doc) =>
+			grantAccess(doc, {
+				entityId: SHARED,
+				member: mallory.identity.publicKeyBase64,
+				role: AccessRole.Editor,
+				signerSecret: exposed.secretKey,
+				now: Date.now(),
+				x25519: mallory.deviceX25519.publicKeyBase64,
+				trust: accessTrust.trustFor(doc, SHARED),
+			}),
+		);
 		// Alice revokes Mallory on her own copy of the container. Mallory's later
 		// cascade claim resolves against THAT record, not the one she sends.
-		const { doc } = await alice.ydocStore.load(SHARED);
-		try {
-			const exposed = alice.exposeIdentityForPairing();
+		await mutate((doc) => {
 			expect(
 				revokeAccess(doc, {
 					entityId: SHARED,
 					member: mallory.identity.publicKeyBase64,
 					signerSecret: exposed.secretKey,
 					now: Date.now(),
+					trust: accessTrust.trustFor(doc, SHARED),
 				}),
 			).toBe(true);
-			await alice.ydocStore.appendUpdate(SHARED, Y.encodeStateAsUpdate(doc));
-		} finally {
-			doc.destroy();
-		}
+		});
 
 		const types = { [SHARED]: "io.brainstorm.chat/Channel/v1", [INJECTED]: MESSAGE_TYPE_URL };
 		const child = forgeState(INJECTED, { via: SHARED });
@@ -616,8 +636,11 @@ describe("Collab-C5-invite-anchor — a co-member cannot inject a second entity"
 				now: Date.now(),
 				anchor,
 			});
+			// Nobody in this record is an owner at all, so it has no root of
+			// authority: refused one layer earlier than the anchor's granter check
+			// (which it would also fail — `DenyGranterNotOwner` before 0.16).
 			expect(await aliceGate(INJECTED, Y.encodeStateAsUpdate(doc))).toBe(
-				ShareBootstrapVerdict.DenyGranterNotOwner,
+				ShareBootstrapVerdict.DenyNoRoot,
 			);
 		} finally {
 			doc.destroy();

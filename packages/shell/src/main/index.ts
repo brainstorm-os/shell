@@ -155,13 +155,10 @@ import { BundleExportScopeKind } from "./bundle/bundle-format";
 import { exportVaultBundle } from "./bundle/vault-export";
 import { importVaultBundle } from "./bundle/vault-import";
 import { makeCalDavServiceHandler } from "./caldav/caldav-service";
-import { isAuthorizedWriter, keyBytesEqual, resolveMembers } from "./collab/access-record";
 import { createAutoShareReactor } from "./collab/auto-share-reactor";
 import { ContactsStore, contactsStorePath } from "./collab/contacts-store";
-import { deriveInviteSecret } from "./collab/invite-anchor";
 import { LastEditRecorder } from "./collab/last-edit-recorder";
-import { ShareBootstrapVerdict, authorizeShareBootstrap } from "./collab/share-bootstrap-authz";
-import { authorizesWrapInstall } from "./collab/wrap-install-authz";
+import { createSyncAuthz } from "./collab/sync-authz";
 import { makeConnectorsServiceHandler } from "./connectors/connectors-service";
 import { makeNetworkEgress } from "./connectors/egress";
 import { buildConnectorsServiceDeps } from "./connectors/wiring";
@@ -4021,39 +4018,17 @@ void app.whenReady().then(async () => {
 				// object (verified inbound sender, or this device on a local edit).
 				const lastEditRecorder = new LastEditRecorder(entitiesRepo.lastEdits);
 				const shareInvites = new ShareInvitesRepository(entitiesDb);
-				// Collab-C5 - see `authorizesWrapInstall`: a DEK ROTATION must come
-				// from an Owner (or ourselves), or any member could re-key an entity
-				// out from under its owner. Fail-closed on any read error.
-				const authorizeWrapInstall = async (
-					entityId: string,
-					senderPubB64: string,
-				): Promise<boolean> => {
-					// See the note on the writer predicate: base64url decoding is
-					// lossy, not throwing, so length-check the key outright.
-					const senderKey = base64UrlToBytes(senderPubB64);
-					if (senderKey.length !== ED25519_PUBLIC_BYTES) return false;
-					try {
-						const existing = dekStore.open(entityId);
-						const holdsDek = existing !== null;
-						if (existing) dekStore.close(existing.dek);
-						if (!holdsDek) return true; // bootstrap: no key to substitute
-						const { doc } = await session.ydocStore.load(entityId);
-						try {
-							return authorizesWrapInstall({
-								entityId,
-								senderKey,
-								selfPub: session.identity.publicKey,
-								holdsDek,
-								localDoc: doc,
-								decodeMemberKey: base64ToBytes,
-							});
-						} finally {
-							doc.destroy();
-						}
-					} catch {
-						return false;
-					}
-				};
+				// The record-reading decisions (is it shared, may this sender write,
+				// may this sender rotate the DEK) live in `createSyncAuthz`, all under
+				// the owner-rooted policy and this vault's pinned trust.
+				const syncAuthz = createSyncAuthz({
+					session,
+					dekStore,
+					accessTrust: await session.accessTrust(),
+					shareInvites,
+					typeOf: (id) => entitiesRepo.get(id)?.type ?? null,
+				});
+				const authorizeWrapInstall = syncAuthz.authorizeWrapInstall;
 				const engine = installLiveSyncEngine({
 					getRelay: () => getActiveRelay(),
 					onEdit: (entityId, editor) => lastEditRecorder.note(entityId, editor),
@@ -4065,72 +4040,8 @@ void app.whenReady().then(async () => {
 					// (whose type the engine already holds), so this fallback is
 					// effectively unused — return null rather than touch the repo.
 					resolveEntityType: () => null,
-					// Shared ⇔ the signed access record lists >1 ACTIVE member.
-					// Read off the persisted doc (the worker persists synchronously
-					// before `loadDoc` returns, so the record is current here).
-					isShared: async (entityId) => {
-						const { doc } = await session.ydocStore.load(entityId);
-						try {
-							return resolveMembers(doc, entityId).filter((m) => m.active).length > 1;
-						} catch {
-							return false;
-						} finally {
-							doc.destroy();
-						}
-					},
-					// Collab-C5 (F-288) — a remote update applies only if its
-					// authenticated sender is an Editor+ member of the entity;
-					// a Viewer's signed edit drops here. Reads the same persisted
-					// access record `isShared` does. Fail-closed on any error (a
-					// doc we can't read the record from doesn't get written to).
-					//
-					// Two branches exist above the persisted-record check because a
-					// record is not always LOCAL yet, and denying those cases is a
-					// deadlock rather than a safe refusal:
-					//   1. our OWN sovereign key - a paired device and the cold-restore
-					//      backfill both re-deliver this identity's own data, and a
-					//      never-shared entity has no access record at all to check;
-					//   2. the share BOOTSTRAP - the first frame of a new share carries
-					//      the signed record that authorizes it. Signatures alone cannot
-					//      root that (an attacker signs their own grants), so
-					//      `authorizeShareBootstrap` additionally demands an out-of-band
-					//      anchor: the granter's echo of the single-use secret from an
-					//      invite THIS vault minted, or - for a collection cascade - a
-					//      container this vault is already a member of.
-					authorizeWriter: async (senderPubB64, entityId, plaintext) => {
-						// `Buffer.from(s, "base64url")` does NOT throw on junk - it drops
-						// invalid characters and returns a short buffer - so state the
-						// invariant explicitly rather than relying on a catch that can
-						// never fire.
-						const senderKey = base64UrlToBytes(senderPubB64);
-						if (senderKey.length !== ED25519_PUBLIC_BYTES) return false;
-						if (keyBytesEqual(senderKey, session.identity.publicKey)) return true;
-						const { doc } = await session.ydocStore.load(entityId);
-						try {
-							if (isAuthorizedWriter(doc, entityId, senderKey)) return true;
-							const verdict = await authorizeShareBootstrap({
-								localDoc: doc,
-								entityId,
-								senderKey,
-								selfPubB64: session.identity.publicKeyBase64,
-								incomingState: plaintext,
-								now: Date.now(),
-								invites: shareInvites,
-								deriveInviteSecret: (nonce, expiresAt) =>
-									deriveInviteSecret((bytes) => session.signPayload(bytes), nonce, expiresAt),
-								loadDoc: async (id) => (await session.ydocStore.load(id)).doc,
-								typeOf: (id) => entitiesRepo.get(id)?.type ?? null,
-							});
-							if (verdict !== ShareBootstrapVerdict.Allow) {
-								console.warn(`[collab] share bootstrap refused for ${entityId}: ${verdict}`);
-							}
-							return verdict === ShareBootstrapVerdict.Allow;
-						} catch {
-							return false;
-						} finally {
-							doc.destroy();
-						}
-					},
+					isShared: syncAuthz.isShared,
+					authorizeWriter: syncAuthz.authorizeWriter,
 					applyRemoteUpdate: makeRemoteDocApplier({
 						apply: () => applyRemoteDocFn,
 						noteSender: (entityId, sender) =>

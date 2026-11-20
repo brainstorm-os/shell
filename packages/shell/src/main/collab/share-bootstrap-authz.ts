@@ -45,18 +45,22 @@
  */
 
 import * as Y from "yjs";
+import { bytesToBase64 } from "../credentials/crypto";
 import { ENTITY_META_TOP } from "../credentials/member-wraps";
 import { readEntityDocProjection } from "../entities/entity-doc-codec";
 import {
 	AccessRole,
+	type AccessTrust,
 	MAX_BOOTSTRAP_STATE_BYTES,
 	type ResolvedMember,
+	activeMembers,
+	docTrust,
+	hasAccessEntries,
 	isActiveMember,
 	isAuthorizedWriter,
-	resolveCurrentMembers,
-	resolveMembers,
 	roleAtLeast,
 } from "./access-record";
+import type { AccessTrustStore } from "./access-trust";
 import { containmentRuleForParent } from "./containment-registry";
 import {
 	type DeriveInviteSecretFn,
@@ -89,6 +93,8 @@ export enum ShareBootstrapVerdict {
 	DenyContainerChildType = "deny-container-child-type",
 	DenyContainerNotAChild = "deny-container-not-a-child",
 	DenyLocalContent = "deny-local-content",
+	DenyNoRoot = "deny-no-root",
+	DenyRootMismatch = "deny-root-mismatch",
 	DenyUnreadable = "deny-unreadable",
 }
 
@@ -124,6 +130,9 @@ export type ShareBootstrapAuthzInput = {
 	loadDoc: (entityId: string) => Promise<Y.Doc>;
 	/** The locally materialized reverse-DNS type of an entity, or null. */
 	typeOf: (entityId: string) => string | null;
+	/** This vault's pinned roots + remembered statements. The gate resolves the
+	 *  CONTAINER through it, and pins the entity's root owner on `Allow`. */
+	accessTrust: AccessTrustStore;
 };
 
 /** Does this doc already carry entity CONTENT, as opposed to the meta map that
@@ -140,22 +149,33 @@ function selfGrantIn(
 	probe: Y.Doc,
 	entityId: string,
 	selfPubB64: string,
+	trust: AccessTrust,
 ): ResolvedMember | undefined {
-	return resolveCurrentMembers(probe, entityId).find((m) => m.active && m.member === selfPubB64);
+	return activeMembers(probe, entityId, trust).find((m) => m.member === selfPubB64);
 }
 
 /** Is `granterPubB64` an active Owner in the state being offered? The person who
  *  redeemed our invite has to be an owner of the thing they are handing us. */
-function granterIsOwner(probe: Y.Doc, entityId: string, granterPubB64: string): boolean {
-	return resolveCurrentMembers(probe, entityId).some(
-		(m) => m.active && m.member === granterPubB64 && roleAtLeast(m.role, AccessRole.Owner),
+function granterIsOwner(
+	probe: Y.Doc,
+	entityId: string,
+	granterPubB64: string,
+	trust: AccessTrust,
+): boolean {
+	return activeMembers(probe, entityId, trust).some(
+		(m) => m.member === granterPubB64 && roleAtLeast(m.role, AccessRole.Owner),
 	);
 }
 
 /** Is `granterPubB64` an active Editor-or-better of the container? */
-function granterMayCascade(container: Y.Doc, containerId: string, granterPubB64: string): boolean {
-	return resolveCurrentMembers(container, containerId).some(
-		(m) => m.active && m.member === granterPubB64 && roleAtLeast(m.role, AccessRole.Editor),
+function granterMayCascade(
+	container: Y.Doc,
+	containerId: string,
+	granterPubB64: string,
+	trust: AccessTrust,
+): boolean {
+	return activeMembers(container, containerId, trust).some(
+		(m) => m.member === granterPubB64 && roleAtLeast(m.role, AccessRole.Editor),
 	);
 }
 
@@ -172,10 +192,13 @@ async function authorizeContainerDescent(
 		return ShareBootstrapVerdict.DenyContainerUnreadable;
 	}
 	try {
-		if (!isActiveMember(container, containerId, input.selfPubB64)) {
+		// The container is a doc this vault already HOLDS, so it is judged under
+		// its pinned root — not under whatever the incoming frame claims.
+		const containerTrust = input.accessTrust.trustFor(container, containerId);
+		if (!isActiveMember(container, containerId, input.selfPubB64, containerTrust)) {
 			return ShareBootstrapVerdict.DenyContainerNotMember;
 		}
-		if (!granterMayCascade(container, containerId, granterPubB64)) {
+		if (!granterMayCascade(container, containerId, granterPubB64, containerTrust)) {
 			return ShareBootstrapVerdict.DenyContainerGranterNotMember;
 		}
 		// The container's type is LOCAL - we are a member, so we hold its row.
@@ -236,31 +259,46 @@ export async function authorizeShareBootstrap(
 		if (hasContentRoots(input.localDoc)) return ShareBootstrapVerdict.DenyLocalContent;
 		// A doc that already resolved a record is authoritative, so no later frame
 		// can re-bootstrap around a revoke.
-		if (resolveMembers(input.localDoc, input.entityId).length > 0) {
-			return ShareBootstrapVerdict.DenyLocalRecord;
-		}
+		if (hasAccessEntries(input.localDoc)) return ShareBootstrapVerdict.DenyLocalRecord;
 		probe = new Y.Doc();
 		Y.applyUpdate(probe, input.incomingState);
 	} catch {
 		return ShareBootstrapVerdict.DenyUnreadable;
 	}
 	try {
+		// Layer 0 (0.16.0): the root of authority. This device holds no record for
+		// the entity, so the root is taken on first sight from the record offered
+		// - the self-signed Owner grant of the sender who is handing us the DEK,
+		// or failing that the one candidate under which we are a member. Every
+		// check below is the owner-rooted policy under THAT root, so a grant the
+		// sender signed without being an owner does not make anyone a member. A
+		// record that does not single a root out is refused, not guessed at; so is
+		// one that disagrees with a root this vault pinned earlier.
+		const root = docTrust(probe, input.entityId, {
+			self: input.selfPubB64,
+			sender: bytesToBase64(input.senderKey),
+		}).root;
+		if (root === null) return ShareBootstrapVerdict.DenyNoRoot;
+		const pinned = input.accessTrust.rootOf(input.entityId);
+		if (pinned !== null && pinned !== root) return ShareBootstrapVerdict.DenyRootMismatch;
+		const trust: AccessTrust = { root };
 		// Layer 1 (F-288): the offered record must make the AUTHENTICATED sender an
 		// active Editor+. Necessary, not sufficient — see the module header.
-		if (!isAuthorizedWriter(probe, input.entityId, input.senderKey)) {
+		if (!isAuthorizedWriter(probe, input.entityId, input.senderKey, trust)) {
 			return ShareBootstrapVerdict.DenySenderNotWriter;
 		}
 		// Every legitimate bootstrap is a record that MAKES US A MEMBER. A state
 		// that does not name us has no business creating an entity in our vault,
 		// whatever it says about its sender.
-		const selfGrant = selfGrantIn(probe, input.entityId, input.selfPubB64);
+		const selfGrant = selfGrantIn(probe, input.entityId, input.selfPubB64, trust);
 		if (!selfGrant) return ShareBootstrapVerdict.DenyNoSelfGrant;
 
 		// Layer 2: the out-of-band anchor.
+		let verdict = ShareBootstrapVerdict.DenyNoAnchor;
 		if (selfGrant.anchor !== null) {
 			// The anchor was computed by the granter under their own key, so it is
 			// bound to `addedBy`, not to whoever relayed the frame.
-			if (!granterIsOwner(probe, input.entityId, selfGrant.addedBy)) {
+			if (!granterIsOwner(probe, input.entityId, selfGrant.addedBy, trust)) {
 				return ShareBootstrapVerdict.DenyGranterNotOwner;
 			}
 			const redemption = redeemInviteAnchor(input.invites, {
@@ -271,12 +309,13 @@ export async function authorizeShareBootstrap(
 				now: input.now,
 				deriveSecret: input.deriveInviteSecret,
 			});
-			return REDEMPTION_VERDICT[redemption];
+			verdict = REDEMPTION_VERDICT[redemption];
+		} else if (selfGrant.via !== null) {
+			verdict = await authorizeContainerDescent(input, probe, selfGrant.via, selfGrant.addedBy);
 		}
-		if (selfGrant.via !== null) {
-			return await authorizeContainerDescent(input, probe, selfGrant.via, selfGrant.addedBy);
-		}
-		return ShareBootstrapVerdict.DenyNoAnchor;
+		// Admitted: from here on this entity's root owner is fixed on this device.
+		if (verdict === ShareBootstrapVerdict.Allow) input.accessTrust.pinRoot(input.entityId, root);
+		return verdict;
 	} catch {
 		return ShareBootstrapVerdict.DenyUnreadable;
 	} finally {

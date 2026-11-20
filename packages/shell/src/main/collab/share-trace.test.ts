@@ -12,6 +12,7 @@ import { getEntityMetaMap } from "../credentials/member-wraps";
 import {
 	AccessRole,
 	ENTITY_ACCESS_KEY,
+	docTrust,
 	getAccessArray,
 	grantAccess,
 	resolveCurrentMembers,
@@ -63,7 +64,7 @@ function reloaded(doc: Y.Doc): Y.Doc {
 }
 
 const activeKeys = (doc: Y.Doc) =>
-	resolveCurrentMembers(doc, ENT)
+	resolveCurrentMembers(doc, ENT, docTrust(doc, ENT))
 		.filter((member) => member.active)
 		.map((member) => member.member);
 
