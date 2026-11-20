@@ -2908,13 +2908,16 @@ export type { BuiltinAgentMentionTarget } from "./builtin-agent";
 
 // ─── Shared agent loop (11b.7 — Automations AIAgent + Agent app) ────────────
 export {
+	AGENT_EMPTY_ANSWER_NUDGE,
 	AGENT_LOOP_DEFAULT_MAX_ITERATIONS,
 	AGENT_LOOP_MAX_ITERATIONS_CEILING,
+	AGENT_NO_ANSWER_REPLY,
 	AgentStopReason,
 	ToolRefusalReason,
 	buildAgentSystemPrompt,
 	intersectAgentTools,
 	parseAgentReply,
+	resolveAgentAnswer,
 	runAgentLoop,
 } from "./agent-loop";
 export type {
@@ -3006,6 +3009,7 @@ export {
 	PROPOSE_DESCRIPTORS,
 	PROPOSE_LONG_MAX,
 	PROPOSE_SHORT_MAX,
+	PROPOSE_CLAIM_GUIDANCE,
 	PROPOSE_TOOL_GUIDANCE,
 	ProposalActionKind,
 	ProposalRejectReason,
