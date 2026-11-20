@@ -35,6 +35,7 @@ import {
 import { LoopbackRelayPort } from "../sync/relay-port";
 import { VaultSession } from "../vault/session";
 import { type AccessRole, isActiveMember, revokeAccess, roleOf } from "./access-record";
+import { AccessTrustStore, inMemoryAccessTrust } from "./access-trust";
 import { type ShareInvite, createShareInviteSigned, shareEntityWithInvite } from "./share-invite";
 
 /** Origin tag for remote-applied updates so a doc's own update observer does
@@ -54,6 +55,9 @@ function freshNonce(): Uint8Array {
  */
 export class CollabVault {
 	readonly docs = new Map<string, Y.Doc>();
+	/** This vault's pinned roots + remembered statements. In-memory: the
+	 *  harness's docs are not the persisted ones `entities.db` sits behind. */
+	readonly accessTrust: AccessTrustStore;
 
 	private constructor(
 		readonly label: string,
@@ -63,7 +67,9 @@ export class CollabVault {
 		readonly ctx: PipelineContext,
 		/** entity id → type, shared with the ctx's `resolveEntity` closure. */
 		private readonly resolvable: Map<string, string>,
-	) {}
+	) {
+		this.accessTrust = new AccessTrustStore(inMemoryAccessTrust(), session.identity.publicKeyBase64);
+	}
 
 	static async create(opts: {
 		label: string;
@@ -187,12 +193,14 @@ export class CollabVault {
 
 	isActiveMember(entityId: string, memberB64: string): boolean {
 		const doc = this.docs.get(entityId);
-		return doc ? isActiveMember(doc, entityId, memberB64) : false;
+		return doc
+			? isActiveMember(doc, entityId, memberB64, this.accessTrust.trustFor(doc, entityId))
+			: false;
 	}
 
 	roleOf(entityId: string, memberB64: string): AccessRole | null {
 		const doc = this.docs.get(entityId);
-		return doc ? roleOf(doc, entityId, memberB64) : null;
+		return doc ? roleOf(doc, entityId, memberB64, this.accessTrust.trustFor(doc, entityId)) : null;
 	}
 
 	/** Resolves once the session has fully released its file handles —
@@ -343,6 +351,7 @@ export class CollabLink {
 			member: memberB64,
 			signerSecret: exposed.secretKey,
 			now: Date.now(),
+			trust: this.owner.accessTrust.trustFor(ownerDoc, entityId),
 		});
 	}
 

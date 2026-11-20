@@ -140,8 +140,13 @@ async function handleMembers(
 	const opts = (envelope.args[1] ?? {}) as { includeAgents?: unknown };
 	const includeAgents = opts.includeAgents === true;
 
+	const accessTrust = await session.accessTrust();
 	const { doc } = await session.ydocStore.load(entityId);
-	const active: ActiveMemberRef[] = activeMembers(doc, entityId).map((m) => ({
+	const active: ActiveMemberRef[] = activeMembers(
+		doc,
+		entityId,
+		accessTrust.trustFor(doc, entityId),
+	).map((m) => ({
 		pubkey: m.member,
 		role: ACCESS_TO_ROSTER_ROLE[m.role],
 	}));

@@ -191,6 +191,39 @@ describe("Collab-C5 — sharing broker service", () => {
 		}
 	});
 
+	it("a member who is not an owner is DENIED sharing or removing anyone (design 71 test-plan 8)", async () => {
+		await ownerBridge.provisionEntity(ENTITY_ID, ENTITY_TYPE);
+		await ownerBridge.editText(ENTITY_ID, "brief");
+		await guestBridge.installShareReceiver(ENTITY_ID, ENTITY_TYPE);
+		await ownerBridge.installShareReceiver(ENTITY_ID, ENTITY_TYPE);
+		const token = (await guestHandler(envelope("createInvite", ["Guest"]))) as ShareInviteToken;
+		await ownerHandler(
+			envelope("share", [
+				{ entityId: ENTITY_ID, type: ENTITY_TYPE, invite: token, role: RosterRole.Editor },
+			]),
+		);
+		await awaitConverged(ownerBridge, guestBridge);
+		const ownerB64 = ownerBridge.whoami().userPubB64;
+
+		// The guest holds the scarce cap in her own vault; it is the POLICY that
+		// refuses — she is an Editor of this entity, not an owner of it.
+		const third = (await ownerHandler(envelope("createInvite", ["Third"]))) as ShareInviteToken;
+		await expect(
+			guestHandler(
+				envelope("share", [
+					{ entityId: ENTITY_ID, type: ENTITY_TYPE, invite: third, role: RosterRole.Viewer },
+				]),
+			),
+		).rejects.toMatchObject({ name: "Denied" });
+		await expect(
+			guestHandler(envelope("revoke", [{ entityId: ENTITY_ID, type: ENTITY_TYPE, member: ownerB64 }])),
+		).rejects.toMatchObject({ name: "Denied" });
+
+		const access = (await ownerHandler(envelope("access", [ENTITY_ID]))) as SharedMember[];
+		expect(access.filter((m) => m.active)).toHaveLength(2);
+		expect(access.find((m) => m.pubkey === ownerB64)?.role).toBe(RosterRole.Owner);
+	});
+
 	it("shareCollection cascades the grant onto the channel's messages (through the service)", async () => {
 		const CHANNEL = "ent_chan_svc";
 		const CHANNEL_TYPE = "io.brainstorm.chat/Channel/v1";
