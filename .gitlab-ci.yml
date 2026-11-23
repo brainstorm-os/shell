@@ -4,12 +4,13 @@
 # they need macOS + Windows runners and the signing/notarisation secrets.
 # Releases are published from a workstation via tools/publish-gitlab-release.sh.
 #
-# Base image is `node:22-bookworm`, NOT a bare debian. better-sqlite3 has no
-# Bun-compatible prebuild, so `bun install` falls back to node-gyp — which needs
-# node, npm, python3 and a C++ toolchain present. A debian-slim base fails the
-# install in ~60s with `node-gyp: command not found`, which is exactly how this
-# pipeline failed five times before. The full (non-slim) node image ships
-# python3 and build-essential; do not "optimise" it to node:22-slim.
+# Base image is `node:22-bookworm`, NOT a bare debian. The Rust addons and any
+# dependency that falls back to node-gyp need node, npm, python3 and a C++
+# toolchain present. A debian-slim base failed the install in ~60s with
+# `node-gyp: command not found` (better-sqlite3 12.x compiled on install; 13.x
+# ships its prebuilds in the package), which is how this pipeline failed five
+# times. The full (non-slim) node image ships python3 and build-essential; do
+# not "optimise" it to node:22-slim.
 #
 # Known coverage gap vs GitHub Actions: no windows-x64 leg. GitLab.com's Linux
 # shared runners are what we use here, so the Windows path/SQLite-lock behaviour
@@ -100,9 +101,6 @@ e2e-smoke:
     - apt-get install -y -qq --no-install-recommends
       xvfb xauth libnss3 libatk-bridge2.0-0 libgtk-3-0 libgbm1 libasound2 libxss1 libxtst6
     - bun run --filter @brainstorm-os/native build:linux-x64
-    # bun install fetches Node-ABI prebuilds; the shell loads these inside
-    # Electron ("Module did not self-register" without the rebuild).
-    - cd packages/shell && bunx @electron/rebuild -f -w better-sqlite3,better-sqlite3-multiple-ciphers && cd -
     - bun run e2e:build
     - xvfb-run --auto-servernum -- npx playwright test --config=playwright.e2e.config.ts
   variables:
@@ -162,7 +160,6 @@ kbn-a11y:
     - apt-get install -y -qq --no-install-recommends
       xvfb xauth libnss3 libatk-bridge2.0-0 libgtk-3-0 libgbm1 libasound2 libxss1 libxtst6
     - bun run --filter @brainstorm-os/native build:linux-x64
-    - cd packages/shell && bunx @electron/rebuild -f -w better-sqlite3,better-sqlite3-multiple-ciphers && cd -
     - bun run e2e:build
     - xvfb-run --auto-servernum -- npx playwright test --config=playwright.config.ts kbn-
   variables:

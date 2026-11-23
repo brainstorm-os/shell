@@ -87,6 +87,16 @@ export async function launchShell(options: LaunchOptions): Promise<LaunchResult>
 			...(options.extraEnv ?? {}),
 		},
 	});
+	// Electron 45 hands Playwright the first window before its document has
+	// started loading (url ""), where 41/42 handed it over already loaded. A
+	// spec that evaluates straight away then dies on "Execution context was
+	// destroyed, most likely because of a navigation". Settle it here once so
+	// every caller's `firstWindow()` is a loaded page.
+	const first = await app.firstWindow({ timeout: options.timeoutMs ?? 60_000 });
+	await first.waitForURL((url) => url.protocol !== "about:" && url.href !== "", {
+		timeout: options.timeoutMs ?? 60_000,
+		waitUntil: "domcontentloaded",
+	});
 	if (options.stdioCapturePath) {
 		const cap = options.stdioCapturePath;
 		const proc = app.process();
