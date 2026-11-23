@@ -99,11 +99,6 @@ jobs:
           CARGO_BUILD_JOBS: 2
         run: bun run --filter @brainstorm-os/native build:linux-x64
 
-      - name: Rebuild SQLite natives for Electron's ABI
-        # bun install fetches Node-ABI prebuilds; the shell loads these inside
-        # Electron ("Module did not self-register" without the rebuild).
-        run: cd packages/shell && bunx @electron/rebuild -f -w better-sqlite3,better-sqlite3-multiple-ciphers
-
       - name: Build shell + apps
         env:
           CARGO_BUILD_JOBS: 2

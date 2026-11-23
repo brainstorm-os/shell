@@ -44,6 +44,7 @@
       "!**/node_modules/@brainstorm-os/native-embed/{src,Cargo.toml,Cargo.lock,build.rs}",
       "!**/node_modules/@brainstorm-os/native-image/target/**",
       "!**/node_modules/@brainstorm-os/native-image/{src,Cargo.toml,Cargo.lock,build.rs}",
+      "!**/node_modules/better-sqlite3{,-multiple-ciphers}/{deps,src,binding.gyp}",
       "!node_modules/@blockprotocol/**",
       "!node_modules/@phosphor-icons/**",
       "!node_modules/pdfjs-dist/**",
@@ -91,12 +92,16 @@
       }
     ],
     "asar": true,
+    "npmRebuild": false,
     "asarUnpack": [
       "**/*.node",
       "node_modules/better-sqlite3-multiple-ciphers/**",
       "node_modules/@napi-rs/**"
     ],
     "mac": {
+      "files": [
+        "!**/node_modules/better-sqlite3{,-multiple-ciphers}/prebuilds/{linux,linuxmusl,win32}-*.node"
+      ],
       "target": [
         {
           "target": "dmg",
@@ -127,6 +132,9 @@
       ]
     },
     "win": {
+      "files": [
+        "!**/node_modules/better-sqlite3{,-multiple-ciphers}/prebuilds/{linux,linuxmusl,darwin}-*.node"
+      ],
       "artifactName": "${productName}-Setup-${version}.${ext}",
       "target": [
         {
@@ -157,6 +165,9 @@
       }
     ],
     "linux": {
+      "files": [
+        "!**/node_modules/better-sqlite3{,-multiple-ciphers}/prebuilds/{darwin,win32}-*.node"
+      ],
       "artifactName": "${productName}-${version}-${arch}.${ext}",
       "target": [
         {
@@ -209,15 +220,15 @@
     "@react-fancy-menus/core": "0.2.1",
     "@tanstack/react-virtual": "^3.13.24",
     "@types/better-sqlite3": "^7.6.13",
-    "better-sqlite3": "^12.9.0",
-    "better-sqlite3-multiple-ciphers": "12.9.0",
+    "better-sqlite3": "^13.2.0",
+    "better-sqlite3-multiple-ciphers": "13.2.0",
     "bonjour-service": "1.4.4",
     "electron-updater": "^6.3.0",
     "framer-motion": "^12.38.0",
     "imapflow": "^1.4.6",
     "linkedom": "^0.18.12",
     "mailparser": "^3.9.14",
-    "nodemailer": "^9.0.1",
+    "nodemailer": "^10.6.1",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -229,7 +240,6 @@
     "yjs": "^13.6.30"
   },
   "devDependencies": {
-    "@electron/rebuild": "^4.0.4",
     "@noble/curves": "^2.2.0",
     "@types/imapflow": "^1.0.189",
     "@types/mailparser": "^3.4.6",
@@ -240,7 +250,7 @@
     "@types/sanitize-html": "^2.16.1",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^4.3.0",
-    "electron": "41",
+    "electron": "45",
     "electron-builder": "^26.0.0",
     "electron-vite": "^5.0.0",
     "vite": "^6.4.3"
