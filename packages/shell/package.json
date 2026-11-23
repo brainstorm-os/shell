@@ -217,7 +217,7 @@
     "imapflow": "^1.4.6",
     "linkedom": "^0.18.12",
     "mailparser": "^3.9.14",
-    "nodemailer": "^9.0.1",
+    "nodemailer": "^10.6.1",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
