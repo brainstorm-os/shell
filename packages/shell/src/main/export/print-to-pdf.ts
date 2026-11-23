@@ -120,7 +120,6 @@ async function renderOnce(bodyHtml: string): Promise<Uint8Array> {
 			return contents.printToPDF({
 				printBackground: true,
 				pageSize: "A4",
-				margins: { marginType: "default" },
 			});
 		})();
 		const pdf = await withTimeout(render, RENDER_TIMEOUT_MS, () => {
